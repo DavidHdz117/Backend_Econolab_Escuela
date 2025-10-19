@@ -98,39 +98,36 @@ export class UsersService {
   }
 
   async setRole(id: string, rol: Role) {
-    if (rol === Role.Admin) {
-      throw new UnauthorizedException('No se puede asignar rol admin por esta ruta');
-    }
 
     const user = await this.findOne(id);
     if (!user) throw new NotFoundException('Usuario no encontrado');
-    if (user.rol === Role.Admin) {
-      throw new UnauthorizedException('No se puede modificar un usuario admin');
-    }
-
+    if (!user.confirmed) throw new UnauthorizedException('El usuario no ha confirmado su cuenta');
     user.rol = rol;
     await this.userRepository.save(user);
     return { message: 'Rol actualizado', usuario: { id: user.id, rol } };
   }
 
   async findConfirmedUnassigned() {
-    return this.userRepository.find({
+    const users = await  this.userRepository.find({
       where: {
         confirmed: true,
         rol: Role.Unassigned, // enum o null, según tu columna
       },
       order: { createdAt: 'ASC' }, // opcional: ordena por fecha de alta
     });
+    if (users !== null) return users;
+    return { message: 'No hay usuarios sin rol' };
   }
 
   async findConfirmedWithRoles() {
-    return this.userRepository.find({
+    const users = await this.userRepository.find({
       where: [
-        { confirmed: true, rol: Role.Cotizador },
-        { confirmed: true, rol: Role.Comprador },
+        { confirmed: true, rol: Role.Recepcionista || Role.Admin },
       ],
       order: { createdAt: 'ASC' },
     });
+    if (users !== null) return users;
+    return { message: 'No hay usuarios con rol' };
   }
 
   /* ───────── Eliminar usuario (solo admin) ───────── */

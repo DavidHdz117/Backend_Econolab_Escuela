@@ -1,7 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 import { Role } from 'src/common/enums/roles.enum';
-import { Quote } from 'src/quotes/entities/quote.entity';
-import { PurchaseOrder } from 'src/orders/entities/purchase-order.entity';
 
 @Entity()
 export class User {
@@ -27,21 +25,9 @@ export class User {
   @Column({ type: 'enum', enum: Role, default: Role.Unassigned })
   rol: Role;
 
-  @Column({ type: 'varchar', name: 'google_id', nullable: true })
-  googleId: string;
-
-  @Column({ type: 'varchar', nullable: true })
-  avatar: string;
-
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
-
-  @OneToMany(() => Quote, (quote) => quote.user)
-  quotes!: Quote[];
-
-  @OneToMany(() => PurchaseOrder, (order) => order.user)
-  purchaseOrders!: PurchaseOrder[];
 }

@@ -103,7 +103,7 @@ export class AdminUsersController {
     return this.users.findConfirmedWithRoles();
   }
 
-  /** Asignar / cambiar rol (solo cotizador | comprador) */
+  /** Asignar / cambiar rol */
   @Patch(':id/role')
   @Roles(Role.Admin)
   updateRole(

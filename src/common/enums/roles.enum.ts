@@ -1,6 +1,5 @@
 export enum Role {
   Admin = 'admin',
-  Cotizador = 'cotizador',
-  Comprador = 'comprador',
+  Recepcionista = 'recepcionista',
   Unassigned = 'unassigned',
 }

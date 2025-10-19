@@ -18,11 +18,11 @@ export class MailService {
 
   async sendConfirmationEmail({ nombre, email, token }: EmailPayload) {
     await this.transporter.sendMail({
-      from: `50ta <${this.config.get('GMAIL_USER')}>`,
+      from: `Econolab Huejutla <${this.config.get('GMAIL_USER')}>`,
       to: email,
-      subject: '50ta – Confirma tu cuenta',
+      subject: 'Econolab Huejutla – Confirma tu cuenta',
       html: `
-        <p>Hola ${nombre}, has creado tu cuenta en 50ta, ya casi está lista.</p>
+        <p>Hola ${nombre}, has creado tu cuenta en Econolab Huejutla, ya casi está lista.</p>
         <p>Visita el siguiente enlace:</p>
         <a href="${this.config.get('FRONTEND_URL')}/auth/confirm-account">Confirmar cuenta</a>
         <p>e ingresa el código: <b>${token}</b></p>
@@ -32,9 +32,9 @@ export class MailService {
 
   async sendPasswordResetToken({ nombre, email, token }: EmailPayload) {
     await this.transporter.sendMail({
-      from: `50ta <${this.config.get('GMAIL_USER')}>`,
+      from: `Econolab Huejutla <${this.config.get('GMAIL_USER')}>`,
       to: email,
-      subject: '50ta – Restablece tu contraseña',
+      subject: 'Econolab Huejutla – Restablece tu contraseña',
       html: `
         <p>Hola ${nombre}, has solicitado restablecer tu contraseña.</p>
         <p>Visita el siguiente enlace:</p>

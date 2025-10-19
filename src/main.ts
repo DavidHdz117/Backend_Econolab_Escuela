@@ -11,6 +11,8 @@ async function bootstrap() {
     exceptionFactory: validationExceptionFactory
   }))
   app.useGlobalFilters(new HttpExceptionZodFilter)
+  app.setGlobalPrefix('api');
   await app.listen(process.env.PORT ?? 3000);
+  console.log(`🚀 Server running on port ${await app.getUrl()}`);
 }
 bootstrap();
