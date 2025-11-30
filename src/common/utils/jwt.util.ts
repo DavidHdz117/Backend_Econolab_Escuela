@@ -2,12 +2,15 @@ import * as jwt from 'jsonwebtoken';
 import { Secret } from 'jsonwebtoken';
 import { Role } from '../enums/roles.enum';
 
-/** Payload que grabaremos dentro del JWT */
+/** Payload que graba dentro del JWT */
 export interface AppJwtPayload extends jwt.JwtPayload {
-  sub: string;     // id del usuario
-  rol: Role;       // admin | cotizador | comprador | unassigned
+  sub: string;        // id del usuario
   email: string;
   nombre: string;
+  rol: Role;
+  jti?: string;       // id de la sesión
+  iat?: number;
+  exp?: number;
 }
 
 export function generateJWT(payload: AppJwtPayload): string {
@@ -15,7 +18,7 @@ export function generateJWT(payload: AppJwtPayload): string {
   if (!secret) throw new Error('Falta la variable de entorno JWT_SECRET');
 
   return jwt.sign(payload, secret as Secret, {
-    expiresIn: '30d',     // o el tiempo que prefieras
+    expiresIn: '15m',     // o el tiempo que prefieras
     algorithm: 'HS256',
   });
 }

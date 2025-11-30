@@ -1,8 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index, OneToMany } from 'typeorm';
 import { Role } from 'src/common/enums/roles.enum';
+import { UserSession } from 'src/auth/entities/user-session.entity';
 
 @Entity()
 export class User {
+  @OneToMany(() => UserSession, session => session.user)
+  sessions: UserSession[];
+
   @PrimaryGeneratedColumn()
   id: string;
 
@@ -24,6 +28,30 @@ export class User {
 
   @Column({ type: 'enum', enum: Role, default: Role.Unassigned })
   rol: Role;
+
+  @Column({ type: 'timestamp', nullable: true })
+  resetTokenExpiresAt: Date | null;
+
+  @Column({ type: 'int', default: 0 })
+  resetRequestCount: number;
+
+  @Column({ type: 'timestamp', nullable: true })
+  resetRequestWindowStart: Date | null;
+
+  @Column({ type: 'int', default: 0 })
+  failedLoginAttempts: number;
+
+  @Column({ type: 'timestamp', nullable: true })
+  lockUntil: Date | null;
+
+  @Column({ type: 'varchar', length: 6, nullable: true })
+  mfaCode: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  mfaCodeExpiresAt: Date | null;
+
+  @Column({ type: 'int', default: 0 })
+  mfaCodeAttempts: number;
 
   @CreateDateColumn()
   createdAt: Date;

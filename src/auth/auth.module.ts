@@ -1,18 +1,28 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { PassportModule } from '@nestjs/passport';
+import { ConfigModule } from '@nestjs/config';
+
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
-import { UsersModule } from 'src/users/users.module';
-import { ConfigModule } from '@nestjs/config';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { AuthEventsService } from './auth-events.service';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { GoogleStrategy } from './strategies/google.strategy';
+
+import { UsersModule } from 'src/users/users.module';
 import { UserLoginLog } from './entities/user-login-log.entity';
 import { User } from 'src/users/entities/user.entity';
+import { UserSession } from './entities/user-session.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([UserLoginLog,User]),UsersModule, ConfigModule, UsersModule],
+  imports: [
+    ConfigModule,
+    PassportModule, // o PassportModule.register({ defaultStrategy: 'jwt' }),
+    TypeOrmModule.forFeature([UserLoginLog, User, UserSession]),
+    UsersModule,
+  ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, AuthEventsService],
+  providers: [AuthService, JwtStrategy, AuthEventsService, GoogleStrategy],
   exports: [AuthService, AuthEventsService],
 })
 export class AuthModule {}

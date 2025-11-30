@@ -8,12 +8,34 @@ import { generateRandomToken } from 'src/common/utils/token.util';
 import { Role } from 'src/common/enums/roles.enum';
 import { MailService } from 'src/mail/mail.service';
 
+
+
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User) private readonly userRepository: Repository<User>,
     private readonly mailService: MailService
   ) { }
+
+  async registerFailedLogin(user: User) {
+    const MAX_ATTEMPTS = 3;
+    const LOCK_MINUTES = 15;
+    const now = new Date();
+
+    user.failedLoginAttempts = (user.failedLoginAttempts ?? 0) + 1;
+
+    if (user.failedLoginAttempts >= MAX_ATTEMPTS) {
+      user.lockUntil = new Date(now.getTime() + LOCK_MINUTES * 60 * 1000);
+    }
+
+    await this.userRepository.save(user);
+  }
+
+  async resetLoginAttempts(user: User) {
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
+    await this.userRepository.save(user);
+  }
 
   /* ───────── Registro ───────── */
   async register(dto: CreateUserDto) {
@@ -38,9 +60,44 @@ export class UsersService {
   /* ───────── Recuperar contraseña ───────── */
   async forgotPassword(email: string) {
     const user = await this.findByEmail(email);
-    if (!user) throw new NotFoundException('Usuario no encontrado');
 
-    user.token = generateRandomToken(6);
+    // Respuesta genérica SIEMPRE
+    const genericResponse = {
+      message: 'Si el correo existe, se enviará un enlace de recuperación',
+    };
+
+    // Si no existe, no decimos nada; opcional: delay para evitar timing attacks
+    if (!user) {
+      await new Promise((resolve) => setTimeout(resolve, 300)); // 300ms
+      return genericResponse;
+    }
+
+    const now = new Date();
+    const WINDOW_HOURS = 1;     // ventana de 1 hora
+    const MAX_REQUESTS = 3;     // máximo 3 correos por hora
+
+    // Reiniciar ventana si ya pasó la hora
+    if (
+      !user.resetRequestWindowStart ||
+      now.getTime() - user.resetRequestWindowStart.getTime() >
+      WINDOW_HOURS * 60 * 60 * 1000
+    ) {
+      user.resetRequestWindowStart = now;
+      user.resetRequestCount = 0;
+    }
+
+    // Si ya se pasó del límite, no mandamos más correos
+    if (user.resetRequestCount >= MAX_REQUESTS) {
+      return {
+        message:
+          'Ya se envió recientemente un correo de recuperación. Revisa tu bandeja o inténtalo más tarde.',
+      };
+    }
+
+    // Generar token "serio" y con expiración
+    user.token = generateRandomToken(32); // mejor que 6 dígitos
+    user.resetTokenExpiresAt = new Date(now.getTime() + 60 * 60 * 1000); // 1 hora
+    user.resetRequestCount++;
     await this.userRepository.save(user);
 
     await this.mailService.sendPasswordResetToken({
@@ -49,27 +106,44 @@ export class UsersService {
       token: user.token,
     });
 
-    return { message: 'Revisa tu email' };
+    return genericResponse;
   }
+
 
   /* ───────── Validar token de reset ───────── */
   async validateResetToken(token: string) {
-    const exists = await this.findByToken(token);
-    if (!exists) throw new NotFoundException('Token no válido');
-    return { message: 'Token válido...' }
+    const user = await this.findByToken(token);
+    const now = new Date();
+
+    if (!user || !user.resetTokenExpiresAt || user.resetTokenExpiresAt < now) {
+      throw new NotFoundException('Token no válido o expirado');
+    }
+
+    return { message: 'Token válido...' };
   }
+
 
   /* ───────── Reset con token ───────── */
   async resetPassword(token: string, newPass: string) {
     const user = await this.findByToken(token);
-    if (!user) throw new NotFoundException('Token no válido');
+    const now = new Date();
+
+    if (!user || !user.resetTokenExpiresAt || user.resetTokenExpiresAt < now) {
+      throw new NotFoundException('Token no válido o expirado');
+    }
 
     user.password = await hashPassword(newPass);
     user.token = null;
+    user.resetTokenExpiresAt = null;
+    // Podrías resetear también contador de solicitudes si quieres:
+    user.resetRequestCount = 0;
+    user.resetRequestWindowStart = null;
+
     await this.userRepository.save(user);
 
     return { message: 'La contraseña se modificó correctamente' };
   }
+
 
   /* ───────── Cambiar contraseña autenticado ───────── */
   async updatePassword(userId: string, currentPass: string, newPass: string) {
@@ -108,7 +182,7 @@ export class UsersService {
   }
 
   async findConfirmedUnassigned() {
-    const users = await  this.userRepository.find({
+    const users = await this.userRepository.find({
       where: {
         confirmed: true,
         rol: Role.Unassigned, // enum o null, según tu columna

@@ -1,15 +1,20 @@
+// auth/strategies/jwt.strategy.ts
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
-import { UsersService } from 'src/users/users.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+
 import { AppJwtPayload } from 'src/common/utils/jwt.util';
+import { UserSession } from '../entities/user-session.entity';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
-    private readonly usersService: UsersService,   // ← volvemos a inyectar
     cfg: ConfigService,
+    @InjectRepository(UserSession)
+    private readonly sessionsRepo: Repository<UserSession>,
   ) {
     const secret = cfg.get<string>('JWT_SECRET');
     if (!secret) throw new Error('Falta JWT_SECRET en variables de entorno');
@@ -17,25 +22,44 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       secretOrKey: secret,
-      algorithms: ['HS256'],
+      ignoreExpiration: false, // respeta exp del JWT
     });
   }
 
   async validate(payload: AppJwtPayload) {
-    // 1. obtenemos el rol real desde la BD (select ligero)
-    const dbRol = await this.usersService.getRoleOnly(payload.sub);
-    if (!dbRol) {
-      throw new UnauthorizedException('Usuario no encontrado');
+    // 1) jti obligatorio
+    if (!payload.jti) {
+      throw new UnauthorizedException('Token sin id de sesión');
     }
 
-    // 2. si cambió el rol, invalida el token
-    if (dbRol !== payload.rol) {
-      throw new UnauthorizedException(
-        'Roles desactualizados – vuelve a iniciar sesión',
-      );
+    // 2) buscar sesión
+    const session = await this.sessionsRepo.findOne({
+      where: { id: payload.jti },
+      relations: ['user'],
+    });
+
+    if (!session) {
+      throw new UnauthorizedException('Sesión no encontrada');
     }
 
-    // 3. todo OK → req.user = payload
-    return payload;
+    // 3) revocada
+    if (session.revoked) {
+      throw new UnauthorizedException('Sesión revocada');
+    }
+
+    // 4) expirada en BD (además de exp del JWT)
+    if (session.expiresAt < new Date()) {
+      throw new UnauthorizedException('Sesión expirada');
+    }
+
+    const { user } = session;
+
+    // Lo que se inyecta en req.user
+    return {
+      id: user.id,
+      email: user.email,
+      rol: user.rol,
+      jti: session.id,
+    };
   }
 }
