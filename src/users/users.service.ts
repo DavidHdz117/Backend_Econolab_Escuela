@@ -278,4 +278,42 @@ export class UsersService {
     });
   }
 
+  async registerFromGoogleAsAdmin(data: {
+    nombre: string;
+    email: string;
+    googleId: string;
+  }) {
+    const randomPass = await hashPassword(
+      `google-${data.email}-${Date.now()}`
+    );
+
+    const user = this.userRepository.create({
+      nombre: data.nombre,
+      email: data.email,
+      password: randomPass,
+      confirmed: true,
+      rol: Role.Admin,        // 👈 ADMIN directo (SOLO pruebas)
+      // si tu entidad tiene estos campos, puedes guardarlos:
+      // googleId: data.googleId,
+      // provider: 'google',
+    });
+
+    return this.userRepository.save(user);
+  }
+
+  /** Marcar usuario como confirmado (si viene de Google) */
+  async confirmFromGoogle(user: User) {
+    user.confirmed = true;
+    user.token = null;         // si usas token de confirmación
+    return this.userRepository.save(user);
+  }
+
+  /** ⚠️ SOLO PRUEBAS: promover a admin si sigue unassigned */
+  async promoteUnassignedToAdminForTesting(user: User) {
+    if (user.rol === Role.Unassigned) {
+      user.rol = Role.Admin;
+      return this.userRepository.save(user);
+    }
+    return user;
+  }
 }
