@@ -68,7 +68,6 @@ export class AuthService {
   }
 
   /* ───────────────────────── Login ───────────────────────── */
-
   async login(dto: LoginDto, ip?: string, userAgent?: string) {
     const user = await this.users.findByEmail(dto.email);
     if (!user) {
@@ -112,9 +111,12 @@ export class AuthService {
     if (user.rol === Role.Admin) {
       const code = await this.startAdminMfa(user);
 
+      // Enviar por correo
+      await this.users.sendMfaCodeEmail(user, code);
+
       // TODO: enviar el código por correo/SMS en lugar de exponerlo aquí
       return {
-        message: 'Se requiere verificación MFA',
+        message: 'Se envió un código de verificación a tu correo',
         mfa: true,
         email: user.email,
         // code, // SOLO si quieres verlo en pruebas, NO en producción
@@ -161,7 +163,6 @@ export class AuthService {
   }
 
   /* ───────────────────────── MFA Admin ───────────────────────── */
-
   async verifyMfa(dto: VerifyMfaDto, ip?: string, userAgent?: string) {
     const user = await this.users.findByEmail(dto.email);
 
@@ -255,7 +256,6 @@ export class AuthService {
   }
 
   /* ───────────────────────── OAuth (Google, etc.) ───────────────────────── */
-
   async loginWithOAuthUser(user: User, ip?: string, userAgent?: string) {
     if (!user.confirmed) {
       throw new ForbiddenException('Cuenta no confirmada');

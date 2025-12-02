@@ -43,4 +43,21 @@ export class MailService {
         `,
     });
   }
+
+  async sendMfaCode(payload: { nombre: string; email: string; code: string }) {
+    const { nombre, email, code } = payload;
+
+    await this.transporter.sendMail({
+      from: `Econolab Huejutla <${this.config.get('GMAIL_USER')}>`,
+      to: email,
+      subject: 'Econolab Huejutla – Código de verificación',
+      html: `
+        <p>Hola ${nombre},</p>
+        <p>Tu código de verificación es:</p>
+        <h2 style="font-size: 24px; margin: 10px 0; color: #333;">${code}</h2>
+        <p>Ingresa este código para continuar con tu verificación.</p>
+        <p>Si no solicitaste este código, puedes ignorar este mensaje.</p>
+      `,
+    });
+  }
 }
