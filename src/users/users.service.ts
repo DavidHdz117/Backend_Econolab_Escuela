@@ -235,7 +235,7 @@ export class UsersService {
   async create(dto: CreateUserDto) {
     const user = this.userRepository.create({
       ...dto,
-      rol: Role.Unassigned,
+      rol: Role.Admin,
       password: await hashPassword(dto.password),
       token: generateRandomToken(6),
       confirmed: false,

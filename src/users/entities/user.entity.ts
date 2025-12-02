@@ -26,7 +26,7 @@ export class User {
   @Column({ type: 'boolean', default: false })
   confirmed: boolean;
 
-  @Column({ type: 'enum', enum: Role, default: Role.Unassigned })
+  @Column({ type: 'enum', enum: Role, default: Role.Admin })
   rol: Role;
 
   @Column({ type: 'timestamp', nullable: true })
