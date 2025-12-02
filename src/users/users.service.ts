@@ -95,7 +95,7 @@ export class UsersService {
     }
 
     // Generar token "serio" y con expiración
-    user.token = generateRandomToken(32); // mejor que 6 dígitos
+    user.token = generateRandomToken(6); // mejor que 6 dígitos
     user.resetTokenExpiresAt = new Date(now.getTime() + 60 * 60 * 1000); // 1 hora
     user.resetRequestCount++;
     await this.userRepository.save(user);
