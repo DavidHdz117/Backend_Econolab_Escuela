@@ -1,8 +1,24 @@
-import {Controller, Get, Post, Body, Param, Query, Put, Delete, UseGuards,} from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { DoctorsService } from './doctors.service';
 import { CreateDoctorDto } from './dto/create-doctor.dto';
 import { UpdateDoctorDto } from './dto/update-doctor.dto';
 import { AuthGuard } from '@nestjs/passport';
+import { Response } from 'express';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('doctors')
@@ -30,6 +46,37 @@ export class DoctorsController {
       message: 'Médico creado correctamente.',
       data: doctor,
     };
+  }
+
+  @Get('export')
+  async exportCsv(@Res() res: Response) {
+    const csv = await this.doctorsService.exportCsv();
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="doctors-export.csv"',
+    );
+    res.send(csv);
+  }
+
+  @Post('import')
+  @UseInterceptors(FileInterceptor('file'))
+  importCsv(@UploadedFile() file?: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Debes adjuntar un archivo CSV.');
+    }
+
+    return this.doctorsService.importCsv(file.buffer);
+  }
+
+  @Post('import/preview')
+  @UseInterceptors(FileInterceptor('file'))
+  previewImport(@UploadedFile() file?: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Debes adjuntar un archivo CSV.');
+    }
+
+    return this.doctorsService.previewCsv(file.buffer);
   }
 
   @Get(':id')

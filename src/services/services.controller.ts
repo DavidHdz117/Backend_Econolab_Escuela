@@ -1,4 +1,15 @@
-import {Controller, Get, Post, Body, Param, Query, Put, Delete, UseGuards, Res,} from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ServicesService } from './services.service';
 import { CreateServiceDto } from './dto/create-service.dto';
@@ -38,6 +49,17 @@ export class ServicesController {
       page: Number(page),
       limit: Number(limit),
     });
+  }
+
+  @Get('export')
+  async exportCsv(@Res() res: Response) {
+    const csv = await this.servicesService.exportCsv();
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="services-export.csv"',
+    );
+    res.send(csv);
   }
 
   @Get(':id')

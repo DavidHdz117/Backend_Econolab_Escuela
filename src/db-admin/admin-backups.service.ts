@@ -10,8 +10,8 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 
 const execFileAsync = promisify(execFile);
-const BACKUP_FILE_REGEX = /^backup-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.sql$/;
-const TABLE_BACKUP_FILE_REGEX = /^table-backup-[a-zA-Z0-9_]+-[a-zA-Z0-9_]+-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.sql$/;
+const BACKUP_FILE_REGEX = /^backup-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.tar$/;
+const TABLE_BACKUP_FILE_REGEX = /^table-backup-[a-zA-Z0-9_]+-[a-zA-Z0-9_]+-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.tar$/;
 
 export interface BackupFileInfo {
   name: string;
@@ -19,30 +19,49 @@ export interface BackupFileInfo {
   createdAt: string;
 }
 
+export type BackupJobType = 'database' | 'table';
+export type BackupJobStatus = 'queued' | 'running' | 'completed' | 'failed';
+
+export interface BackupJobInfo {
+  id: string;
+  type: BackupJobType;
+  status: BackupJobStatus;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  fileName: string | null;
+  tableName: string | null;
+  error: string | null;
+}
+
 @Injectable()
 export class AdminBackupsService {
   private readonly backupsDir = resolve(process.cwd(), 'backups');
   private readonly tableBackupsDir = resolve(process.cwd(), 'table-backups');
+  private readonly jobs = new Map<string, BackupJobInfo>();
+  private backupQueue: Promise<void> = Promise.resolve();
 
   async createBackup() {
     await this.ensureBackupsDir();
+    const job = this.createJob('database', null);
 
-    const fileName = this.buildBackupFileName();
-    const filePath = join(this.backupsDir, fileName);
+    this.enqueueBackupWork(async () => {
+      try {
+        const fileName = this.buildBackupFileName();
+        const filePath = join(this.backupsDir, fileName);
 
-    await this.runPgDump(filePath);
-    const deletedByRetention = await this.applyRetentionPolicy(
-      this.backupsDir,
-      BACKUP_FILE_REGEX,
-    );
-    const stat = await fs.stat(filePath);
+        this.markJobRunning(job.id);
+        await this.runPgDump(filePath);
+        await this.applyRetentionPolicy(this.backupsDir, BACKUP_FILE_REGEX);
+        this.markJobCompleted(job.id, fileName);
+      } catch (error) {
+        this.markJobFailed(job.id, error);
+      }
+    });
 
     return {
-      message: 'Backup generado correctamente.',
-      fileName,
-      size: stat.size,
-      createdAt: (stat.birthtime ?? stat.ctime).toISOString(),
-      deletedByRetention,
+      message: 'Backup agregado a la cola y ejecutandose en segundo plano.',
+      job,
     };
   }
 
@@ -54,24 +73,30 @@ export class AdminBackupsService {
   async createTableBackup(tableName: string) {
     const table = this.parseTableRef(tableName);
     await this.ensureTableBackupsDir();
+    const qualifiedTable = `${table.schema}.${table.table}`;
+    const job = this.createJob('table', qualifiedTable);
 
-    const fileName = this.buildTableBackupFileName(table.schema, table.table);
-    const filePath = join(this.tableBackupsDir, fileName);
+    this.enqueueBackupWork(async () => {
+      try {
+        const fileName = this.buildTableBackupFileName(table.schema, table.table);
+        const filePath = join(this.tableBackupsDir, fileName);
 
-    await this.runPgDump(filePath, `${table.schema}.${table.table}`);
-    const deletedByRetention = await this.applyRetentionPolicy(
-      this.tableBackupsDir,
-      TABLE_BACKUP_FILE_REGEX,
-    );
-    const stat = await fs.stat(filePath);
+        this.markJobRunning(job.id);
+        await this.runPgDump(filePath, qualifiedTable);
+        await this.applyRetentionPolicy(
+          this.tableBackupsDir,
+          TABLE_BACKUP_FILE_REGEX,
+        );
+        this.markJobCompleted(job.id, fileName);
+      } catch (error) {
+        this.markJobFailed(job.id, error);
+      }
+    });
 
     return {
-      message: 'Backup de tabla generado correctamente.',
-      fileName,
-      table: `${table.schema}.${table.table}`,
-      size: stat.size,
-      createdAt: (stat.birthtime ?? stat.ctime).toISOString(),
-      deletedByRetention,
+      message:
+        'Backup de tabla agregado a la cola y ejecutandose en segundo plano.',
+      job,
     };
   }
 
@@ -94,12 +119,18 @@ export class AdminBackupsService {
       throw new NotFoundException('El backup seleccionado no existe.');
     }
 
-    await this.runPsqlRestore(filePath);
+    await this.runPgRestore(filePath);
 
     return {
       message: 'Restauracion ejecutada correctamente.',
       fileName,
     };
+  }
+
+  listJobs(): BackupJobInfo[] {
+    return Array.from(this.jobs.values()).sort((a, b) =>
+      a.createdAt < b.createdAt ? 1 : -1,
+    );
   }
 
   private async ensureBackupsDir() {
@@ -110,29 +141,99 @@ export class AdminBackupsService {
     await fs.mkdir(this.tableBackupsDir, { recursive: true });
   }
 
+  private createJob(type: BackupJobType, tableName: string | null) {
+    const now = new Date().toISOString();
+    const job: BackupJobInfo = {
+      id: this.buildJobId(),
+      type,
+      status: 'queued',
+      createdAt: now,
+      startedAt: null,
+      finishedAt: null,
+      fileName: null,
+      tableName,
+      error: null,
+    };
+
+    this.jobs.set(job.id, job);
+    this.trimJobs();
+    return job;
+  }
+
+  private buildJobId() {
+    return `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  private enqueueBackupWork(task: () => Promise<void>) {
+    this.backupQueue = this.backupQueue.then(task, task);
+  }
+
+  private markJobRunning(jobId: string) {
+    const job = this.jobs.get(jobId);
+    if (!job) {
+      return;
+    }
+
+    job.status = 'running';
+    job.startedAt = new Date().toISOString();
+    job.finishedAt = null;
+    job.error = null;
+  }
+
+  private markJobCompleted(jobId: string, fileName: string) {
+    const job = this.jobs.get(jobId);
+    if (!job) {
+      return;
+    }
+
+    job.status = 'completed';
+    job.fileName = fileName;
+    job.finishedAt = new Date().toISOString();
+  }
+
+  private markJobFailed(jobId: string, error: unknown) {
+    const job = this.jobs.get(jobId);
+    if (!job) {
+      return;
+    }
+
+    job.status = 'failed';
+    job.finishedAt = new Date().toISOString();
+    job.error =
+      error instanceof Error ? error.message : 'Error desconocido al generar backup.';
+  }
+
+  private trimJobs() {
+    const jobs = Array.from(this.jobs.values()).sort((a, b) =>
+      a.createdAt < b.createdAt ? 1 : -1,
+    );
+
+    for (const job of jobs.slice(25)) {
+      this.jobs.delete(job.id);
+    }
+  }
+
   private buildBackupFileName() {
     const now = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
     const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
-    return `backup-${stamp}.sql`;
+    return `backup-${stamp}.tar`;
   }
 
   private buildTableBackupFileName(schema: string, table: string) {
     const now = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
     const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
-    return `table-backup-${schema}-${table}-${stamp}.sql`;
+    return `table-backup-${schema}-${table}-${stamp}.tar`;
   }
 
   private async runPgDump(filePath: string, table?: string) {
     const databaseUrl = this.resolveDatabaseUrl();
     const args = [
       `--dbname=${databaseUrl}`,
-      '--format=plain',
+      '--format=tar',
       '--no-owner',
       '--no-privileges',
-      '--clean',
-      '--if-exists',
       `--file=${filePath}`,
     ];
 
@@ -158,23 +259,30 @@ export class AdminBackupsService {
     }
   }
 
-  private async runPsqlRestore(filePath: string) {
+  private async runPgRestore(filePath: string) {
     const databaseUrl = this.resolveDatabaseUrl();
 
     try {
       await execFileAsync(
-        'psql',
-        [`--dbname=${databaseUrl}`, `--file=${filePath}`],
+        'pg_restore',
+        [
+          `--dbname=${databaseUrl}`,
+          '--clean',
+          '--if-exists',
+          '--no-owner',
+          '--no-privileges',
+          filePath,
+        ],
         { windowsHide: true },
       );
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
-          : 'Error desconocido al ejecutar psql.';
+          : 'Error desconocido al ejecutar pg_restore.';
       if (this.isCommandNotFoundError(error)) {
         throw new InternalServerErrorException(
-          'No se encontro psql en el PATH. Instala PostgreSQL client tools.',
+          'No se encontro pg_restore en el PATH. Instala PostgreSQL client tools.',
         );
       }
       throw new InternalServerErrorException(
@@ -266,7 +374,7 @@ export class AdminBackupsService {
     const files = entries.filter(
       (entry) =>
         entry.isFile() &&
-        entry.name.endsWith('.sql') &&
+        entry.name.endsWith('.tar') &&
         namePattern.test(entry.name),
     );
 

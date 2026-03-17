@@ -11,6 +11,7 @@ import { Study } from '../studies/entities/study.entity';
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import * as bwipjs from 'bwip-js';
+import { toCsv } from 'src/common/utils/csv.util';
 
 @Injectable()
 export class ServicesService {
@@ -694,5 +695,60 @@ export class ServicesService {
   async generateTubeLabelsPdf(id: number) {
     const service = await this.findOne(id);
     return this.buildLabelsPdfBuffer(service);
+  }
+
+  async exportCsv() {
+    const services = await this.serviceRepo.find({
+      where: { isActive: true },
+      order: { createdAt: 'DESC' },
+    });
+
+    return toCsv(
+      [
+        'folio',
+        'patientId',
+        'patientName',
+        'doctorId',
+        'doctorName',
+        'branchName',
+        'sampleAt',
+        'deliveryAt',
+        'status',
+        'courtesyPercent',
+        'subtotalAmount',
+        'discountAmount',
+        'totalAmount',
+        'notes',
+        'items',
+        'createdAt',
+      ],
+      services.map((service) => [
+        service.folio,
+        service.patientId,
+        service.patient
+          ? `${service.patient.firstName} ${service.patient.lastName} ${service.patient.middleName ?? ''}`.trim()
+          : '',
+        service.doctorId ?? '',
+        service.doctor
+          ? `${service.doctor.firstName} ${service.doctor.lastName} ${service.doctor.middleName ?? ''}`.trim()
+          : '',
+        service.branchName,
+        service.sampleAt?.toISOString() ?? '',
+        service.deliveryAt?.toISOString() ?? '',
+        service.status,
+        service.courtesyPercent,
+        service.subtotalAmount,
+        service.discountAmount,
+        service.totalAmount,
+        service.notes,
+        (service.items ?? [])
+          .map(
+            (item) =>
+              `${item.studyId}:${item.studyNameSnapshot}:${item.quantity}:${item.priceType}:${item.unitPrice}:${item.discountPercent}:${item.subtotalAmount}`,
+          )
+          .join(' | '),
+        service.createdAt?.toISOString() ?? '',
+      ]),
+    );
   }
 }

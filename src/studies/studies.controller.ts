@@ -1,4 +1,18 @@
-import {Controller, Get, Post, Body, Param, Query, Put, Delete, UseGuards,} from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { StudiesService } from './studies.service';
 import { CreateStudyDto } from './dto/create-study.dto';
@@ -6,6 +20,8 @@ import { UpdateStudyDto } from './dto/update-study.dto';
 import { CreateStudyDetailDto } from './dto/create-study-detail.dto';
 import { UpdateStudyDetailDto } from './dto/update-study-detail.dto';
 import { StudyStatus, StudyType } from './entities/study.entity';
+import { Response } from 'express';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('studies')
@@ -35,6 +51,37 @@ export class StudiesController {
       message: 'Estudio creado correctamente.',
       data: study,
     };
+  }
+
+  @Get('export')
+  async exportCsv(@Res() res: Response) {
+    const csv = await this.studiesService.exportCsv();
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="studies-export.csv"',
+    );
+    res.send(csv);
+  }
+
+  @Post('import')
+  @UseInterceptors(FileInterceptor('file'))
+  importCsv(@UploadedFile() file?: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Debes adjuntar un archivo CSV.');
+    }
+
+    return this.studiesService.importCsv(file.buffer);
+  }
+
+  @Post('import/preview')
+  @UseInterceptors(FileInterceptor('file'))
+  previewImport(@UploadedFile() file?: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Debes adjuntar un archivo CSV.');
+    }
+
+    return this.studiesService.previewCsv(file.buffer);
   }
 
   @Get(':id')

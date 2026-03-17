@@ -27,6 +27,11 @@ export class AdminBackupsController {
     return this.backupsService.listBackups();
   }
 
+  @Get('jobs')
+  listJobs() {
+    return this.backupsService.listJobs();
+  }
+
   @Get('table')
   listTableBackups() {
     return this.backupsService.listTableBackups();
