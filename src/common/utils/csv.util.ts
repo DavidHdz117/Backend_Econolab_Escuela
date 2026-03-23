@@ -1,12 +1,13 @@
 export function parseCsv(content: string): string[][] {
+  const normalizedContent = content.replace(/^\uFEFF/, '');
   const rows: string[][] = [];
   let currentRow: string[] = [];
   let currentValue = '';
   let inQuotes = false;
 
-  for (let i = 0; i < content.length; i += 1) {
-    const char = content[i];
-    const next = content[i + 1];
+  for (let i = 0; i < normalizedContent.length; i += 1) {
+    const char = normalizedContent[i];
+    const next = normalizedContent[i + 1];
 
     if (char === '"') {
       if (inQuotes && next === '"') {
