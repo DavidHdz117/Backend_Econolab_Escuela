@@ -10,6 +10,10 @@ import { CreateLossHistoryDto } from './dto/create-loss-history.dto';
 import { PredictLossDto } from './dto/predict-loss.dto';
 import { QueryLossHistoryDto } from './dto/query-loss-history.dto';
 import { LossHistory } from './entities/loss-history.entity';
+import {
+  buildExponentialLossModel,
+  predictExponentialLoss,
+} from './utils/exponential-loss-prediction.util';
 
 type LossRecordResponse = {
   id: number;
@@ -38,6 +42,19 @@ type LossChartPoint = {
   isForecast: boolean;
 };
 
+type LogisticsSuggestion = {
+  level: 'high' | 'medium' | 'low' | 'unavailable';
+  title: string;
+  message: string;
+  recommendedAction: string | null;
+};
+
+type SeedTemplate = {
+  supplyName: string;
+  baseLoss: number;
+  growthRate: number;
+};
+
 @Injectable()
 export class LossPredictionsService {
   constructor(
@@ -64,6 +81,94 @@ export class LossPredictionsService {
         code: study.code,
         type: study.type,
       })),
+    };
+  }
+
+  async seedSampleHistory() {
+    const studies = await this.studyRepo.find({
+      where: {
+        isActive: true,
+        status: StudyStatus.ACTIVE,
+        type: In([StudyType.STUDY, StudyType.PACKAGE]),
+      },
+      order: { id: 'ASC' },
+      take: 4,
+    });
+
+    if (studies.length === 0) {
+      throw new NotFoundException(
+        'No hay servicios o paquetes activos para generar historial de perdidas.',
+      );
+    }
+
+    const templates: SeedTemplate[] = [
+      { supplyName: 'Guantes de nitrilo', baseLoss: 4.8, growthRate: 0.061 },
+      { supplyName: 'Tubo vacutainer', baseLoss: 3.2, growthRate: 0.054 },
+      { supplyName: 'Reactivo de control', baseLoss: 2.4, growthRate: 0.048 },
+    ];
+
+    const startMonth = new Date(Date.UTC(2025, 6, 1));
+    const periods = 8;
+    const entities: LossHistory[] = [];
+    let skipped = 0;
+
+    for (const study of studies) {
+      for (const template of templates) {
+        for (let period = 0; period < periods; period += 1) {
+          const occurredAt = this.addMonths(startMonth, period);
+          const existing = await this.lossHistoryRepo.findOne({
+            where: {
+              studyId: study.id,
+              supplyName: template.supplyName,
+              occurredAt,
+            },
+          });
+
+          if (existing) {
+            skipped += 1;
+            continue;
+          }
+
+          const quantityLoss = this.roundValue(
+            template.baseLoss * Math.exp(template.growthRate * period),
+          );
+
+          entities.push(
+            this.lossHistoryRepo.create({
+              occurredAt,
+              studyId: study.id,
+              studyNameSnapshot: study.name,
+              studyTypeSnapshot: study.type,
+              supplyName: template.supplyName,
+              quantityLoss,
+              notes: `Registro de referencia ${study.code}-${template.supplyName}-${period + 1}`,
+            }),
+          );
+        }
+      }
+    }
+
+    if (entities.length > 0) {
+      await this.lossHistoryRepo.save(entities);
+    }
+
+    return {
+      message:
+        entities.length > 0
+          ? 'Historico de perdidas cargado correctamente.'
+          : 'No se insertaron registros nuevos porque el historico ya existia.',
+      data: {
+        studiesUsed: studies.map((study) => ({
+          id: study.id,
+          name: study.name,
+          code: study.code,
+          type: study.type,
+        })),
+        templatesUsed: templates.map((template) => template.supplyName),
+        periodsGenerated: periods,
+        inserted: entities.length,
+        skipped,
+      },
     };
   }
 
@@ -176,11 +281,15 @@ export class LossPredictionsService {
         model: {
           hasEnoughData: false,
           reason:
-            'Se requieren al menos 2 meses con perdidas registradas para calcular la prediccion.',
+            'Se requieren al menos 2 periodos con perdidas registradas para calcular la prediccion.',
           p0: monthlyHistory[0]?.quantityLoss ?? null,
+          y0: monthlyHistory[0]?.quantityLoss ?? null,
           r: null,
+          k: null,
           dataPointsUsed: monthlyHistory.length,
           monthsAhead,
+          basePoint: null,
+          comparisonPoint: null,
         },
         summary: {
           totalHistoricalLoss,
@@ -194,40 +303,35 @@ export class LossPredictionsService {
               : null,
           monthsWithHistory: monthlyHistory.length,
           recordsCount: mappedRecords.length,
+          nextMonthPrediction: null,
+          nextMonthLabel: null,
+        },
+        logisticsSuggestion: {
+          level: 'unavailable',
+          title: 'Sin recomendacion disponible',
+          message:
+            'Necesitas al menos dos periodos historicos para estimar la perdida del siguiente mes.',
+          recommendedAction: null,
         },
       };
     }
 
     const firstPoint = monthlyHistory[0];
-    const p0 = firstPoint.quantityLoss;
+    const normalizedHistory = monthlyHistory.map((point) => ({
+      period: this.diffInMonths(firstPoint.monthDate, point.monthDate),
+      quantityLoss: point.quantityLoss,
+      label: point.monthKey,
+      date: point.monthDate.toISOString(),
+    }));
 
-    if (p0 <= 0) {
-      throw new BadRequestException(
-        'La primera perdida registrada debe ser mayor a cero para aplicar el modelo exponencial.',
-      );
-    }
-
-    let numerator = 0;
-    let denominator = 0;
-
-    for (const point of monthlyHistory.slice(1)) {
-      if (point.quantityLoss <= 0) {
-        throw new BadRequestException(
-          'Todas las perdidas historicas deben ser mayores a cero para calcular la prediccion exponencial.',
-        );
+    let model;
+    try {
+      model = buildExponentialLossModel(normalizedHistory);
+    } catch (error) {
+      if (!(error instanceof BadRequestException)) {
+        throw error;
       }
 
-      const monthOffset = this.diffInMonths(firstPoint.monthDate, point.monthDate);
-      if (monthOffset <= 0) {
-        continue;
-      }
-
-      const transformed = Math.log(point.quantityLoss / p0);
-      numerator += monthOffset * transformed;
-      denominator += monthOffset * monthOffset;
-    }
-
-    if (denominator === 0) {
       return {
         filters: {
           studyId: study.id,
@@ -249,11 +353,16 @@ export class LossPredictionsService {
         model: {
           hasEnoughData: false,
           reason:
-            'No hay suficiente variacion temporal entre los datos historicos para calcular la tasa.',
-          p0,
+            error.message ||
+            'No fue posible calcular la tasa exponencial con los datos historicos.',
+          p0: firstPoint.quantityLoss,
+          y0: firstPoint.quantityLoss,
           r: null,
+          k: null,
           dataPointsUsed: monthlyHistory.length,
           monthsAhead,
+          basePoint: null,
+          comparisonPoint: null,
         },
         summary: {
           totalHistoricalLoss,
@@ -264,19 +373,30 @@ export class LossPredictionsService {
             monthlyHistory[monthlyHistory.length - 1]?.quantityLoss ?? null,
           monthsWithHistory: monthlyHistory.length,
           recordsCount: mappedRecords.length,
+          nextMonthPrediction: null,
+          nextMonthLabel: null,
+        },
+        logisticsSuggestion: {
+          level: 'unavailable',
+          title: 'Sin recomendacion disponible',
+          message:
+            'No fue posible calcular una recomendacion porque la tasa exponencial no es valida con el historico actual.',
+          recommendedAction: null,
         },
       };
     }
 
-    const r = numerator / denominator;
+    const p0 = model.y0;
+    const r = model.k;
     const lastHistoricalPoint = monthlyHistory[monthlyHistory.length - 1];
     const totalHistoricalMonths = this.diffInMonths(
       firstPoint.monthDate,
       lastHistoricalPoint.monthDate,
     );
     const chartSeries: LossChartPoint[] = [];
+    const nextForecastOffset = totalHistoricalMonths + 1;
 
-    for (let offset = 0; offset <= totalHistoricalMonths + monthsAhead; offset += 1) {
+    for (let offset = 0; offset <= totalHistoricalMonths; offset += 1) {
       const currentMonth = this.addMonths(firstPoint.monthDate, offset);
       const monthKey = this.formatMonthKey(currentMonth);
       const historicalPoint = monthlyHistory.find(
@@ -287,10 +407,33 @@ export class LossPredictionsService {
         monthKey,
         date: currentMonth.toISOString(),
         historicalLoss: historicalPoint?.quantityLoss ?? null,
-        predictedLoss: this.roundValue(p0 * Math.exp(r * offset)),
-        isForecast: offset > totalHistoricalMonths,
+        predictedLoss: this.roundValue(
+          predictExponentialLoss(model, offset),
+        ),
+        isForecast: false,
       });
     }
+
+    const nextForecastMonth = this.addMonths(firstPoint.monthDate, nextForecastOffset);
+    const nextMonthPrediction = this.roundValue(
+      predictExponentialLoss(model, nextForecastOffset),
+    );
+    chartSeries.push({
+      monthKey: this.formatMonthKey(nextForecastMonth),
+      date: nextForecastMonth.toISOString(),
+      historicalLoss: null,
+      predictedLoss: nextMonthPrediction,
+      isForecast: true,
+    });
+
+    const logisticsSuggestion = this.buildLogisticsSuggestion({
+      nextMonthPrediction,
+      lastRecordedLoss: lastHistoricalPoint.quantityLoss,
+      averageMonthlyLoss: this.roundValue(
+        totalHistoricalLoss / monthlyHistory.length,
+      ),
+      supplyName,
+    });
 
     return {
       filters: {
@@ -308,9 +451,19 @@ export class LossPredictionsService {
         hasEnoughData: true,
         reason: null,
         p0: this.roundValue(p0),
+        y0: this.roundValue(p0),
         r: Number(r.toFixed(6)),
+        k: Number(r.toFixed(6)),
         dataPointsUsed: monthlyHistory.length,
         monthsAhead,
+        basePoint: {
+          ...model.basePoint,
+          quantityLoss: this.roundValue(model.basePoint.quantityLoss),
+        },
+        comparisonPoint: {
+          ...model.comparisonPoint,
+          quantityLoss: this.roundValue(model.comparisonPoint.quantityLoss),
+        },
       },
       summary: {
         totalHistoricalLoss,
@@ -320,7 +473,10 @@ export class LossPredictionsService {
         lastRecordedLoss: lastHistoricalPoint.quantityLoss,
         monthsWithHistory: monthlyHistory.length,
         recordsCount: mappedRecords.length,
+        nextMonthPrediction,
+        nextMonthLabel: this.formatMonthKey(nextForecastMonth),
       },
+      logisticsSuggestion,
     };
   }
 
@@ -466,5 +622,53 @@ export class LossPredictionsService {
 
   private roundValue(value: number) {
     return Number(value.toFixed(4));
+  }
+
+  private buildLogisticsSuggestion(input: {
+    nextMonthPrediction: number;
+    lastRecordedLoss: number;
+    averageMonthlyLoss: number;
+    supplyName: string;
+  }): LogisticsSuggestion {
+    const { nextMonthPrediction, lastRecordedLoss, averageMonthlyLoss, supplyName } =
+      input;
+
+    if (nextMonthPrediction >= averageMonthlyLoss * 1.2) {
+      return {
+        level: 'high',
+        title: 'Incrementa el stock preventivo',
+        message: `La perdida estimada de ${supplyName} para el siguiente mes supera claramente el promedio reciente. Conviene reforzar existencias y revisar consumo operativo antes de que falte inventario.`,
+        recommendedAction:
+          'Compra mas inventario de seguridad y programa una reposicion anticipada.',
+      };
+    }
+
+    if (nextMonthPrediction <= averageMonthlyLoss * 0.85) {
+      return {
+        level: 'low',
+        title: 'Reduce compras y rota inventario actual',
+        message: `La perdida estimada de ${supplyName} para el siguiente mes cae por debajo del promedio reciente. Puedes operar con una compra mas conservadora para evitar sobrestock.`,
+        recommendedAction:
+          'Compra menos que el promedio reciente y prioriza salida del inventario actual.',
+      };
+    }
+
+    if (nextMonthPrediction > lastRecordedLoss) {
+      return {
+        level: 'medium',
+        title: 'Manten una reposicion moderadamente mayor',
+        message: `La perdida proyectada de ${supplyName} para el siguiente mes viene ligeramente arriba del ultimo registro. Vale la pena ajustar el pedido con un margen moderado.`,
+        recommendedAction:
+          'Compra un poco mas que el ultimo periodo y vigila el comportamiento semanal.',
+      };
+    }
+
+    return {
+      level: 'medium',
+      title: 'Manten compras estables',
+      message: `La perdida proyectada de ${supplyName} para el siguiente mes se mantiene cerca del comportamiento reciente. No se observa una señal fuerte de alza o baja.`,
+      recommendedAction:
+        'Compra en un rango similar al promedio reciente y monitorea desviaciones.',
+    };
   }
 }

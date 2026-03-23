@@ -33,6 +33,11 @@ export class LossPredictionsController {
     return this.lossPredictionsService.listHistory(query);
   }
 
+  @Post('seed-sample')
+  seedSampleHistory() {
+    return this.lossPredictionsService.seedSampleHistory();
+  }
+
   @Post('history')
   createHistory(@Body() dto: CreateLossHistoryDto) {
     return this.lossPredictionsService.createHistory(dto);
