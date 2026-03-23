@@ -17,13 +17,21 @@ export class DbAdminController {
   async backups(@Body() dto: GenerateBackupDto, @Res() res: Response) {
     const file = await this.dbAdminService.generateBackup(dto);
     res.setHeader('Content-Type', file.mimeType);
-    res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${file.fileName}"`,
+    );
     return res.send(file.content);
   }
 
   @Get('topics')
   topics() {
     return this.dbAdminService.topics();
+  }
+
+  @Get('monitoring')
+  monitoring() {
+    return this.dbAdminService.monitoring();
   }
 
   @Get('health')

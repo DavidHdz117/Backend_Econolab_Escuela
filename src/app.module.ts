@@ -14,6 +14,7 @@ import { ServicesModule } from './services/services.module';
 import { ResultsModule } from './results/results.module';
 import { DatabaseModule } from './database/database.module';
 import { DbAdminModule } from './db-admin/db-admin.module';
+import { LossPredictionsModule } from './loss-predictions/loss-predictions.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { DbAdminModule } from './db-admin/db-admin.module';
     ResultsModule,
     DatabaseModule,
     DbAdminModule,
+    LossPredictionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -9,6 +9,7 @@ import {
   BackupScope,
   GenerateBackupDto,
 } from './dto/generate-backup.dto';
+import { AdminBackupsService } from './admin-backups.service';
 
 type DbIdentityRow = QueryResultRow & {
   current_user: string;
@@ -16,16 +17,99 @@ type DbIdentityRow = QueryResultRow & {
   now: string;
 };
 
+type NumericValue = string | number | null;
+
 type TableRef = {
   schema: string;
   name: string;
   qualifiedName: string;
 };
 
+type MonitoringSummaryRow = QueryResultRow & {
+  database_name: string;
+  database_size_bytes: NumericValue;
+  database_size_pretty: string;
+  table_count: NumericValue;
+  index_count: NumericValue;
+  commits: NumericValue;
+  rollbacks: NumericValue;
+  deadlocks: NumericValue;
+  temp_files: NumericValue;
+  temp_bytes: NumericValue;
+  temp_bytes_pretty: string;
+  blks_read: NumericValue;
+  blks_hit: NumericValue;
+  stats_reset: string | null;
+};
+
+type MonitoringConnectionTotalsRow = QueryResultRow & {
+  total_connections: NumericValue;
+  active_connections: NumericValue;
+  idle_connections: NumericValue;
+  waiting_sessions: NumericValue;
+  long_running_queries: NumericValue;
+  max_connections: NumericValue;
+};
+
+type MonitoringConnectionStateRow = QueryResultRow & {
+  state: string | null;
+  total: NumericValue;
+};
+
+type MonitoringTableAccessRow = QueryResultRow & {
+  schemaname: string;
+  table_name: string;
+  seq_scan: NumericValue;
+  idx_scan: NumericValue;
+  n_live_tup: NumericValue;
+  n_dead_tup: NumericValue;
+  index_usage_pct: NumericValue;
+};
+
+type MonitoringIndexRow = QueryResultRow & {
+  schemaname: string;
+  table_name: string;
+  index_name: string;
+  idx_scan: NumericValue;
+  idx_tup_read: NumericValue;
+  idx_tup_fetch: NumericValue;
+  size_bytes: NumericValue;
+  size_pretty: string;
+};
+
+type MonitoringStorageRow = QueryResultRow & {
+  schemaname: string;
+  table_name: string;
+  total_size_bytes: NumericValue;
+  total_size_pretty: string;
+  table_size_bytes: NumericValue;
+  table_size_pretty: string;
+  indexes_size_bytes: NumericValue;
+  indexes_size_pretty: string;
+  n_live_tup: NumericValue;
+  n_dead_tup: NumericValue;
+};
+
+type MonitoringMaintenanceRow = QueryResultRow & {
+  schemaname: string;
+  table_name: string;
+  vacuum_count: NumericValue;
+  autovacuum_count: NumericValue;
+  analyze_count: NumericValue;
+  autoanalyze_count: NumericValue;
+  last_vacuum: string | null;
+  last_autovacuum: string | null;
+  last_analyze: string | null;
+  last_autoanalyze: string | null;
+  n_dead_tup: NumericValue;
+  maintenance_need_pct: NumericValue;
+};
+
 @Injectable()
 export class DbAdminService {
   constructor(
     private readonly db: DatabaseService,
+    private readonly adminBackupsService: AdminBackupsService,
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
@@ -36,7 +120,9 @@ export class DbAdminService {
 
     if (payload.scope === BackupScope.TABLE) {
       if (!payload.tableName) {
-        throw new BadRequestException('tableName es requerido cuando scope = table');
+        throw new BadRequestException(
+          'tableName es requerido cuando scope = table',
+        );
       }
 
       const tableRef = this.parseTableReference(payload.tableName);
@@ -80,13 +166,288 @@ export class DbAdminService {
       ok: true,
       checkedAt: new Date().toISOString(),
       module: 'Administracion de Base de Datos',
-      topics: [
-        backupRestore,
-        automation,
-        exportImport,
-        security,
-        performance,
-      ],
+      topics: [backupRestore, automation, exportImport, security, performance],
+    };
+  }
+
+  async monitoring() {
+    const [
+      summaryResult,
+      connectionTotalsResult,
+      connectionStatesResult,
+      tableAccessResult,
+      topIndexesResult,
+      storageResult,
+      maintenanceResult,
+    ] = await Promise.all([
+      this.db.query<MonitoringSummaryRow>(
+        Role.Admin,
+        `
+        SELECT
+          current_database() AS database_name,
+          pg_database_size(current_database()) AS database_size_bytes,
+          pg_size_pretty(pg_database_size(current_database())) AS database_size_pretty,
+          COALESCE((
+            SELECT COUNT(*)::int
+            FROM pg_stat_user_tables
+            WHERE schemaname IN ('operativo', 'public')
+          ), 0) AS table_count,
+          COALESCE((
+            SELECT COUNT(*)::int
+            FROM pg_stat_user_indexes
+            WHERE schemaname IN ('operativo', 'public')
+          ), 0) AS index_count,
+          xact_commit AS commits,
+          xact_rollback AS rollbacks,
+          deadlocks,
+          temp_files,
+          temp_bytes,
+          pg_size_pretty(temp_bytes) AS temp_bytes_pretty,
+          blks_read,
+          blks_hit,
+          stats_reset::text AS stats_reset
+        FROM pg_stat_database
+        WHERE datname = current_database()
+        `,
+      ),
+      this.db.query<MonitoringConnectionTotalsRow>(
+        Role.Admin,
+        `
+        SELECT
+          COUNT(*)::int AS total_connections,
+          COUNT(*) FILTER (WHERE state = 'active')::int AS active_connections,
+          COUNT(*) FILTER (WHERE state = 'idle')::int AS idle_connections,
+          COUNT(*) FILTER (WHERE wait_event_type IS NOT NULL)::int AS waiting_sessions,
+          COUNT(*) FILTER (
+            WHERE state = 'active'
+              AND query_start IS NOT NULL
+              AND NOW() - query_start > INTERVAL '5 minutes'
+          )::int AS long_running_queries,
+          (
+            SELECT setting::int
+            FROM pg_settings
+            WHERE name = 'max_connections'
+          ) AS max_connections
+        FROM pg_stat_activity
+        WHERE datname = current_database()
+        `,
+      ),
+      this.db.query<MonitoringConnectionStateRow>(
+        Role.Admin,
+        `
+        SELECT
+          COALESCE(state, 'unknown') AS state,
+          COUNT(*)::int AS total
+        FROM pg_stat_activity
+        WHERE datname = current_database()
+        GROUP BY COALESCE(state, 'unknown')
+        ORDER BY total DESC, state ASC
+        `,
+      ),
+      this.db.query<MonitoringTableAccessRow>(
+        Role.Admin,
+        `
+        SELECT
+          schemaname,
+          relname AS table_name,
+          seq_scan,
+          idx_scan,
+          n_live_tup,
+          n_dead_tup,
+          CASE
+            WHEN seq_scan + idx_scan = 0 THEN 0
+            ELSE ROUND((idx_scan::numeric * 100) / (seq_scan + idx_scan), 2)
+          END AS index_usage_pct
+        FROM pg_stat_user_tables
+        WHERE schemaname IN ('operativo', 'public')
+        ORDER BY (seq_scan + idx_scan) DESC, idx_scan DESC, relname ASC
+        LIMIT 8
+        `,
+      ),
+      this.db.query<MonitoringIndexRow>(
+        Role.Admin,
+        `
+        SELECT
+          s.schemaname,
+          s.relname AS table_name,
+          s.indexrelname AS index_name,
+          s.idx_scan,
+          s.idx_tup_read,
+          s.idx_tup_fetch,
+          pg_relation_size(s.indexrelid) AS size_bytes,
+          pg_size_pretty(pg_relation_size(s.indexrelid)) AS size_pretty
+        FROM pg_stat_user_indexes s
+        WHERE s.schemaname IN ('operativo', 'public')
+        ORDER BY s.idx_scan DESC, pg_relation_size(s.indexrelid) DESC, s.indexrelname ASC
+        LIMIT 8
+        `,
+      ),
+      this.db.query<MonitoringStorageRow>(
+        Role.Admin,
+        `
+        SELECT
+          schemaname,
+          relname AS table_name,
+          pg_total_relation_size(relid) AS total_size_bytes,
+          pg_size_pretty(pg_total_relation_size(relid)) AS total_size_pretty,
+          pg_relation_size(relid) AS table_size_bytes,
+          pg_size_pretty(pg_relation_size(relid)) AS table_size_pretty,
+          pg_indexes_size(relid) AS indexes_size_bytes,
+          pg_size_pretty(pg_indexes_size(relid)) AS indexes_size_pretty,
+          n_live_tup,
+          n_dead_tup
+        FROM pg_stat_user_tables
+        WHERE schemaname IN ('operativo', 'public')
+        ORDER BY pg_total_relation_size(relid) DESC, relname ASC
+        LIMIT 8
+        `,
+      ),
+      this.db.query<MonitoringMaintenanceRow>(
+        Role.Admin,
+        `
+        SELECT
+          schemaname,
+          relname AS table_name,
+          vacuum_count,
+          autovacuum_count,
+          analyze_count,
+          autoanalyze_count,
+          last_vacuum::text AS last_vacuum,
+          last_autovacuum::text AS last_autovacuum,
+          last_analyze::text AS last_analyze,
+          last_autoanalyze::text AS last_autoanalyze,
+          n_dead_tup,
+          CASE
+            WHEN n_live_tup = 0 THEN 0
+            ELSE ROUND((n_dead_tup::numeric * 100) / n_live_tup, 2)
+          END AS maintenance_need_pct
+        FROM pg_stat_user_tables
+        WHERE schemaname IN ('operativo', 'public')
+        ORDER BY n_dead_tup DESC, relname ASC
+        LIMIT 8
+        `,
+      ),
+    ]);
+
+    const summary = summaryResult.rows[0];
+    const connectionTotals = connectionTotalsResult.rows[0];
+
+    const blocksRead = this.toNumber(summary?.blks_read);
+    const blocksHit = this.toNumber(summary?.blks_hit);
+    const cacheHitRatioPct = this.toPercentage(
+      blocksHit,
+      blocksRead + blocksHit,
+    );
+
+    const totalSeqScans = tableAccessResult.rows.reduce(
+      (total, row) => total + this.toNumber(row.seq_scan),
+      0,
+    );
+    const totalIdxScans = tableAccessResult.rows.reduce(
+      (total, row) => total + this.toNumber(row.idx_scan),
+      0,
+    );
+
+    const totalConnections = this.toNumber(connectionTotals?.total_connections);
+    const maxConnections = this.toNumber(connectionTotals?.max_connections);
+    const totalLiveTuples = storageResult.rows.reduce(
+      (total, row) => total + this.toNumber(row.n_live_tup),
+      0,
+    );
+    const totalDeadTuples = storageResult.rows.reduce(
+      (total, row) => total + this.toNumber(row.n_dead_tup),
+      0,
+    );
+
+    return {
+      ok: true,
+      checkedAt: new Date().toISOString(),
+      database: {
+        name: summary?.database_name ?? '',
+        sizeBytes: this.toNumber(summary?.database_size_bytes),
+        sizePretty: summary?.database_size_pretty ?? '0 bytes',
+        statsResetAt: summary?.stats_reset ?? null,
+      },
+      overview: {
+        tableCount: this.toNumber(summary?.table_count),
+        indexCount: this.toNumber(summary?.index_count),
+        commits: this.toNumber(summary?.commits),
+        rollbacks: this.toNumber(summary?.rollbacks),
+        deadlocks: this.toNumber(summary?.deadlocks),
+        tempFiles: this.toNumber(summary?.temp_files),
+        tempBytes: this.toNumber(summary?.temp_bytes),
+        tempBytesPretty: summary?.temp_bytes_pretty ?? '0 bytes',
+        cacheHitRatioPct,
+        totalSeqScans,
+        totalIdxScans,
+        indexUsagePct: this.toPercentage(
+          totalIdxScans,
+          totalSeqScans + totalIdxScans,
+        ),
+        totalConnections,
+        activeConnections: this.toNumber(connectionTotals?.active_connections),
+        idleConnections: this.toNumber(connectionTotals?.idle_connections),
+        waitingSessions: this.toNumber(connectionTotals?.waiting_sessions),
+        longRunningQueries: this.toNumber(
+          connectionTotals?.long_running_queries,
+        ),
+        maxConnections,
+        connectionUtilizationPct: this.toPercentage(
+          totalConnections,
+          maxConnections,
+        ),
+        liveTuples: totalLiveTuples,
+        deadTuples: totalDeadTuples,
+      },
+      connectionsByState: connectionStatesResult.rows.map((row) => ({
+        state: row.state ?? 'unknown',
+        total: this.toNumber(row.total),
+      })),
+      tableAccess: tableAccessResult.rows.map((row) => ({
+        schema: row.schemaname,
+        tableName: row.table_name,
+        seqScan: this.toNumber(row.seq_scan),
+        idxScan: this.toNumber(row.idx_scan),
+        liveTuples: this.toNumber(row.n_live_tup),
+        deadTuples: this.toNumber(row.n_dead_tup),
+        indexUsagePct: this.toNumber(row.index_usage_pct),
+      })),
+      topIndexes: topIndexesResult.rows.map((row) => ({
+        schema: row.schemaname,
+        tableName: row.table_name,
+        indexName: row.index_name,
+        scans: this.toNumber(row.idx_scan),
+        tuplesRead: this.toNumber(row.idx_tup_read),
+        tuplesFetched: this.toNumber(row.idx_tup_fetch),
+        sizeBytes: this.toNumber(row.size_bytes),
+        sizePretty: row.size_pretty,
+      })),
+      storage: storageResult.rows.map((row) => ({
+        schema: row.schemaname,
+        tableName: row.table_name,
+        totalSizeBytes: this.toNumber(row.total_size_bytes),
+        totalSizePretty: row.total_size_pretty,
+        tableSizeBytes: this.toNumber(row.table_size_bytes),
+        tableSizePretty: row.table_size_pretty,
+        indexesSizeBytes: this.toNumber(row.indexes_size_bytes),
+        indexesSizePretty: row.indexes_size_pretty,
+        liveTuples: this.toNumber(row.n_live_tup),
+        deadTuples: this.toNumber(row.n_dead_tup),
+      })),
+      maintenance: maintenanceResult.rows.map((row) => ({
+        schema: row.schemaname,
+        tableName: row.table_name,
+        vacuumCount: this.toNumber(row.vacuum_count),
+        autovacuumCount: this.toNumber(row.autovacuum_count),
+        analyzeCount: this.toNumber(row.analyze_count),
+        autoanalyzeCount: this.toNumber(row.autoanalyze_count),
+        lastVacuum: row.last_vacuum,
+        lastAutovacuum: row.last_autovacuum,
+        lastAnalyze: row.last_analyze,
+        lastAutoanalyze: row.last_autoanalyze,
+        deadTuples: this.toNumber(row.n_dead_tup),
+        maintenanceNeedPct: this.toNumber(row.maintenance_need_pct),
+      })),
     };
   }
 
@@ -151,26 +512,39 @@ export class DbAdminService {
   }
 
   async backupRestore() {
+    const jobs = this.adminBackupsService.listJobs();
+    const completedJobs = jobs.filter((job) => job.status === 'completed').length;
+
     return {
       id: 'backup_restore',
       title: 'Copias de seguridad y restauracion',
-      status: 'partial',
+      status: 'implemented',
       summary:
-        'Se documentan estrategias y prevalidaciones de conexion. La ejecucion automatizada de backup/restore aun no se expone por API.',
+        'Los respaldos completos y por tabla ya se generan desde la aplicacion, se ejecutan en cola y pueden restaurarse desde archivos validados.',
       implemented: [
-        'Diagnostico de conexion admin/recepcionista',
-        'Inventario de tablas operativas para planeacion de respaldos',
+        'Backups completos en .tar con pg_dump cuando esta disponible',
+        'Modo compatible que empaqueta respaldo SQL dentro de .tar si faltan client tools',
+        'Backups por tabla desde la interfaz administrativa',
+        'Restauracion con pg_restore y validacion del artefacto',
+        'Cola de ejecucion para evitar respaldos duplicados',
       ],
       pending: [
-        'Disparo de backup desde API con control de permisos',
-        'Flujo de restauracion por archivo validado',
+        'Alertas por fallos de restauracion',
+        'Notificaciones posteriores a la finalizacion de jobs',
       ],
       recommendation:
-        'Usar pg_dump/pg_restore via job externo y almacenar bitacora de ejecuciones.',
+        'Mantener pg_dump y pg_restore disponibles en el servidor para conservar el flujo optimizado.',
+      data: {
+        completedJobs,
+        queuedOrRunningJobs: jobs.filter((job) =>
+          ['queued', 'running'].includes(job.status),
+        ).length,
+      },
     };
   }
 
   async automation() {
+    const automation = this.adminBackupsService.getAutomationSettings();
     const { rows } = await this.db.query<{
       installed: boolean;
       version: string | null;
@@ -189,20 +563,27 @@ export class DbAdminService {
     return {
       id: 'automation',
       title: 'Automatizacion de tareas',
-      status: ext.installed ? 'partial' : 'planned',
+      status: 'implemented',
       summary:
-        'Se valida si existe soporte de planificador en la base. La gestion de jobs aun no esta habilitada en UI/API.',
+        'La aplicacion ya puede programar respaldos automaticos diarios o por intervalos de varios dias, conservarlos por retencion y ejecutarlos sin duplicar trabajos activos.',
       implemented: [
-        'Deteccion de extension pg_cron',
-        'Base para monitoreo de tareas programadas',
+        'Programacion de backups por hora e intervalo de dias desde Admin BD',
+        'Persistencia local de configuracion de automatizacion',
+        'Control de retencion y cantidad de procesos paralelos',
+        'Deteccion opcional de pg_cron para diagnostico del entorno',
       ],
       pending: [
-        'Alta/baja/edicion de jobs programados',
-        'Politicas de reintento y alertamiento',
+        'Alertamiento por correo o webhook al finalizar jobs',
+        'Calendarios avanzados ademas del intervalo por dias',
       ],
       data: {
         pgCronInstalled: ext.installed,
         pgCronVersion: ext.version,
+        enabled: automation.enabled,
+        nextRunAt: automation.nextRunAt,
+        intervalDays: automation.intervalDays,
+        retentionDays: automation.retentionDays,
+        parallelJobs: automation.parallelJobs,
       },
     };
   }
@@ -301,7 +682,9 @@ export class DbAdminService {
     const blocksRead = Number(stats?.blks_read ?? 0);
     const blocksHit = Number(stats?.blks_hit ?? 0);
     const cacheHitRatio =
-      blocksHit + blocksRead === 0 ? 0 : Number((blocksHit / (blocksHit + blocksRead)).toFixed(4));
+      blocksHit + blocksRead === 0
+        ? 0
+        : Number((blocksHit / (blocksHit + blocksRead)).toFixed(4));
 
     return {
       id: 'performance',
@@ -348,12 +731,14 @@ export class DbAdminService {
     };
   }
 
-  private async countFromOperativeTable(role: Role, tableName: string): Promise<number> {
+  private async countFromOperativeTable(
+    role: Role,
+    tableName: string,
+  ): Promise<number> {
     const safeTable = this.assertIdentifier(tableName);
-    const { rows } = await this.db.queryInOperativeSchema<{ total: string | number }>(
-      role,
-      `SELECT COUNT(*)::int AS total FROM ${safeTable}`,
-    );
+    const { rows } = await this.db.queryInOperativeSchema<{
+      total: string | number;
+    }>(role, `SELECT COUNT(*)::int AS total FROM ${safeTable}`);
 
     return Number(rows[0]?.total ?? 0);
   }
@@ -422,7 +807,9 @@ export class DbAdminService {
       const valueList = columns
         .map((col) => this.toSqlLiteral(row[col]))
         .join(', ');
-      lines.push(`INSERT INTO ${qualifiedTable} (${columnList}) VALUES (${valueList});`);
+      lines.push(
+        `INSERT INTO ${qualifiedTable} (${columnList}) VALUES (${valueList});`,
+      );
     }
 
     return lines.join('\n');
@@ -447,7 +834,9 @@ export class DbAdminService {
     return lines.join('\n');
   }
 
-  private async getTableRows(table: TableRef): Promise<Record<string, unknown>[]> {
+  private async getTableRows(
+    table: TableRef,
+  ): Promise<Record<string, unknown>[]> {
     const safeSchema = this.assertIdentifier(table.schema);
     const safeTable = this.assertIdentifier(table.name);
     return this.dataSource.query(`SELECT * FROM ${safeSchema}.${safeTable}`);
@@ -484,10 +873,13 @@ export class DbAdminService {
 
   private toSqlLiteral(value: unknown): string {
     if (value == null) return 'NULL';
-    if (typeof value === 'number' || typeof value === 'bigint') return String(value);
+    if (typeof value === 'number' || typeof value === 'bigint')
+      return String(value);
     if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
-    if (value instanceof Date) return `'${value.toISOString().replace(/'/g, "''")}'`;
-    if (typeof value === 'object') return `'${JSON.stringify(value).replace(/'/g, "''")}'::jsonb`;
+    if (value instanceof Date)
+      return `'${value.toISOString().replace(/'/g, "''")}'`;
+    if (typeof value === 'object')
+      return `'${JSON.stringify(value).replace(/'/g, "''")}'::jsonb`;
     return `'${String(value).replace(/'/g, "''")}'`;
   }
 
@@ -510,5 +902,17 @@ export class DbAdminService {
       throw new Error(`Invalid identifier: ${name}`);
     }
     return name;
+  }
+
+  private toNumber(value: NumericValue | undefined): number {
+    return Number(value ?? 0);
+  }
+
+  private toPercentage(value: number, total: number): number {
+    if (total <= 0) {
+      return 0;
+    }
+
+    return Number(((value / total) * 100).toFixed(2));
   }
 }

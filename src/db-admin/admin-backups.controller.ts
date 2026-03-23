@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { Role } from 'src/common/enums/roles.enum';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { RestoreBackupDto } from './dto/restore-backup.dto';
+import { UpdateBackupAutomationDto } from './dto/update-backup-automation.dto';
 import { AdminBackupsService } from './admin-backups.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -30,6 +31,16 @@ export class AdminBackupsController {
   @Get('jobs')
   listJobs() {
     return this.backupsService.listJobs();
+  }
+
+  @Get('automation')
+  getAutomationSettings() {
+    return this.backupsService.getAutomationSettings();
+  }
+
+  @Put('automation')
+  updateAutomationSettings(@Body() dto: UpdateBackupAutomationDto) {
+    return this.backupsService.updateAutomationSettings(dto);
   }
 
   @Get('table')
