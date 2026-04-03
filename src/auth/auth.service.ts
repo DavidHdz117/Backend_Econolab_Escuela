@@ -5,7 +5,11 @@ import { Repository } from 'typeorm';
 import { UsersService } from 'src/users/users.service';
 import { checkPassword } from 'src/common/utils/crypto.util';
 import { LoginDto } from './dto/login.dto';
-import { generateJWT, AppJwtPayload } from 'src/common/utils/jwt.util';
+import {
+  generateJWT,
+  AppJwtPayload,
+  AUTH_SESSION_TTL_MS,
+} from 'src/common/utils/jwt.util';
 import { Role } from 'src/common/enums/roles.enum';
 import { AuthEventsService } from './auth-events.service';
 
@@ -49,22 +53,48 @@ export class AuthService {
     await this.usersRepo.save(user);
   }
 
-  // Código MFA para admins
-  private generateMfaCode(): string {
-    const num = Math.floor(100000 + Math.random() * 900000);
-    return num.toString(); // 6 dígitos
+  private async clearPendingMfa(user: User) {
+    user.mfaCode = null;
+    user.mfaCodeExpiresAt = null;
+    user.mfaCodeAttempts = 0;
+    await this.usersRepo.save(user);
   }
 
-  private async startAdminMfa(user: User): Promise<string> {
-    const code = this.generateMfaCode();
-    const EXPIRE_MINUTES = 5;
+  private async createAuthenticatedSession(
+    user: User,
+    ip?: string,
+    userAgent?: string,
+  ) {
+    const expiresAt = new Date(Date.now() + AUTH_SESSION_TTL_MS);
 
-    user.mfaCode = code;
-    user.mfaCodeExpiresAt = new Date(Date.now() + EXPIRE_MINUTES * 60 * 1000);
-    user.mfaCodeAttempts = 0;
+    const session = await this.sessionsRepo.save(
+      this.sessionsRepo.create({
+        user,
+        expiresAt,
+        ip: ip ?? null,
+        userAgent: userAgent ?? null,
+      }),
+    );
 
-    await this.usersRepo.save(user);
-    return code;
+    const payload: AppJwtPayload = {
+      sub: user.id,
+      rol: user.rol,
+      nombre: user.nombre,
+      email: user.email,
+      jti: session.id,
+    };
+
+    const token = generateJWT(payload);
+
+    return {
+      token,
+      usuario: {
+        id: user.id,
+        nombre: user.nombre,
+        email: user.email,
+        rol: user.rol,
+      },
+    };
   }
 
   /* ───────────────────────── Login ───────────────────────── */
@@ -107,58 +137,15 @@ export class AuthService {
       throw new ForbiddenException('Rol pendiente de asignación');
     }
 
-    // 🔐 Si es admin → requiere MFA, no generamos token ni sesión todavía
-    if (user.rol === Role.Admin) {
-      const code = await this.startAdminMfa(user);
-
-      // Enviar por correo
-      await this.users.sendMfaCodeEmail(user, code);
-
-      // TODO: enviar el código por correo/SMS en lugar de exponerlo aquí
-      return {
-        message: 'Se envió un código de verificación a tu correo',
-        mfa: true,
-        email: user.email,
-        // code, // SOLO si quieres verlo en pruebas, NO en producción
-      };
-    }
-
-    // Usuario NO admin → login normal con sesión
     await this.resetLoginAttempts(user);
-
-    const SESSION_MINUTES = 15;
-    const expiresAt = new Date(Date.now() + SESSION_MINUTES * 60 * 1000);
-
-    const session = await this.sessionsRepo.save(
-      this.sessionsRepo.create({
-        user,
-        expiresAt,
-        ip: ip ?? null,
-        userAgent: userAgent ?? null,
-      }),
-    );
-
-    const payload: AppJwtPayload = {
-      sub: user.id,
-      rol: user.rol,
-      nombre: user.nombre,
-      email: user.email,
-      jti: session.id,
-    };
-
-    const token = generateJWT(payload);
+    await this.clearPendingMfa(user);
+    const authSession = await this.createAuthenticatedSession(user, ip, userAgent);
 
     await this.authEvents.logSuccess(user, ip, userAgent);
 
     return {
       message: 'Autenticado...',
-      token,
-      usuario: {
-        id: user.id,
-        nombre: user.nombre,
-        email: user.email,
-        rol: user.rol,
-      },
+      ...authSession,
     };
   }
 
@@ -218,40 +205,13 @@ export class AuthService {
     user.mfaCodeAttempts = 0;
     await this.usersRepo.save(user);
 
-    // Crear sesión y token igual que en login normal
-    const SESSION_MINUTES = 15;
-    const expiresAt = new Date(Date.now() + SESSION_MINUTES * 60 * 1000);
-
-    const session = await this.sessionsRepo.save(
-      this.sessionsRepo.create({
-        user,
-        expiresAt,
-        ip: ip ?? null,
-        userAgent: userAgent ?? null,
-      }),
-    );
-
-    const payload: AppJwtPayload = {
-      sub: user.id,
-      rol: user.rol,
-      nombre: user.nombre,
-      email: user.email,
-      jti: session.id,
-    };
-
-    const token = generateJWT(payload);
+    const authSession = await this.createAuthenticatedSession(user, ip, userAgent);
 
     await this.authEvents.logSuccess(user, ip, userAgent);
 
     return {
       message: 'Autenticado con MFA...',
-      token,
-      usuario: {
-        id: user.id,
-        nombre: user.nombre,
-        email: user.email,
-        rol: user.rol,
-      },
+      ...authSession,
     };
   }
 
@@ -265,39 +225,14 @@ export class AuthService {
       throw new ForbiddenException('Rol pendiente de asignación');
     }
 
-    const SESSION_MINUTES = 15;
-    const expiresAt = new Date(Date.now() + SESSION_MINUTES * 60 * 1000);
-
-    const session = await this.sessionsRepo.save(
-      this.sessionsRepo.create({
-        user,
-        expiresAt,
-        ip: ip ?? null,
-        userAgent: userAgent ?? null,
-      }),
-    );
-
-    const payload: AppJwtPayload = {
-      sub: user.id,
-      rol: user.rol,
-      nombre: user.nombre,
-      email: user.email,
-      jti: session.id,
-    };
-
-    const token = generateJWT(payload);
+    await this.clearPendingMfa(user);
+    const authSession = await this.createAuthenticatedSession(user, ip, userAgent);
 
     await this.authEvents.logSuccess(user, ip, userAgent);
 
     return {
       message: 'Autenticado con proveedor externo...',
-      token,
-      usuario: {
-        id: user.id,
-        nombre: user.nombre,
-        email: user.email,
-        rol: user.rol,
-      },
+      ...authSession,
     };
   }
 
