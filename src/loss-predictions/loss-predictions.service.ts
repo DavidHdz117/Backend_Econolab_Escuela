@@ -241,7 +241,7 @@ export class LossPredictionsService {
     this.assertValidDateRange(query.fromDate, query.toDate);
     const study = await this.assertPredictableStudy(query.studyId);
     const supplyName = this.normalizeSupplyName(query.supplyName);
-    const monthsAhead = query.monthsAhead ?? 6;
+    const monthsAhead = query.monthsAhead ?? 1;
 
     const records = await this.lossHistoryRepo.find({
       where: this.buildHistoryWhere({
@@ -254,9 +254,11 @@ export class LossPredictionsService {
     });
 
     const monthlyHistory = this.aggregateMonthlyLosses(records);
-    const totalHistoricalLoss = this.roundValue(
-      monthlyHistory.reduce((total, point) => total + point.quantityLoss, 0),
+    const totalHistoricalLossRaw = monthlyHistory.reduce(
+      (total, point) => total + point.quantityLoss,
+      0,
     );
+    const totalHistoricalLoss = this.roundValue(totalHistoricalLossRaw);
     const mappedRecords = records.map((record) => this.toLossRecord(record));
 
     if (monthlyHistory.length < 2) {
@@ -295,7 +297,7 @@ export class LossPredictionsService {
           totalHistoricalLoss,
           averageMonthlyLoss:
             monthlyHistory.length > 0
-              ? this.roundValue(totalHistoricalLoss / monthlyHistory.length)
+              ? this.roundValue(totalHistoricalLossRaw / monthlyHistory.length)
               : null,
           lastRecordedLoss:
             monthlyHistory.length > 0
@@ -367,7 +369,7 @@ export class LossPredictionsService {
         summary: {
           totalHistoricalLoss,
           averageMonthlyLoss: this.roundValue(
-            totalHistoricalLoss / monthlyHistory.length,
+            totalHistoricalLossRaw / monthlyHistory.length,
           ),
           lastRecordedLoss:
             monthlyHistory[monthlyHistory.length - 1]?.quantityLoss ?? null,
@@ -394,14 +396,14 @@ export class LossPredictionsService {
       lastHistoricalPoint.monthDate,
     );
     const chartSeries: LossChartPoint[] = [];
-    const nextForecastOffset = totalHistoricalMonths + 1;
+    const monthlyHistoryMap = new Map(
+      monthlyHistory.map((point) => [point.monthKey, point] as const),
+    );
 
     for (let offset = 0; offset <= totalHistoricalMonths; offset += 1) {
       const currentMonth = this.addMonths(firstPoint.monthDate, offset);
       const monthKey = this.formatMonthKey(currentMonth);
-      const historicalPoint = monthlyHistory.find(
-        (point) => point.monthKey === monthKey,
-      );
+      const historicalPoint = monthlyHistoryMap.get(monthKey);
 
       chartSeries.push({
         monthKey,
@@ -414,23 +416,36 @@ export class LossPredictionsService {
       });
     }
 
-    const nextForecastMonth = this.addMonths(firstPoint.monthDate, nextForecastOffset);
-    const nextMonthPrediction = this.roundValue(
-      predictExponentialLoss(model, nextForecastOffset),
-    );
-    chartSeries.push({
-      monthKey: this.formatMonthKey(nextForecastMonth),
-      date: nextForecastMonth.toISOString(),
-      historicalLoss: null,
-      predictedLoss: nextMonthPrediction,
-      isForecast: true,
-    });
+    let nextMonthPrediction: number | null = null;
+    let nextMonthLabel: string | null = null;
+
+    for (let forecastStep = 1; forecastStep <= monthsAhead; forecastStep += 1) {
+      const forecastOffset = totalHistoricalMonths + forecastStep;
+      const forecastMonth = this.addMonths(firstPoint.monthDate, forecastOffset);
+      const forecastMonthKey = this.formatMonthKey(forecastMonth);
+      const predictedLoss = this.roundValue(
+        predictExponentialLoss(model, forecastOffset),
+      );
+
+      if (forecastStep === 1) {
+        nextMonthPrediction = predictedLoss;
+        nextMonthLabel = forecastMonthKey;
+      }
+
+      chartSeries.push({
+        monthKey: forecastMonthKey,
+        date: forecastMonth.toISOString(),
+        historicalLoss: null,
+        predictedLoss,
+        isForecast: true,
+      });
+    }
 
     const logisticsSuggestion = this.buildLogisticsSuggestion({
-      nextMonthPrediction,
+      nextMonthPrediction: nextMonthPrediction ?? 0,
       lastRecordedLoss: lastHistoricalPoint.quantityLoss,
       averageMonthlyLoss: this.roundValue(
-        totalHistoricalLoss / monthlyHistory.length,
+        totalHistoricalLossRaw / monthlyHistory.length,
       ),
       supplyName,
     });
@@ -468,13 +483,13 @@ export class LossPredictionsService {
       summary: {
         totalHistoricalLoss,
         averageMonthlyLoss: this.roundValue(
-          totalHistoricalLoss / monthlyHistory.length,
+          totalHistoricalLossRaw / monthlyHistory.length,
         ),
         lastRecordedLoss: lastHistoricalPoint.quantityLoss,
         monthsWithHistory: monthlyHistory.length,
         recordsCount: mappedRecords.length,
         nextMonthPrediction,
-        nextMonthLabel: this.formatMonthKey(nextForecastMonth),
+        nextMonthLabel,
       },
       logisticsSuggestion,
     };

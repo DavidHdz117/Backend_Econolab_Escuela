@@ -23,37 +23,59 @@ export function buildExponentialLossModel(
     );
   }
 
-  const [basePoint, comparisonPoint] = history;
+  const basePoint = history[0];
+  const comparisonPoint = history[history.length - 1];
 
-  if (basePoint.quantityLoss == null || comparisonPoint.quantityLoss == null) {
+  if (history.some((point) => point.quantityLoss == null)) {
     throw new BadRequestException(
       'Los periodos historicos deben incluir la cantidad de perdida.',
     );
   }
 
-  if (basePoint.quantityLoss <= 0 || comparisonPoint.quantityLoss <= 0) {
+  if (history.some((point) => point.quantityLoss <= 0)) {
     throw new BadRequestException(
       'Las perdidas historicas deben ser mayores a cero para calcular la prediccion exponencial.',
     );
   }
 
-  const periodDelta = comparisonPoint.period - basePoint.period;
-  if (periodDelta === 0) {
+  const logPoints = history.map((point) => ({
+    period: point.period,
+    logQuantityLoss: Math.log(point.quantityLoss),
+  }));
+  const meanPeriod =
+    logPoints.reduce((total, point) => total + point.period, 0) / logPoints.length;
+  const meanLogQuantityLoss =
+    logPoints.reduce((total, point) => total + point.logQuantityLoss, 0) /
+    logPoints.length;
+
+  const numerator = logPoints.reduce(
+    (total, point) =>
+      total + (point.period - meanPeriod) * (point.logQuantityLoss - meanLogQuantityLoss),
+    0,
+  );
+  const denominator = logPoints.reduce(
+    (total, point) => total + (point.period - meanPeriod) ** 2,
+    0,
+  );
+
+  if (denominator === 0) {
     throw new BadRequestException(
-      'No se puede calcular la tasa exponencial cuando ambos puntos pertenecen al mismo periodo.',
+      'No se puede calcular la tasa exponencial cuando todos los puntos pertenecen al mismo periodo.',
     );
   }
 
-  const k = Math.log(comparisonPoint.quantityLoss / basePoint.quantityLoss) / periodDelta;
+  const k = numerator / denominator;
+  const intercept = meanLogQuantityLoss - k * meanPeriod;
+  const y0 = Math.exp(intercept + k * basePoint.period);
 
-  if (!Number.isFinite(k)) {
+  if (!Number.isFinite(k) || !Number.isFinite(y0) || y0 <= 0) {
     throw new BadRequestException(
       'No fue posible calcular una tasa exponencial valida con los datos historicos proporcionados.',
     );
   }
 
   return {
-    y0: basePoint.quantityLoss,
+    y0,
     k,
     basePoint,
     comparisonPoint,
