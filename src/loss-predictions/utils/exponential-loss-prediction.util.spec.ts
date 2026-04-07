@@ -26,6 +26,18 @@ describe('exponential-loss-prediction.util', () => {
     );
   });
 
+  it('con dos periodos consecutivos de 5 y 7 proyecta 9.8 para el siguiente periodo', () => {
+    const history = [
+      { period: 0, quantityLoss: 5, label: '2025-07', date: '2025-07-01T00:00:00.000Z' },
+      { period: 1, quantityLoss: 7, label: '2025-08', date: '2025-08-01T00:00:00.000Z' },
+    ];
+
+    const model = buildExponentialLossModel(history);
+
+    expect(model.k).toBeCloseTo(Math.log(7 / 5), 6);
+    expect(predictExponentialLoss(model, 2)).toBeCloseTo(9.8, 6);
+  });
+
   it('rechaza historicos con perdidas no positivas', () => {
     expect(() =>
       buildExponentialLossModel([

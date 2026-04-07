@@ -9,9 +9,13 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { IsNotInFutureDate } from 'src/common/validators/is-not-in-future-date.validator';
 
 export class CreateLossHistoryDto {
   @IsDateString({}, { message: 'date debe ser una fecha valida.' })
+  @IsNotInFutureDate({
+    message: 'date no puede estar en el futuro.',
+  })
   date: string;
 
   @Type(() => Number)

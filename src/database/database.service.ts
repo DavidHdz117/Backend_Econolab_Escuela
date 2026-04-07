@@ -38,7 +38,9 @@ export class DatabaseService implements OnModuleDestroy {
 
     try {
       await client.query('BEGIN');
-      await client.query(`SET LOCAL search_path TO ${safeSchema}, public`);
+      await client.query(
+        `SET LOCAL search_path TO ${this.quoteIdentifier(safeSchema)}, public`,
+      );
       const result = await client.query<T>(text, values as unknown[]);
       await client.query('COMMIT');
       return result;
@@ -68,5 +70,9 @@ export class DatabaseService implements OnModuleDestroy {
       throw new Error(`Invalid schema name: ${schema}`);
     }
     return schema;
+  }
+
+  private quoteIdentifier(identifier: string): string {
+    return `"${this.assertSafeSchema(identifier)}"`;
   }
 }

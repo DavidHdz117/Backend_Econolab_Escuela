@@ -16,8 +16,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     @InjectRepository(UserSession)
     private readonly sessionsRepo: Repository<UserSession>,
   ) {
-    const secret = cfg.get<string>('JWT_SECRET');
-    if (!secret) throw new Error('Falta JWT_SECRET en variables de entorno');
+    const secret = cfg.getOrThrow<string>('JWT_SECRET');
 
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
