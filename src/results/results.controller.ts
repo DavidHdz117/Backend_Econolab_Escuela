@@ -1,4 +1,4 @@
-import {Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Res,} from '@nestjs/common';
+import {Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Res, Query,} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ResultsService } from './results.service';
 import { CreateStudyResultDto } from './dto/create-study-result.dto';
@@ -15,9 +15,31 @@ export class ResultsController {
     return this.resultsService.findOne(+id);
   }
 
+  @Get('service-order/:serviceOrderId/pdf')
+  async downloadServicePdf(
+    @Param('serviceOrderId') serviceOrderId: string,
+    @Query() query: Record<string, string | string[] | undefined>,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.resultsService.generateServicePdf(
+      +serviceOrderId,
+      query,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename=\"resultado-servicio-${serviceOrderId}.pdf\"`,
+    );
+    res.send(buffer);
+  }
+
   @Get(':id/pdf')
-  async downloadPdf(@Param('id') id: string, @Res() res: Response) {
-    const buffer = await this.resultsService.generatePdf(+id);
+  async downloadPdf(
+    @Param('id') id: string,
+    @Query() query: Record<string, string | string[] | undefined>,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.resultsService.generatePdf(+id, query);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',

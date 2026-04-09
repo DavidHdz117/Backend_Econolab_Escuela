@@ -36,6 +36,7 @@ export class ServicesController {
   search(
     @Query('search') search?: string,
     @Query('status') status?: ServiceStatus,
+    @Query('branchName') branchName?: string,
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
     @Query('page') page = '1',
@@ -44,11 +45,17 @@ export class ServicesController {
     return this.servicesService.search({
       search,
       status,
+      branchName,
       fromDate,
       toDate,
       page: Number(page),
       limit: Number(limit),
     });
+  }
+
+  @Get('next-folio')
+  getSuggestedFolio() {
+    return this.servicesService.getSuggestedFolio();
   }
 
   @Get('export')
@@ -71,10 +78,7 @@ export class ServicesController {
   async downloadReceipt(@Param('id') id: string, @Res() res: Response) {
     const buffer = await this.servicesService.generateReceiptPdf(+id);
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader(
-      'Content-Disposition',
-      `inline; filename=\"recibo-${id}.pdf\"`,
-    );
+    res.setHeader('Content-Disposition', `inline; filename="recibo-${id}.pdf"`);
     res.send(buffer);
   }
 
@@ -84,8 +88,16 @@ export class ServicesController {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',
-      `inline; filename=\"etiquetas-${id}.pdf\"`,
+      `inline; filename="etiquetas-${id}.pdf"`,
     );
+    res.send(buffer);
+  }
+
+  @Get(':id/ticket')
+  async downloadTicket(@Param('id') id: string, @Res() res: Response) {
+    const buffer = await this.servicesService.generateTicketPdf(+id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="ticket-${id}.pdf"`);
     res.send(buffer);
   }
 

@@ -9,7 +9,10 @@ import {
   BackupScope,
   GenerateBackupDto,
 } from './dto/generate-backup.dto';
-import { AdminBackupsService } from './admin-backups.service';
+import {
+  AdminBackupsService,
+  type BackupJobInfo,
+} from './admin-backups.service';
 
 type DbIdentityRow = QueryResultRow & {
   current_user: string;
@@ -103,6 +106,124 @@ type MonitoringMaintenanceRow = QueryResultRow & {
   last_autoanalyze: string | null;
   n_dead_tup: NumericValue;
   maintenance_need_pct: NumericValue;
+};
+
+type MonitoringActivityLogRow = QueryResultRow & {
+  pid: NumericValue;
+  usename: string | null;
+  application_name: string | null;
+  client_addr: string | null;
+  state: string | null;
+  wait_event_type: string | null;
+  wait_event: string | null;
+  backend_type: string | null;
+  backend_start: string | null;
+  xact_start: string | null;
+  query_start: string | null;
+  state_change: string | null;
+  query_duration_ms: NumericValue;
+  query: string | null;
+};
+
+type MonitoringBlockedSessionRow = QueryResultRow & {
+  blocked_pid: NumericValue;
+  blocked_user: string | null;
+  blocked_state: string | null;
+  blocked_wait_event_type: string | null;
+  blocked_wait_event: string | null;
+  blocked_duration_ms: NumericValue;
+  blocked_query: string | null;
+  blocking_pid: NumericValue;
+  blocking_user: string | null;
+  blocking_state: string | null;
+  blocking_query: string | null;
+};
+
+type MonitoringExtensionStatusRow = QueryResultRow & {
+  installed: boolean;
+  version: string | null;
+};
+
+type MonitoringStatementLogRow = QueryResultRow & {
+  calls: NumericValue;
+  total_exec_time: NumericValue;
+  mean_exec_time: NumericValue;
+  rows: NumericValue;
+  shared_blks_hit: NumericValue;
+  shared_blks_read: NumericValue;
+  temp_blks_written: NumericValue;
+  query: string | null;
+};
+
+type MonitoringLoggingSettingRow = QueryResultRow & {
+  name: string;
+  setting: string;
+};
+
+type MonitoringConsoleEntryLevel = 'info' | 'warn' | 'error' | 'success';
+type MonitoringConsoleEntryCategory =
+  | 'summary'
+  | 'query'
+  | 'lock'
+  | 'backup'
+  | 'statement'
+  | 'system';
+
+type MonitoringConsoleEntry = {
+  id: string;
+  occurredAt: string;
+  level: MonitoringConsoleEntryLevel;
+  source: string;
+  category: MonitoringConsoleEntryCategory;
+  title: string;
+  message: string;
+  context: string | null;
+  commandText: string | null;
+};
+
+type MonitoringActiveSession = {
+  pid: number;
+  user: string;
+  applicationName: string;
+  clientAddress: string;
+  state: string;
+  waitEventType: string | null;
+  waitEvent: string | null;
+  backendType: string;
+  queryStart: string | null;
+  stateChange: string | null;
+  queryDurationMs: number;
+  queryPreview: string;
+  queryText: string;
+};
+
+type MonitoringBlockedSession = {
+  blockedPid: number;
+  blockedUser: string;
+  blockedState: string;
+  blockedWaitEventType: string | null;
+  blockedWaitEvent: string | null;
+  blockedDurationMs: number;
+  blockedQueryPreview: string;
+  blockedQueryText: string;
+  blockingPid: number;
+  blockingUser: string;
+  blockingState: string;
+  blockingQueryPreview: string;
+  blockingQueryText: string;
+};
+
+type MonitoringTopStatement = {
+  id: string;
+  calls: number;
+  totalExecTimeMs: number;
+  meanExecTimeMs: number;
+  rows: number;
+  sharedHits: number;
+  sharedReads: number;
+  tempWritten: number;
+  queryPreview: string;
+  queryText: string;
 };
 
 @Injectable()
@@ -451,6 +572,292 @@ export class DbAdminService {
     };
   }
 
+  async monitoringLogs() {
+    const checkedAt = new Date().toISOString();
+    const backupJobs = this.adminBackupsService.listJobs().slice(0, 12);
+
+    const [
+      activityResult,
+      blockedResult,
+      loggingSettingsResult,
+      extensionResult,
+    ] = await Promise.all([
+      this.db.query<MonitoringActivityLogRow>(
+        Role.Admin,
+        `
+        SELECT
+          pid,
+          usename,
+          COALESCE(application_name, 'app') AS application_name,
+          COALESCE(client_addr::text, 'local') AS client_addr,
+          COALESCE(state, 'unknown') AS state,
+          wait_event_type,
+          wait_event,
+          COALESCE(backend_type, 'client backend') AS backend_type,
+          backend_start::text AS backend_start,
+          xact_start::text AS xact_start,
+          query_start::text AS query_start,
+          state_change::text AS state_change,
+          ROUND(EXTRACT(EPOCH FROM (
+            NOW() - COALESCE(query_start, xact_start, backend_start)
+          )) * 1000)::bigint AS query_duration_ms,
+          query
+        FROM pg_stat_activity
+        WHERE datname = current_database()
+          AND pid <> pg_backend_pid()
+          AND backend_type = 'client backend'
+          AND (
+            state IS DISTINCT FROM 'idle'
+            OR wait_event_type IS NOT NULL
+            OR state = 'idle in transaction'
+          )
+        ORDER BY
+          CASE
+            WHEN state = 'active' THEN 0
+            WHEN state = 'idle in transaction' THEN 1
+            WHEN wait_event_type IS NOT NULL THEN 2
+            ELSE 3
+          END,
+          query_start ASC NULLS LAST,
+          backend_start DESC
+        LIMIT 20
+        `,
+      ),
+      this.db.query<MonitoringBlockedSessionRow>(
+        Role.Admin,
+        `
+        SELECT
+          blocked.pid AS blocked_pid,
+          blocked.usename AS blocked_user,
+          COALESCE(blocked.state, 'unknown') AS blocked_state,
+          blocked.wait_event_type AS blocked_wait_event_type,
+          blocked.wait_event AS blocked_wait_event,
+          ROUND(EXTRACT(EPOCH FROM (
+            NOW() - COALESCE(blocked.query_start, blocked.xact_start, blocked.backend_start)
+          )) * 1000)::bigint AS blocked_duration_ms,
+          blocked.query AS blocked_query,
+          blocker.pid AS blocking_pid,
+          blocker.usename AS blocking_user,
+          COALESCE(blocker.state, 'unknown') AS blocking_state,
+          blocker.query AS blocking_query
+        FROM pg_stat_activity blocked
+        CROSS JOIN LATERAL unnest(pg_blocking_pids(blocked.pid)) AS blocker_pid(pid)
+        INNER JOIN pg_stat_activity blocker
+          ON blocker.pid = blocker_pid.pid
+        WHERE blocked.datname = current_database()
+        ORDER BY blocked.query_start ASC NULLS LAST
+        LIMIT 12
+        `,
+      ),
+      this.db.query<MonitoringLoggingSettingRow>(
+        Role.Admin,
+        `
+        SELECT name, setting
+        FROM pg_settings
+        WHERE name IN (
+          'logging_collector',
+          'log_statement',
+          'log_min_duration_statement'
+        )
+        ORDER BY name ASC
+        `,
+      ),
+      this.db.query<MonitoringExtensionStatusRow>(
+        Role.Admin,
+        `
+        SELECT
+          EXISTS(
+            SELECT 1
+            FROM pg_extension
+            WHERE extname = 'pg_stat_statements'
+          ) AS installed,
+          (
+            SELECT extversion::text
+            FROM pg_extension
+            WHERE extname = 'pg_stat_statements'
+          ) AS version
+        `,
+      ),
+    ]);
+
+    const activeSessions: MonitoringActiveSession[] = activityResult.rows.map(
+      (row) => {
+        const queryText = this.formatQueryText(row.query);
+        return {
+          pid: this.toNumber(row.pid),
+          user: row.usename ?? 'desconocido',
+          applicationName: row.application_name ?? 'app',
+          clientAddress: row.client_addr ?? 'local',
+          state: row.state ?? 'unknown',
+          waitEventType: row.wait_event_type ?? null,
+          waitEvent: row.wait_event ?? null,
+          backendType: row.backend_type ?? 'client backend',
+          queryStart: row.query_start ?? null,
+          stateChange: row.state_change ?? null,
+          queryDurationMs: this.toNumber(row.query_duration_ms),
+          queryPreview: this.buildSingleLinePreview(queryText),
+          queryText,
+        };
+      },
+    );
+
+    const blockedSessions: MonitoringBlockedSession[] = blockedResult.rows.map(
+      (row) => {
+        const blockedQueryText = this.formatQueryText(row.blocked_query);
+        const blockingQueryText = this.formatQueryText(row.blocking_query);
+        return {
+          blockedPid: this.toNumber(row.blocked_pid),
+          blockedUser: row.blocked_user ?? 'desconocido',
+          blockedState: row.blocked_state ?? 'unknown',
+          blockedWaitEventType: row.blocked_wait_event_type ?? null,
+          blockedWaitEvent: row.blocked_wait_event ?? null,
+          blockedDurationMs: this.toNumber(row.blocked_duration_ms),
+          blockedQueryPreview: this.buildSingleLinePreview(blockedQueryText),
+          blockedQueryText,
+          blockingPid: this.toNumber(row.blocking_pid),
+          blockingUser: row.blocking_user ?? 'desconocido',
+          blockingState: row.blocking_state ?? 'unknown',
+          blockingQueryPreview: this.buildSingleLinePreview(blockingQueryText),
+          blockingQueryText,
+        };
+      },
+    );
+
+    const loggingSettings = loggingSettingsResult.rows.reduce<
+      Record<string, string>
+    >((acc, row) => {
+      acc[row.name] = row.setting;
+      return acc;
+    }, {});
+
+    const extensionInfo = extensionResult.rows[0] ?? {
+      installed: false,
+      version: null,
+    };
+
+    let topStatements: MonitoringTopStatement[] = [];
+    let topStatementsError: string | null = null;
+
+    if (extensionInfo.installed) {
+      try {
+        const statementsResult = await this.db.query<MonitoringStatementLogRow>(
+          Role.Admin,
+          `
+          SELECT
+            calls,
+            total_exec_time,
+            mean_exec_time,
+            rows,
+            shared_blks_hit,
+            shared_blks_read,
+            temp_blks_written,
+            query
+          FROM pg_stat_statements
+          WHERE dbid = (SELECT oid FROM pg_database WHERE datname = current_database())
+          ORDER BY total_exec_time DESC NULLS LAST, calls DESC
+          LIMIT 12
+          `,
+        );
+
+        topStatements = statementsResult.rows.map((row, index) => {
+          const queryText = this.formatQueryText(row.query);
+          return {
+            id: `statement-${index + 1}`,
+            calls: this.toNumber(row.calls),
+            totalExecTimeMs: this.toNumber(row.total_exec_time),
+            meanExecTimeMs: this.toNumber(row.mean_exec_time),
+            rows: this.toNumber(row.rows),
+            sharedHits: this.toNumber(row.shared_blks_hit),
+            sharedReads: this.toNumber(row.shared_blks_read),
+            tempWritten: this.toNumber(row.temp_blks_written),
+            queryPreview: this.buildSingleLinePreview(queryText),
+            queryText,
+          };
+        });
+      } catch (error) {
+        topStatementsError =
+          error instanceof Error
+            ? error.message
+            : 'No se pudo consultar pg_stat_statements.';
+      }
+    }
+
+    const notes = [
+      'La consola muestra actividad viva de PostgreSQL y el historial operativo del modulo de respaldos.',
+      'No es un archivo historico completo del servidor. Para eso PostgreSQL debe tener logging persistente configurado fuera de la app.',
+    ];
+
+    if (!extensionInfo.installed) {
+      notes.push(
+        'pg_stat_statements no esta instalado; por eso no hay ranking historico de consultas frecuentes.',
+      );
+    } else if (topStatementsError) {
+      notes.push(
+        `pg_stat_statements esta instalado, pero no se pudo leer: ${topStatementsError}`,
+      );
+    }
+
+    if (loggingSettings.logging_collector !== 'on') {
+      notes.push(
+        'logging_collector aparece desactivado; desde aqui no hay acceso a archivos historicos del servidor.',
+      );
+    }
+
+    const summary = {
+      activeSessions: activeSessions.length,
+      waitingSessions: activeSessions.filter((session) =>
+        Boolean(session.waitEventType),
+      ).length,
+      blockedSessions: blockedSessions.length,
+      longRunningSessions: activeSessions.filter(
+        (session) => session.queryDurationMs >= 60_000,
+      ).length,
+      backupJobsTracked: backupJobs.length,
+      failedBackupJobs: backupJobs.filter((job) => job.status === 'failed')
+        .length,
+      topStatementsTracked: topStatements.length,
+    };
+
+    return {
+      ok: true,
+      checkedAt,
+      summary,
+      capabilities: {
+        liveActivity: true,
+        lockInspection: true,
+        backupHistory: true,
+        queryFrequencyExtensionInstalled: extensionInfo.installed,
+        queryFrequencyRanking:
+          extensionInfo.installed && topStatementsError === null,
+        serverLogFiles: false,
+      },
+      logging: {
+        loggingCollector: loggingSettings.logging_collector ?? 'unknown',
+        logStatement: loggingSettings.log_statement ?? 'unknown',
+        logMinDurationStatement:
+          loggingSettings.log_min_duration_statement ?? 'unknown',
+        pgStatStatementsVersion: extensionInfo.version ?? null,
+      },
+      activeSessions,
+      blockedSessions,
+      topStatements,
+      backupJobs,
+      notes,
+      consoleEntries: this.buildMonitoringConsoleEntries({
+        checkedAt,
+        summary,
+        activeSessions,
+        blockedSessions,
+        topStatements,
+        backupJobs,
+        loggingSettings,
+        extensionInstalled: extensionInfo.installed,
+        extensionVersion: extensionInfo.version ?? null,
+        topStatementsError,
+      }),
+    };
+  }
+
   async health() {
     const admin = await this.getIdentity(Role.Admin);
     const recepcionista = await this.getIdentity(Role.Recepcionista);
@@ -711,6 +1118,215 @@ export class DbAdminService {
     };
   }
 
+  private buildMonitoringConsoleEntries(input: {
+    checkedAt: string;
+    summary: {
+      activeSessions: number;
+      waitingSessions: number;
+      blockedSessions: number;
+      longRunningSessions: number;
+      backupJobsTracked: number;
+      failedBackupJobs: number;
+      topStatementsTracked: number;
+    };
+    activeSessions: MonitoringActiveSession[];
+    blockedSessions: MonitoringBlockedSession[];
+    topStatements: MonitoringTopStatement[];
+    backupJobs: BackupJobInfo[];
+    loggingSettings: Record<string, string>;
+    extensionInstalled: boolean;
+    extensionVersion: string | null;
+    topStatementsError: string | null;
+  }): MonitoringConsoleEntry[] {
+    const entries: MonitoringConsoleEntry[] = [];
+
+    entries.push({
+      id: 'capture-summary',
+      occurredAt: input.checkedAt,
+      level: 'info',
+      source: 'monitor',
+      category: 'summary',
+      title: 'CAPTURA DE MONITORIZACION',
+      message:
+        `Sesiones activas: ${input.summary.activeSessions} | ` +
+        `Esperas: ${input.summary.waitingSessions} | ` +
+        `Bloqueos: ${input.summary.blockedSessions} | ` +
+        `Backups rastreados: ${input.summary.backupJobsTracked}`,
+      context: `Snapshot generado ${input.checkedAt}`,
+      commandText: null,
+    });
+
+    entries.push({
+      id: 'logging-settings',
+      occurredAt: input.checkedAt,
+      level:
+        input.loggingSettings.logging_collector === 'on' ? 'info' : 'warn',
+      source: 'postgres',
+      category: 'system',
+      title: 'CONFIGURACION DE LOGGING DEL MOTOR',
+      message:
+        `logging_collector=${input.loggingSettings.logging_collector ?? 'unknown'} | ` +
+        `log_statement=${input.loggingSettings.log_statement ?? 'unknown'} | ` +
+        `log_min_duration_statement=${input.loggingSettings.log_min_duration_statement ?? 'unknown'}`,
+      context:
+        input.loggingSettings.logging_collector === 'on'
+          ? 'El servidor tiene soporte para logging persistente, pero los archivos no se leen desde la app.'
+          : 'La app solo puede mostrar actividad viva y el historial de respaldos del modulo.',
+      commandText:
+        'SHOW logging_collector;\nSHOW log_statement;\nSHOW log_min_duration_statement;',
+    });
+
+    entries.push({
+      id: 'extension-status',
+      occurredAt: input.checkedAt,
+      level:
+        input.extensionInstalled && !input.topStatementsError ? 'info' : 'warn',
+      source: 'pg_stat_statements',
+      category: 'system',
+      title: 'ESTADO DE CONSULTAS FRECUENTES',
+      message: input.extensionInstalled
+        ? `Extension disponible${input.extensionVersion ? ` v${input.extensionVersion}` : ''}.`
+        : 'La extension pg_stat_statements no esta instalada.',
+      context: input.topStatementsError
+        ? `No se pudo leer el ranking historico: ${input.topStatementsError}`
+        : input.extensionInstalled
+          ? `${input.topStatements.length} consultas frecuentes cargadas.`
+          : 'Solo se mostraran consultas activas del momento.',
+      commandText: input.extensionInstalled
+        ? 'SELECT * FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 12;'
+        : null,
+    });
+
+    if (input.blockedSessions.length === 0) {
+      entries.push({
+        id: 'no-blocking',
+        occurredAt: input.checkedAt,
+        level: 'success',
+        source: 'postgres',
+        category: 'lock',
+        title: 'SIN BLOQUEOS DETECTADOS',
+        message: 'No se observaron sesiones bloqueadas en esta captura.',
+        context: null,
+        commandText: null,
+      });
+    } else {
+      for (const row of input.blockedSessions) {
+        entries.push({
+          id: `blocking-${row.blockedPid}-${row.blockingPid}`,
+          occurredAt: input.checkedAt,
+          level: 'warn',
+          source: 'postgres',
+          category: 'lock',
+          title: `BLOQUEO PID ${row.blockedPid} <- PID ${row.blockingPid}`,
+          message:
+            `${row.blockedUser} espera sobre ${row.blockedWaitEventType ?? 'lock'}` +
+            `${row.blockedWaitEvent ? `/${row.blockedWaitEvent}` : ''}` +
+            ` mientras ${row.blockingUser} mantiene la sesion bloqueante.`,
+          context:
+            `Bloqueada ${this.formatDurationShort(row.blockedDurationMs)} | ` +
+            `estado ${row.blockedState} -> ${row.blockingState}`,
+          commandText:
+            `-- blocked\n${row.blockedQueryText || '<sin consulta visible>'}\n\n` +
+            `-- blocking\n${row.blockingQueryText || '<sin consulta visible>'}`,
+        });
+      }
+    }
+
+    if (input.activeSessions.length === 0) {
+      entries.push({
+        id: 'no-active-sessions',
+        occurredAt: input.checkedAt,
+        level: 'success',
+        source: 'postgres',
+        category: 'query',
+        title: 'SIN CONSULTAS ACTIVAS',
+        message: 'No hay sesiones activas o en espera visibles para esta captura.',
+        context: null,
+        commandText: null,
+      });
+    } else {
+      for (const session of input.activeSessions) {
+        entries.push({
+          id: `session-${session.pid}`,
+          occurredAt:
+            session.queryStart ?? session.stateChange ?? input.checkedAt,
+          level:
+            session.waitEventType || session.queryDurationMs >= 60_000
+              ? 'warn'
+              : 'info',
+          source: 'postgres',
+          category: 'query',
+          title: `PID ${session.pid} • ${session.user} • ${session.state}`,
+          message: session.waitEventType
+            ? `Sesion en espera por ${session.waitEventType}${session.waitEvent ? `/${session.waitEvent}` : ''}.`
+            : 'Sesion visible en pg_stat_activity.',
+          context:
+            `${session.applicationName} • ${session.clientAddress} • ` +
+            `${this.formatDurationShort(session.queryDurationMs)}`,
+          commandText: session.queryText || '<consulta no disponible>',
+        });
+      }
+    }
+
+    for (const statement of input.topStatements) {
+      entries.push({
+        id: statement.id,
+        occurredAt: input.checkedAt,
+        level: 'info',
+        source: 'pg_stat_statements',
+        category: 'statement',
+        title:
+          `TOP SQL • ${statement.calls} calls • ` +
+          `avg ${this.formatDurationShort(statement.meanExecTimeMs)}`,
+        message:
+          `Tiempo total ${this.formatDurationShort(statement.totalExecTimeMs)} • ` +
+          `${statement.rows} filas retornadas`,
+        context:
+          `cache hits ${statement.sharedHits} • reads ${statement.sharedReads} • temp ${statement.tempWritten}`,
+        commandText: statement.queryText || '<consulta agregada no disponible>',
+      });
+    }
+
+    for (const job of input.backupJobs) {
+      entries.push({
+        id: `backup-${job.id}`,
+        occurredAt: job.finishedAt ?? job.startedAt ?? job.createdAt,
+        level:
+          job.status === 'completed'
+            ? 'success'
+            : job.status === 'failed'
+              ? 'error'
+              : job.status === 'running'
+                ? 'warn'
+                : 'info',
+        source: 'backups',
+        category: 'backup',
+        title:
+          `${job.type === 'database' ? 'BACKUP COMPLETO' : 'BACKUP POR TABLA'} • ` +
+          `${job.source === 'automatic' ? 'automatico' : 'manual'} • ${job.status}`,
+        message:
+          job.error ??
+          job.fileName ??
+          (job.type === 'table' && job.tableName
+            ? `Tabla ${job.tableName}`
+            : 'Trabajo en progreso'),
+        context:
+          `Creado ${job.createdAt} • ${this.formatDurationShort(job.durationMs)}` +
+          (job.tableName ? ` • ${job.tableName}` : ''),
+        commandText: this.buildBackupConsoleCommand(job),
+      });
+    }
+
+    const [summaryEntry, ...rest] = entries;
+    const sortedRest = rest.sort((left, right) => {
+      const leftTime = new Date(left.occurredAt).getTime();
+      const rightTime = new Date(right.occurredAt).getTime();
+      return rightTime - leftTime;
+    });
+
+    return [summaryEntry, ...sortedRest];
+  }
+
   private async getIdentity(role: Role) {
     const { rows } = await this.db.query<DbIdentityRow>(
       role,
@@ -906,6 +1522,61 @@ export class DbAdminService {
 
   private toNumber(value: NumericValue | undefined): number {
     return Number(value ?? 0);
+  }
+
+  private formatQueryText(query: string | null, maxLength = 2200): string {
+    if (!query) {
+      return '';
+    }
+
+    const normalized = query
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .join('\n');
+
+    if (normalized.length <= maxLength) {
+      return normalized;
+    }
+
+    return `${normalized.slice(0, maxLength - 3)}...`;
+  }
+
+  private buildSingleLinePreview(text: string, maxLength = 160): string {
+    const compact = text.replace(/\s+/g, ' ').trim();
+    if (!compact) {
+      return '<sin consulta visible>';
+    }
+
+    if (compact.length <= maxLength) {
+      return compact;
+    }
+
+    return `${compact.slice(0, maxLength - 3)}...`;
+  }
+
+  private formatDurationShort(durationMs: number | null | undefined): string {
+    const safeValue = Math.max(0, Math.round(durationMs ?? 0));
+
+    if (safeValue < 1000) {
+      return `${safeValue} ms`;
+    }
+
+    if (safeValue < 60_000) {
+      return `${(safeValue / 1000).toFixed(1)} s`;
+    }
+
+    const minutes = Math.floor(safeValue / 60_000);
+    const seconds = Math.round((safeValue % 60_000) / 1000);
+    return `${minutes}m ${seconds}s`;
+  }
+
+  private buildBackupConsoleCommand(job: BackupJobInfo): string {
+    if (job.type === 'table' && job.tableName) {
+      return `pg_dump --table=${job.tableName} --format=custom --no-owner --no-privileges`;
+    }
+
+    return 'pg_dump --format=tar --no-owner --no-privileges';
   }
 
   private toPercentage(value: number, total: number): number {

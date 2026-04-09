@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { DoctorsService } from './doctors.service';
 import { CreateDoctorDto } from './dto/create-doctor.dto';
+import { UpdateDoctorStatusDto } from './dto/update-doctor-status.dto';
 import { UpdateDoctorDto } from './dto/update-doctor.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { Response } from 'express';
@@ -30,8 +31,9 @@ export class DoctorsController {
     @Query('search') search = '',
     @Query('page') page = 1,
     @Query('limit') limit = 10,
+    @Query('status') status?: string,
   ) {
-    return this.doctorsService.search(search, +page, +limit);
+    return this.doctorsService.search(search, +page, +limit, status);
   }
 
   @Get('exists')
@@ -43,7 +45,7 @@ export class DoctorsController {
   async create(@Body() dto: CreateDoctorDto) {
     const doctor = await this.doctorsService.create(dto);
     return {
-      message: 'Médico creado correctamente.',
+      message: 'Medico creado correctamente.',
       data: doctor,
     };
   }
@@ -88,7 +90,19 @@ export class DoctorsController {
   async update(@Param('id') id: string, @Body() dto: UpdateDoctorDto) {
     const doctor = await this.doctorsService.update(+id, dto);
     return {
-      message: 'Médico actualizado correctamente.',
+      message: 'Medico actualizado correctamente.',
+      data: doctor,
+    };
+  }
+
+  @Put(':id/status')
+  async updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateDoctorStatusDto,
+  ) {
+    const doctor = await this.doctorsService.updateStatus(+id, dto);
+    return {
+      message: 'Estatus de medico actualizado correctamente.',
       data: doctor,
     };
   }

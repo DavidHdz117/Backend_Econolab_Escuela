@@ -49,6 +49,9 @@ export class ServiceOrder {
     @Column({ type: 'timestamp', nullable: true })
     deliveryAt?: Date;
 
+    @Column({ type: 'timestamp', nullable: true })
+    completedAt?: Date;
+
     @Column({
         type: 'enum',
         enum: ServiceStatus,
@@ -108,6 +111,12 @@ export class ServiceOrderItem {
 
     @Column({ length: 200 })
     studyNameSnapshot: string; // Nombre del estudio al momento de crear el servicio
+
+    @Column({ name: 'source_package_id', nullable: true })
+    sourcePackageId?: number;
+
+    @Column({ name: 'source_package_name_snapshot', length: 200, nullable: true })
+    sourcePackageNameSnapshot?: string;
 
     @Column({ length: 20 })
     priceType: ServiceItemPriceType; // normal, especial, DIF, etc.

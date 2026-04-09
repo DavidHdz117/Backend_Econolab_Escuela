@@ -58,6 +58,9 @@ export class Study {
     @Column({ length: 150, nullable: true })
     indicator?: string;
 
+    @Column('integer', { array: true, default: () => "'{}'" })
+    packageStudyIds: number[];
+
     @Column({
         type: 'enum',
         enum: StudyStatus,

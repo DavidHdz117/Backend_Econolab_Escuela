@@ -1,54 +1,75 @@
-import {IsArray, IsDateString, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Max, Min, ValidateNested,} from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ServiceStatus } from '../entities/service-order.entity';
 import { CreateServiceItemDto } from './service-item.dto';
 
 export class CreateServiceDto {
-    @IsString({ message: 'El folio debe ser una cadena de texto.' })
-    @IsNotEmpty({ message: 'El folio es obligatorio.' })
-    folio: string;
+  @IsOptional()
+  @IsString({ message: 'El folio debe ser una cadena de texto.' })
+  @IsNotEmpty({ message: 'El folio no puede estar vacio.' })
+  folio?: string;
 
-    @Type(() => Number)
-    @IsInt({ message: 'El identificador del paciente debe ser un número entero.' })
-    patientId: number;
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean({ message: 'La bandera de folio automatico es invalida.' })
+  autoGenerateFolio?: boolean;
 
-    @IsOptional()
-    @Type(() => Number)
-    @IsInt({ message: 'El identificador del médico debe ser un número entero.' })
-    doctorId?: number;
+  @Type(() => Number)
+  @IsInt({
+    message: 'El identificador del paciente debe ser un numero entero.',
+  })
+  patientId: number;
 
-    @IsOptional()
-    @IsString({ message: 'La sucursal debe ser una cadena de texto.' })
-    branchName?: string;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'El identificador del medico debe ser un numero entero.' })
+  doctorId?: number;
 
-    @IsOptional()
-    @IsDateString({}, { message: 'La fecha/hora de toma de muestra no es válida.' })
-    sampleAt?: string;
+  @IsOptional()
+  @IsString({ message: 'La sucursal debe ser una cadena de texto.' })
+  branchName?: string;
 
-    @IsOptional()
-    @IsDateString({}, { message: 'La fecha/hora de entrega no es válida.' })
-    deliveryAt?: string;
+  @IsOptional()
+  @IsDateString({}, { message: 'La fecha/hora de toma de muestra no es valida.' })
+  sampleAt?: string;
 
-    @IsOptional()
-    @IsEnum(ServiceStatus, {
-        message:
-            'El estatus es inválido. Valores permitidos: pending, in_progress, delayed, completed, cancelled.',
-    })
-    status?: ServiceStatus;
+  @IsOptional()
+  @IsDateString({}, { message: 'La fecha/hora de entrega no es valida.' })
+  deliveryAt?: string;
 
-    @IsOptional()
-    @Type(() => Number)
-    @IsNumber({}, { message: 'El porcentaje de cortesía debe ser numérico.' })
-    @Min(0, { message: 'La cortesía no puede ser negativa.' })
-    @Max(100, { message: 'La cortesía no puede ser mayor a 100.' })
-    courtesyPercent?: number;
+  @IsOptional()
+  @IsEnum(ServiceStatus, {
+    message:
+      'El estatus es invalido. Valores permitidos: pending, in_progress, delayed, completed, cancelled.',
+  })
+  status?: ServiceStatus;
 
-    @IsOptional()
-    @IsString({ message: 'Las notas deben ser una cadena de texto.' })
-    notes?: string;
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({}, { message: 'El porcentaje de cortesia debe ser numerico.' })
+  @Min(0, { message: 'La cortesia no puede ser negativa.' })
+  @Max(100, { message: 'La cortesia no puede ser mayor a 100.' })
+  courtesyPercent?: number;
 
-    @IsArray({ message: 'Los estudios deben venir en un arreglo.' })
-    @ValidateNested({ each: true })
-    @Type(() => CreateServiceItemDto)
-    items: CreateServiceItemDto[];
+  @IsOptional()
+  @IsString({ message: 'Las notas deben ser una cadena de texto.' })
+  notes?: string;
+
+  @IsArray({ message: 'Los estudios deben venir en un arreglo.' })
+  @ValidateNested({ each: true })
+  @Type(() => CreateServiceItemDto)
+  items: CreateServiceItemDto[];
 }

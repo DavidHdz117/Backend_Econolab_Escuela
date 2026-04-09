@@ -34,6 +34,11 @@ export class DbAdminController {
     return this.dbAdminService.monitoring();
   }
 
+  @Get('monitoring/logs')
+  monitoringLogs() {
+    return this.dbAdminService.monitoringLogs();
+  }
+
   @Get('health')
   health() {
     return this.dbAdminService.health();

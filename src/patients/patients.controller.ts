@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { PatientsService } from './patients.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
+import { UpdatePatientStatusDto } from './dto/update-patient-status.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { Response } from 'express';
@@ -30,8 +31,9 @@ export class PatientsController {
     @Query('search') search = '',
     @Query('page') page = 1,
     @Query('limit') limit = 10,
+    @Query('status') status?: string,
   ) {
-    return this.patientsService.search(search, +page, +limit);
+    return this.patientsService.search(search, +page, +limit, status);
   }
 
   @Get('exists')
@@ -92,6 +94,18 @@ export class PatientsController {
     const patient = await this.patientsService.update(+id, dto);
     return {
       message: 'Paciente actualizado correctamente.',
+      data: patient,
+    };
+  }
+
+  @Put(':id/status')
+  async updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdatePatientStatusDto,
+  ) {
+    const patient = await this.patientsService.updateStatus(+id, dto);
+    return {
+      message: 'Estatus de paciente actualizado correctamente.',
       data: patient,
     };
   }

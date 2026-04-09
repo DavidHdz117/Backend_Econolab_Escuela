@@ -19,6 +19,7 @@ import { CreateStudyDto } from './dto/create-study.dto';
 import { UpdateStudyDto } from './dto/update-study.dto';
 import { CreateStudyDetailDto } from './dto/create-study-detail.dto';
 import { UpdateStudyDetailDto } from './dto/update-study-detail.dto';
+import { UpdateStudyDetailStatusDto } from './dto/update-study-detail-status.dto';
 import { StudyStatus, StudyType } from './entities/study.entity';
 import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -42,6 +43,11 @@ export class StudiesController {
   @Get('exists')
   exists(@Query('code') code: string) {
     return this.studiesService.existsByCode(code);
+  }
+
+  @Get('next-code')
+  getSuggestedCode(@Query('type') type?: StudyType) {
+    return this.studiesService.getSuggestedCode(type ?? StudyType.STUDY);
   }
 
   @Post()
@@ -108,8 +114,6 @@ export class StudiesController {
     return this.studiesService.hardDelete(+id);
   }
 
-  // -------- DETALLES --------
-
   @Get(':id/details')
   listDetails(@Param('id') id: string) {
     return this.studiesService.listDetails(+id);
@@ -135,6 +139,18 @@ export class StudiesController {
     const detail = await this.studiesService.updateDetail(+detailId, dto);
     return {
       message: 'Detalle de estudio actualizado correctamente.',
+      data: detail,
+    };
+  }
+
+  @Put('details/:detailId/status')
+  async updateDetailStatus(
+    @Param('detailId') detailId: string,
+    @Body() dto: UpdateStudyDetailStatusDto,
+  ) {
+    const detail = await this.studiesService.updateDetailStatus(+detailId, dto);
+    return {
+      message: 'Estatus del detalle actualizado correctamente.',
       data: detail,
     };
   }
