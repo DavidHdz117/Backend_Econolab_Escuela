@@ -1,8 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException, } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import PDFDocument from 'pdfkit';
-import fs from 'fs';
+import PDFDocument = require('pdfkit');
+import * as fs from 'fs';
 import * as QRCode from 'qrcode';
 import {ServiceOrder,ServiceOrderItem,} from '../services/entities/service-order.entity';
 import {
@@ -195,7 +195,364 @@ export class ResultsService {
     return new Map<number, StudyDetail[]>(entries);
   }
 
-  private async buildPdfBuffer(result: StudyResult): Promise<Buffer> {
+  private buildPersonName(
+    person?:
+      | {
+          firstName?: string | null;
+          lastName?: string | null;
+          middleName?: string | null;
+        }
+      | null,
+  ) {
+    if (!person) return 'N/D';
+
+    const fullName = [
+      person.firstName?.trim(),
+      person.lastName?.trim(),
+      person.middleName?.trim(),
+    ]
+      .filter((part): part is string => Boolean(part))
+      .join(' ')
+      .trim();
+
+    return fullName || 'N/D';
+  }
+
+  private formatGenderLabel(gender?: string | null) {
+    switch ((gender ?? '').toLowerCase()) {
+      case 'male':
+        return 'Masculino';
+      case 'female':
+        return 'Femenino';
+      case 'other':
+        return 'Otro';
+      default:
+        return gender ? `${gender.charAt(0).toUpperCase()}${gender.slice(1)}` : 'N/D';
+    }
+  }
+
+  private formatPdfDate(value?: Date | string | null) {
+    if (!value) return 'N/D';
+    try {
+      return new Date(value).toLocaleString('es-MX');
+    } catch {
+      return String(value);
+    }
+  }
+
+  private formatPdfDateShort(value?: Date | string | null) {
+    if (!value) return 'N/D';
+    try {
+      return new Date(value).toLocaleDateString('es-MX');
+    } catch {
+      return String(value);
+    }
+  }
+
+  private calcAgeLabel(birthDate?: string | null) {
+    if (!birthDate) return 'N/D';
+
+    const birth = new Date(`${birthDate}T00:00:00`);
+    if (Number.isNaN(birth.getTime())) return 'N/D';
+
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birth.getDate())
+    ) {
+      age -= 1;
+    }
+
+    return `${age} anos`;
+  }
+
+  private drawPdfLogo(
+    doc: any,
+    logoPath: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ) {
+    if (logoPath && fs.existsSync(logoPath)) {
+      doc.image(logoPath, x, y, {
+        fit: [width, height],
+        align: 'center',
+        valign: 'center',
+      });
+      return;
+    }
+
+    doc.rect(x, y, width, height).strokeColor('#c8ced6').stroke();
+    doc
+      .font('Helvetica')
+      .fontSize(8)
+      .fillColor('#7a7a7a')
+      .text('LOGO', x, y + height / 2 - 4, {
+        width,
+        align: 'center',
+      })
+      .fillColor('black');
+  }
+
+  private drawDetailBlock(
+    doc: any,
+    title: string,
+    lines: string[],
+    x: number,
+    y: number,
+    width: number,
+  ) {
+    doc.font('Helvetica-Bold').fontSize(10.5).text(title, x, y, { width });
+
+    let cursorY = y + 18;
+    doc.font('Helvetica').fontSize(9.1);
+    for (const line of lines) {
+      doc.text(line, x, cursorY, { width });
+      cursorY += 18;
+    }
+
+    return cursorY;
+  }
+
+  private drawResultHeader(
+    doc: any,
+    options: {
+      labName: string;
+      labSubtitle: string;
+      labAddress: string;
+      labAddress2: string;
+      labPhone: string;
+      logoPath: string;
+      branchName?: string | null;
+      folio?: string | null;
+    },
+  ) {
+    const left = 48;
+    const right = doc.page.width - 48;
+    const top = 42;
+
+    this.drawPdfLogo(doc, options.logoPath, left, top, 90, 50);
+
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(18)
+      .text(options.labName, 150, top - 2, {
+        width: 240,
+        align: 'center',
+      });
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(9)
+      .text(options.labSubtitle, 150, top + 24, {
+        width: 240,
+        align: 'center',
+      });
+    doc
+      .font('Helvetica')
+      .fontSize(8.3)
+      .text(options.labAddress, 150, top + 38, {
+        width: 240,
+        align: 'center',
+      });
+    if (options.labAddress2) {
+      doc.text(options.labAddress2, 150, top + 50, {
+        width: 240,
+        align: 'center',
+      });
+    }
+    if (options.labPhone) {
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(8)
+        .text(`TEL. ${options.labPhone}`, 150, top + 62, {
+          width: 240,
+          align: 'center',
+        });
+    }
+
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(12)
+      .text(`SUC: ${options.branchName ?? 'N/D'}`, right - 165, top, {
+        width: 165,
+        align: 'right',
+      })
+      .text(`FOLIO: ${options.folio ?? 'N/D'}`, right - 210, top + 22, {
+        width: 210,
+        align: 'right',
+      });
+
+    const dividerY = top + 104;
+    doc.moveTo(left, dividerY).lineTo(right, dividerY).strokeColor('#c8ced6').stroke();
+    doc.y = dividerY + 16;
+  }
+
+  private drawResultInfoSection(
+    doc: any,
+    service: ServiceOrder | undefined,
+    sampleAt?: Date | null,
+    deliveredAt?: Date | null,
+  ) {
+    const left = 48;
+    const right = doc.page.width - 48;
+    const top = doc.y;
+    const patient = service?.patient;
+    const doctor = service?.doctor;
+
+    const patientBottom = this.drawDetailBlock(
+      doc,
+      'PACIENTE',
+      [
+        `Nombre: ${this.buildPersonName(patient)}`,
+        `Fecha nac.: ${this.formatPdfDateShort(patient?.birthDate)}`,
+        `Edad: ${this.calcAgeLabel(patient?.birthDate)}`,
+        `Tel: ${patient?.phone ?? 'N/D'}`,
+        `Sexo: ${this.formatGenderLabel(patient?.gender)}`,
+        `Direccion: ${patient?.addressLine ?? 'N/D'}`,
+        `Entre calles: ${patient?.addressBetween ?? 'N/D'}`,
+      ],
+      left,
+      top,
+      220,
+    );
+
+    const doctorBottom = this.drawDetailBlock(
+      doc,
+      'MEDICO',
+      [
+        `Doctor(a): ${this.buildPersonName(doctor)}`,
+        `Cedula: ${doctor?.licenseNumber ?? 'N/D'}`,
+        `Especialidad: ${doctor?.specialty ?? 'N/D'}`,
+        `Fecha de toma de muestra: ${this.formatPdfDate(sampleAt ?? service?.sampleAt)}`,
+        `Fecha de entrega de resultado: ${this.formatPdfDate(deliveredAt ?? service?.deliveryAt)}`,
+      ],
+      300,
+      top,
+      247,
+    );
+
+    const dividerY = Math.max(patientBottom, doctorBottom) + 8;
+    doc.moveTo(left, dividerY).lineTo(right, dividerY).strokeColor('#c8ced6').stroke();
+    doc.y = dividerY + 16;
+  }
+
+  private drawResultsFooter(
+    doc: any,
+    qrBuffer: Buffer | null,
+    options: {
+      includeSignature: boolean;
+      labSchedule: string;
+      labSampleSchedule: string;
+      labEmail: string;
+      labPhone: string;
+      signaturePath: string;
+      responsibleName: string;
+      responsibleLicense: string;
+    },
+  ) {
+    const left = 48;
+    const right = doc.page.width - 48;
+    const top = doc.y + 4;
+
+    doc.moveTo(left, top).lineTo(right, top).strokeColor('#c8ced6').stroke();
+
+    const blockTop = top + 12;
+    if (qrBuffer) {
+      doc.image(qrBuffer, left, blockTop, { width: 68, height: 68 });
+    } else {
+      doc.rect(left, blockTop, 68, 68).strokeColor('#c8ced6').stroke();
+      doc
+        .font('Helvetica')
+        .fontSize(7)
+        .fillColor('#7a7a7a')
+        .text('QR', left, blockTop + 26, {
+          width: 68,
+          align: 'center',
+        })
+        .fillColor('black');
+    }
+
+    doc
+      .font('Helvetica')
+      .fontSize(7)
+      .text('Escanea para validar', left, blockTop + 56, {
+        width: 68,
+        align: 'center',
+      });
+
+    doc
+      .font('Helvetica')
+      .fontSize(8)
+      .text(options.labSchedule, 130, blockTop + 2, { width: 170 })
+      .text(options.labSampleSchedule, 130, blockTop + 16, { width: 170 })
+      .text(`Correo: ${options.labEmail}`, 130, blockTop + 30, { width: 170 })
+      .text(`Telefono: ${options.labPhone}`, 130, blockTop + 44, {
+        width: 170,
+      });
+
+    if (options.includeSignature) {
+      doc
+        .font('Helvetica')
+        .fontSize(9)
+        .text('ATENTAMENTE', 360, blockTop + 4, {
+          width: 160,
+          align: 'right',
+        });
+
+      if (options.signaturePath && fs.existsSync(options.signaturePath)) {
+        doc.image(options.signaturePath, 360, blockTop + 14, {
+          fit: [160, 42],
+          align: 'right',
+        });
+      }
+
+      doc
+        .font('Helvetica')
+        .fontSize(8.7)
+        .text('______________________________', 360, blockTop + 44, {
+          width: 160,
+          align: 'right',
+        })
+        .text(options.responsibleName, 360, blockTop + 58, {
+          width: 160,
+          align: 'right',
+        });
+
+      if (options.responsibleLicense) {
+        doc.text(`Ced. Prof. ${options.responsibleLicense}`, 360, blockTop + 70, {
+          width: 160,
+          align: 'right',
+        });
+      }
+    } else {
+      doc
+        .font('Helvetica')
+        .fontSize(9)
+        .text('Documento emitido sin firma.', 360, blockTop + 28, {
+          width: 160,
+          align: 'right',
+        });
+    }
+
+    doc
+      .font('Helvetica')
+      .fontSize(7.5)
+      .fillColor('#555555')
+      .text(
+        'Este resultado es confidencial y forma parte del expediente clinico.',
+        left,
+        blockTop + 86,
+        { width: right - left },
+      )
+      .fillColor('black');
+
+    doc.y = blockTop + 98;
+  }
+
+  private async buildPdfBufferLegacy(result: StudyResult): Promise<Buffer> {
     const qrBuffer = await this.buildQrBuffer(result);
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ margin: 48, size: 'A4' });
@@ -489,7 +846,7 @@ export class ResultsService {
     });
   }
 
-  private async buildServicePdfBuffer(
+  private async buildServicePdfBufferLegacy(
     service: ServiceOrder,
     sections: ServicePdfSection[],
     options: ResultPdfOptions,
@@ -838,6 +1195,470 @@ export class ResultsService {
         .font('Helvetica')
         .fontSize(8)
         .text('Este resultado es confidencial y forma parte del expediente clinico.');
+
+      doc.end();
+    });
+  }
+
+  private async buildPdfBuffer(result: StudyResult): Promise<Buffer> {
+    const studyDetails = result.serviceOrderItem?.studyId
+      ? await this.detailRepo.find({
+          where: {
+            studyId: result.serviceOrderItem.studyId,
+            isActive: true,
+          },
+          order: { sortOrder: 'ASC' },
+        })
+      : [];
+    const qrBuffer = await this.buildQrBuffer(result);
+
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 48, size: 'A4' });
+      const chunks: Buffer[] = [];
+
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('error', (err) => reject(err));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+
+      const labName = process.env.LAB_NAME ?? 'ECONOLAB';
+      const labSubtitle =
+        process.env.LAB_SUBTITLE ?? 'LABORATORIO DE ANALISIS CLINICOS';
+      const labAddress = process.env.LAB_ADDRESS ?? 'Direccion no configurada';
+      const labAddress2 = process.env.LAB_ADDRESS_2 ?? '';
+      const labPhone = process.env.LAB_PHONE ?? 'Telefono no configurado';
+      const labEmail = process.env.LAB_EMAIL ?? 'Correo no configurado';
+      const labSchedule = process.env.LAB_SCHEDULE ?? 'Horario no configurado';
+      const labSampleSchedule =
+        process.env.LAB_SAMPLE_SCHEDULE ?? 'Horario de toma no configurado';
+      const logoPath = process.env.LAB_LOGO_PATH ?? '';
+      const signaturePath = process.env.LAB_SIGNATURE_PATH ?? '';
+      const responsibleName =
+        process.env.LAB_RESPONSIBLE_NAME ?? 'Responsable Sanitario';
+      const responsibleLicense =
+        process.env.LAB_RESPONSIBLE_LICENSE ?? '';
+
+      const service = result.serviceOrder;
+      const studyName =
+        result.serviceOrderItem?.studyNameSnapshot ?? 'Estudio';
+
+      const left = 48;
+      const right = doc.page.width - 48;
+      const bottomLimit = doc.page.height - 150;
+      const colX = { label: left, value: 305, unit: 414, ref: 478 };
+      const colWidth = { label: 225, value: 90, unit: 48, ref: 70 };
+
+      this.drawResultHeader(doc, {
+        labName,
+        labSubtitle,
+        labAddress,
+        labAddress2,
+        labPhone,
+        logoPath,
+        branchName: service?.branchName,
+        folio: service?.folio,
+      });
+      this.drawResultInfoSection(
+        doc,
+        service,
+        result.sampleAt ?? service?.sampleAt,
+        result.reportedAt ?? service?.deliveryAt,
+      );
+
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(12.5)
+        .fillColor('#3b6f9c')
+        .text(studyName.toUpperCase(), left, doc.y, {
+          width: right - left,
+          align: 'center',
+        })
+        .fillColor('black');
+
+      if (result.method) {
+        doc
+          .font('Helvetica')
+          .fontSize(8.8)
+          .text(`Metodo: ${result.method}`, {
+            width: right - left,
+            align: 'center',
+          });
+      }
+      if (result.observations) {
+        doc
+          .font('Helvetica')
+          .fontSize(8.8)
+          .text(`Observaciones: ${result.observations}`, {
+            width: right - left,
+            align: 'center',
+          });
+      }
+
+      let cursorY = doc.y + 10;
+
+      const drawTableHeader = () => {
+        doc.moveTo(left, cursorY).lineTo(right, cursorY).strokeColor('#c8ced6').stroke();
+        cursorY += 8;
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(9.4)
+          .text('Parametro', colX.label, cursorY, { width: colWidth.label })
+          .text('Resultado', colX.value, cursorY, { width: colWidth.value })
+          .text('Unidad', colX.unit, cursorY, { width: colWidth.unit })
+          .text('Referencia', colX.ref, cursorY, { width: colWidth.ref });
+        cursorY += 16;
+        doc.moveTo(left, cursorY).lineTo(right, cursorY).strokeColor('#c8ced6').stroke();
+        cursorY += 10;
+      };
+
+      const addContinuationPage = () => {
+        doc.addPage();
+        cursorY = 56;
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(12.5)
+          .fillColor('#3b6f9c')
+          .text(studyName.toUpperCase(), left, cursorY, {
+            width: right - left,
+            align: 'center',
+          })
+          .fillColor('black');
+        cursorY += 24;
+        drawTableHeader();
+      };
+
+      const ensureSpace = (needed: number) => {
+        if (cursorY + needed > bottomLimit) {
+          addContinuationPage();
+        }
+      };
+
+      drawTableHeader();
+
+      const groups = this.groupResultValues(result.values ?? [], studyDetails);
+      if (groups.length === 0) {
+        ensureSpace(18);
+        doc
+          .font('Helvetica')
+          .fontSize(9.5)
+          .text('Sin parametros visibles para mostrar.', left, cursorY, {
+            width: right - left,
+          });
+        cursorY += 18;
+      } else {
+        for (const group of groups) {
+          if (group.title) {
+            ensureSpace(24);
+            doc
+              .font('Helvetica-Bold')
+              .fontSize(10)
+              .fillColor('#3b6f9c')
+              .text(group.title.toUpperCase(), left, cursorY, {
+                width: right - left,
+              })
+              .fillColor('black');
+            cursorY += 18;
+          }
+
+          for (const value of group.rows) {
+            doc.font('Helvetica').fontSize(9.4);
+            const rowHeight =
+              Math.max(
+                doc.heightOfString(value.label ?? 'N/D', {
+                  width: colWidth.label,
+                }),
+                doc.heightOfString(value.value ?? '', {
+                  width: colWidth.value,
+                }),
+                doc.heightOfString(value.unit ?? '', {
+                  width: colWidth.unit,
+                }),
+                doc.heightOfString(value.referenceValue ?? '', {
+                  width: colWidth.ref,
+                }),
+                12,
+              ) + 4;
+
+            ensureSpace(rowHeight + 8);
+            doc.text(value.label ?? 'N/D', colX.label, cursorY, {
+              width: colWidth.label,
+            });
+            doc.text(value.value ?? '', colX.value, cursorY, {
+              width: colWidth.value,
+            });
+            doc.text(value.unit ?? '', colX.unit, cursorY, {
+              width: colWidth.unit,
+            });
+            doc.text(value.referenceValue ?? '', colX.ref, cursorY, {
+              width: colWidth.ref,
+            });
+
+            cursorY += rowHeight;
+            doc.moveTo(left, cursorY).lineTo(right, cursorY).strokeColor('#eef2f6').stroke();
+            cursorY += 6;
+          }
+
+          cursorY += 4;
+        }
+      }
+
+      doc.y = cursorY;
+      if (doc.y + 130 > doc.page.height - 40) {
+        doc.addPage();
+        doc.y = 56;
+      }
+
+      this.drawResultsFooter(doc, qrBuffer, {
+        includeSignature: true,
+        labSchedule,
+        labSampleSchedule,
+        labEmail,
+        labPhone,
+        signaturePath,
+        responsibleName,
+        responsibleLicense,
+      });
+
+      doc.end();
+    });
+  }
+
+  private async buildServicePdfBuffer(
+    service: ServiceOrder,
+    sections: ServicePdfSection[],
+    options: ResultPdfOptions,
+  ): Promise<Buffer> {
+    const qrBuffer = sections[0]
+      ? await this.buildQrBuffer(sections[0].result)
+      : null;
+
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 48, size: 'A4' });
+      const chunks: Buffer[] = [];
+
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('error', (err) => reject(err));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+
+      const labName = process.env.LAB_NAME ?? 'ECONOLAB';
+      const labSubtitle =
+        process.env.LAB_SUBTITLE ?? 'LABORATORIO DE ANALISIS CLINICOS';
+      const labAddress = process.env.LAB_ADDRESS ?? 'Direccion no configurada';
+      const labAddress2 = process.env.LAB_ADDRESS_2 ?? '';
+      const labPhone = process.env.LAB_PHONE ?? 'Telefono no configurado';
+      const labEmail = process.env.LAB_EMAIL ?? 'Correo no configurado';
+      const labSchedule = process.env.LAB_SCHEDULE ?? 'Horario no configurado';
+      const labSampleSchedule =
+        process.env.LAB_SAMPLE_SCHEDULE ?? 'Horario de toma no configurado';
+      const logoPath = process.env.LAB_LOGO_PATH ?? '';
+      const signaturePath = process.env.LAB_SIGNATURE_PATH ?? '';
+      const responsibleName =
+        process.env.LAB_RESPONSIBLE_NAME ?? 'Responsable Sanitario';
+      const responsibleLicense =
+        process.env.LAB_RESPONSIBLE_LICENSE ?? '';
+
+      const left = 48;
+      const right = doc.page.width - 48;
+      const bottomLimit = doc.page.height - 150;
+      const colX = { label: left, value: 305, unit: 414, ref: 478 };
+      const colWidth = { label: 225, value: 90, unit: 48, ref: 70 };
+      const studySummary = sections
+        .map((section) => section.item.studyNameSnapshot)
+        .join(', ');
+
+      this.drawResultHeader(doc, {
+        labName,
+        labSubtitle,
+        labAddress,
+        labAddress2,
+        labPhone,
+        logoPath,
+        branchName: service.branchName,
+        folio: service.folio,
+      });
+      this.drawResultInfoSection(doc, service, service.sampleAt, service.deliveryAt);
+
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(11.4)
+        .fillColor('#3b6f9c')
+        .text(studySummary.toUpperCase(), left, doc.y, {
+          width: right - left,
+          align: 'center',
+        })
+        .fillColor('black');
+
+      let cursorY = doc.y + 10;
+
+      const drawTableHeader = () => {
+        doc.moveTo(left, cursorY).lineTo(right, cursorY).strokeColor('#c8ced6').stroke();
+        cursorY += 8;
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(9.4)
+          .text('Parametro', colX.label, cursorY, { width: colWidth.label })
+          .text('Resultado', colX.value, cursorY, { width: colWidth.value })
+          .text('Unidad', colX.unit, cursorY, { width: colWidth.unit })
+          .text('Referencia', colX.ref, cursorY, { width: colWidth.ref });
+        cursorY += 16;
+        doc.moveTo(left, cursorY).lineTo(right, cursorY).strokeColor('#c8ced6').stroke();
+        cursorY += 10;
+      };
+
+      const drawStudyHeader = (section: ServicePdfSection) => {
+        const studyTitle = section.item.studyNameSnapshot.toUpperCase();
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(12)
+          .text(studyTitle, left, cursorY, {
+            width: right - left,
+            align: 'center',
+          });
+        cursorY += 18;
+
+        if (section.result.method) {
+          doc
+            .font('Helvetica')
+            .fontSize(8.8)
+            .text(`Metodo: ${section.result.method}`, left, cursorY, {
+              width: right - left,
+              align: 'center',
+            });
+          cursorY += 14;
+        }
+        if (section.result.observations) {
+          doc
+            .font('Helvetica')
+            .fontSize(8.8)
+            .text(`Observaciones: ${section.result.observations}`, left, cursorY, {
+              width: right - left,
+              align: 'center',
+            });
+          cursorY += 14;
+        }
+
+        drawTableHeader();
+      };
+
+      const addContinuationPage = (section: ServicePdfSection) => {
+        doc.addPage();
+        cursorY = 56;
+        drawStudyHeader(section);
+      };
+
+      const ensureSpace = (needed: number, section: ServicePdfSection) => {
+        if (cursorY + needed > bottomLimit) {
+          addContinuationPage(section);
+        }
+      };
+
+      sections.forEach((section, sectionIndex) => {
+        if (sectionIndex > 0) {
+          if (options.studyLayout === 'page-per-study') {
+            doc.addPage();
+            cursorY = 56;
+          } else {
+            ensureSpace(42, section);
+          }
+        }
+
+        drawStudyHeader(section);
+
+        const groups = this.groupResultValues(
+          section.result.values ?? [],
+          section.studyDetails,
+        );
+
+        if (groups.length === 0) {
+          ensureSpace(20, section);
+          doc
+            .font('Helvetica')
+            .fontSize(9.5)
+            .text('Sin parametros visibles para mostrar.', left, cursorY, {
+              width: right - left,
+            });
+          cursorY += 20;
+          return;
+        }
+
+        groups.forEach((group, groupIndex) => {
+          if (options.categoryLayout === 'page-per-category' && groupIndex > 0) {
+            doc.addPage();
+            cursorY = 56;
+            drawStudyHeader(section);
+          } else if (group.title) {
+            ensureSpace(26, section);
+          }
+
+          if (group.title) {
+            doc
+              .font('Helvetica-Bold')
+              .fontSize(10)
+              .fillColor('#3b6f9c')
+              .text(group.title.toUpperCase(), left, cursorY, {
+                width: right - left,
+              })
+              .fillColor('black');
+            cursorY += 18;
+          }
+
+          for (const value of group.rows) {
+            doc.font('Helvetica').fontSize(9.4);
+            const rowHeight =
+              Math.max(
+                doc.heightOfString(value.label ?? 'N/D', {
+                  width: colWidth.label,
+                }),
+                doc.heightOfString(value.value ?? '', {
+                  width: colWidth.value,
+                }),
+                doc.heightOfString(value.unit ?? '', {
+                  width: colWidth.unit,
+                }),
+                doc.heightOfString(value.referenceValue ?? '', {
+                  width: colWidth.ref,
+                }),
+                12,
+              ) + 4;
+
+            ensureSpace(rowHeight + 8, section);
+            doc.text(value.label ?? 'N/D', colX.label, cursorY, {
+              width: colWidth.label,
+            });
+            doc.text(value.value ?? '', colX.value, cursorY, {
+              width: colWidth.value,
+            });
+            doc.text(value.unit ?? '', colX.unit, cursorY, {
+              width: colWidth.unit,
+            });
+            doc.text(value.referenceValue ?? '', colX.ref, cursorY, {
+              width: colWidth.ref,
+            });
+
+            cursorY += rowHeight;
+            doc.moveTo(left, cursorY).lineTo(right, cursorY).strokeColor('#eef2f6').stroke();
+            cursorY += 6;
+          }
+
+          cursorY += 4;
+        });
+      });
+
+      doc.y = cursorY;
+      if (doc.y + 130 > doc.page.height - 40) {
+        doc.addPage();
+        doc.y = 56;
+      }
+
+      this.drawResultsFooter(doc, qrBuffer, {
+        includeSignature: options.includeSignature,
+        labSchedule,
+        labSampleSchedule,
+        labEmail,
+        labPhone,
+        signaturePath,
+        responsibleName,
+        responsibleLicense,
+      });
 
       doc.end();
     });

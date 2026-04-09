@@ -18,8 +18,8 @@ import { UpdateServiceStatusDto } from './dto/update-service-status.dto';
 import { Patient } from '../patients/entities/patient.entity';
 import { Doctor } from '../doctors/entities/doctor.entity';
 import { Study, StudyStatus, StudyType } from '../studies/entities/study.entity';
-import PDFDocument from 'pdfkit';
-import fs from 'fs';
+import PDFDocument = require('pdfkit');
+import * as fs from 'fs';
 import * as bwipjs from 'bwip-js';
 import { toCsv } from 'src/common/utils/csv.util';
 
@@ -128,6 +128,71 @@ export class ServicesService {
     if (!text) return '';
     if (text.length <= max) return text;
     return `${text.slice(0, max - 3)}...`;
+  }
+
+  private buildPersonName(
+    person?:
+      | {
+          firstName?: string | null;
+          lastName?: string | null;
+          middleName?: string | null;
+        }
+      | null,
+  ) {
+    if (!person) return 'N/D';
+
+    const fullName = [
+      person.firstName?.trim(),
+      person.lastName?.trim(),
+      person.middleName?.trim(),
+    ]
+      .filter((part): part is string => Boolean(part))
+      .join(' ')
+      .trim();
+
+    return fullName || 'N/D';
+  }
+
+  private formatGenderLabel(gender?: string | null) {
+    switch ((gender ?? '').toLowerCase()) {
+      case 'male':
+        return 'Masculino';
+      case 'female':
+        return 'Femenino';
+      case 'other':
+        return 'Otro';
+      default:
+        return gender ? `${gender.charAt(0).toUpperCase()}${gender.slice(1)}` : 'N/D';
+    }
+  }
+
+  private drawPdfLogo(
+    doc: any,
+    logoPath: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ) {
+    if (logoPath && fs.existsSync(logoPath)) {
+      doc.image(logoPath, x, y, {
+        fit: [width, height],
+        align: 'center',
+        valign: 'center',
+      });
+      return;
+    }
+
+    doc.rect(x, y, width, height).strokeColor('#c8ced6').stroke();
+    doc
+      .font('Helvetica')
+      .fontSize(8)
+      .fillColor('#7a7a7a')
+      .text('LOGO', x, y + height / 2 - 4, {
+        width,
+        align: 'center',
+      })
+      .fillColor('black');
   }
 
   private sanitizeBarcodeToken(text: string, max = 10) {
@@ -262,6 +327,8 @@ export class ServicesService {
 
     const patient = service.patient;
     const doctor = service.doctor;
+    const patientName = this.buildPersonName(patient);
+    const doctorName = this.buildPersonName(doctor);
     const barcodeText = service.folio ?? String(service.id);
     const barcodeBuffer = await this.buildBarcodeBuffer(barcodeText, 12);
 
@@ -273,140 +340,232 @@ export class ServicesService {
       doc.on('error', (err) => reject(err));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
 
-      const headerTop = doc.y;
-      if (logoPath && fs.existsSync(logoPath)) {
-        doc.image(logoPath, 40, headerTop, {
-          fit: [90, 50],
+      const left = 40;
+      const right = doc.page.width - 40;
+      const top = 42;
+      const dividerColor = '#c8ced6';
+      const lightDividerColor = '#e9edf2';
+      const blueAccent = '#3b6f9c';
+      const infoLeftX = left;
+      const infoRightX = 308;
+      const infoWidth = 220;
+
+      this.drawPdfLogo(doc, logoPath, left + 22, top, 92, 48);
+
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(18)
+        .text(labName, 150, top - 2, {
+          width: 240,
+          align: 'center',
         });
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(9)
+        .text(labSubtitle, 150, top + 24, {
+          width: 240,
+          align: 'center',
+        });
+      doc
+        .font('Helvetica')
+        .fontSize(8.2)
+        .text(labAddress, 150, top + 38, {
+          width: 240,
+          align: 'center',
+        });
+      if (labAddress2) {
+        doc.text(labAddress2, 150, top + 50, {
+          width: 240,
+          align: 'center',
+        });
+      }
+      if (labPhone) {
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(8)
+          .text(`TELEFONO ${labPhone}`, 150, top + 62, {
+            width: 240,
+            align: 'center',
+          });
       }
 
       doc
         .font('Helvetica-Bold')
         .fontSize(12)
-        .text(labName, 140, headerTop, { align: 'center' });
-      doc
-        .font('Helvetica')
-        .fontSize(8)
-        .text(labSubtitle, 140, headerTop + 14, { align: 'center' })
-        .text(labAddress, 140, headerTop + 26, { align: 'center' })
-        .text(labAddress2, 140, headerTop + 36, { align: 'center' });
-
+        .text('FOLIO', right - 145, top - 2, {
+          width: 145,
+          align: 'right',
+        })
+        .text(service.folio ?? 'N/D', right - 165, top + 16, {
+          width: 165,
+          align: 'right',
+        });
       doc
         .font('Helvetica-Bold')
         .fontSize(9)
-        .text(`FOLIO: ${service.folio ?? 'N/D'}`, 380, headerTop, {
-          align: 'right',
-        })
-        .text(`SUC: ${service.branchName ?? 'N/D'}`, 380, headerTop + 12, {
+        .text(`SUC: ${service.branchName ?? 'N/D'}`, right - 145, top + 34, {
+          width: 145,
           align: 'right',
         });
 
       if (barcodeBuffer) {
-        doc.image(barcodeBuffer, 420, headerTop + 26, {
-          width: 130,
-          height: 32,
+        doc.image(barcodeBuffer, right - 155, top + 46, {
+          width: 145,
+          height: 24,
         });
       }
-
-      doc.moveDown(3.2);
-      doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#bbbbbb').stroke();
-      doc.moveDown(0.8);
-
-      doc.font('Helvetica-Bold').fontSize(9).text('PACIENTE');
       doc
         .font('Helvetica')
-        .fontSize(9)
+        .fontSize(6)
         .text(
-          `Nombre: ${patient ? `${patient.firstName} ${patient.lastName} ${patient.middleName ?? ''}`.trim() : 'N/D'}`,
-        )
-        .text(`Edad: ${this.calcAge(patient?.birthDate)}`)
-        .text(`Sexo: ${patient?.gender ?? 'N/D'}`)
-        .text(`Tel: ${patient?.phone ?? 'N/D'}`)
-        .text(`Direccion: ${patient?.addressLine ?? 'N/D'}`);
-
-      doc.moveDown(0.4);
-      doc.font('Helvetica-Bold').fontSize(9).text('ORDEN');
+          `${service.folio ?? 'N/D'}-${this.sanitizeBarcodeToken(patientName, 8)}-REC`,
+          right - 160,
+          top + 72,
+          {
+            width: 150,
+            align: 'center',
+          },
+        );
       doc
         .font('Helvetica')
-        .fontSize(9)
-        .text(`Fecha: ${this.formatDate(service.createdAt)}`)
-        .text(`Toma de muestra: ${this.formatDate(service.sampleAt)}`)
-        .text(`Entrega: ${this.formatDate(service.deliveryAt)}`)
-        .text(
-          `Doctor: ${doctor ? `${doctor.firstName} ${doctor.lastName} ${doctor.middleName ?? ''}`.trim() : 'N/D'}`,
-        )
-        .text(`Cedula: ${doctor?.licenseNumber ?? 'N/D'}`);
+        .fontSize(6.8)
+        .text(`${patientName} - ${this.calcAge(patient?.birthDate)}`, right - 160, top + 84, {
+          width: 150,
+          align: 'center',
+        });
 
-      doc.moveDown(0.8);
-      doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#bbbbbb').stroke();
-      doc.moveDown(0.6);
+      const headerBottom = top + 104;
+      doc.moveTo(left, headerBottom).lineTo(right, headerBottom).strokeColor(dividerColor).stroke();
 
-      const colX = { name: 40, type: 300, price: 380, discount: 450, total: 510 };
+      const infoTop = headerBottom + 16;
+      const leftLines = [
+        `PACIENTE: ${patientName}`,
+        `TELEFONO: ${patient?.phone ?? 'N/D'}`,
+        `DIRECCION: ${patient?.addressLine ?? 'N/D'}`,
+        `ENTRE CALLES: ${patient?.addressBetween ?? 'N/D'}`,
+      ];
+      const rightLines = [
+        `FECHA: ${this.formatDate(service.createdAt)}`,
+        `EDAD: ${this.calcAge(patient?.birthDate)}`,
+        `SEXO: ${this.formatGenderLabel(patient?.gender)}`,
+        `FECHA DE ENTREGA: ${this.formatDate(service.deliveryAt)}`,
+      ];
+      const rightLinesExtra = [
+        `SUC: ${service.branchName ?? 'N/D'}`,
+        `FOLIO: ${service.folio ?? 'N/D'}`,
+      ];
+
+      doc.font('Helvetica').fontSize(8.8);
+      leftLines.forEach((line, index) => {
+        doc.text(line, infoLeftX, infoTop + index * 18, { width: infoWidth });
+      });
+      rightLines.forEach((line, index) => {
+        doc.text(line, infoRightX, infoTop + index * 18, { width: infoWidth });
+      });
+      rightLinesExtra.forEach((line, index) => {
+        doc
+          .font('Helvetica-Bold')
+          .text(line, right - 130, infoTop + index * 18, {
+            width: 130,
+            align: 'right',
+          });
+      });
+
+      const infoBottom = infoTop + 80;
+      doc.moveTo(left, infoBottom).lineTo(right, infoBottom).strokeColor(dividerColor).stroke();
+
+      let cursorY = infoBottom + 16;
+      const colX = { name: left, type: 255, price: 332, discount: 420, total: 505 };
+
       doc
         .font('Helvetica-Bold')
-        .fontSize(9)
-        .text('ANALISIS CLINICO', colX.name, doc.y)
-        .text('TP', colX.type, doc.y)
-        .text('PRECIO', colX.price, doc.y)
-        .text('DESC.', colX.discount, doc.y)
-        .text('TOTAL', colX.total, doc.y);
+        .fontSize(10)
+        .fillColor('black')
+        .text('ANALISIS CLINICO', colX.name, cursorY)
+        .text('TP', colX.type, cursorY)
+        .text('PRECIO', colX.price, cursorY, { width: 60, align: 'right' })
+        .text('DESC.', colX.discount, cursorY, { width: 50, align: 'right' })
+        .text('TOTAL', colX.total, cursorY, { width: 50, align: 'right' });
+      cursorY += 18;
+      doc.moveTo(left, cursorY).lineTo(right, cursorY).strokeColor(dividerColor).stroke();
+      cursorY += 10;
 
-      doc.moveDown(0.4);
-      doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#cccccc').stroke();
-      doc.moveDown(0.4);
-
-      doc.font('Helvetica').fontSize(9);
       for (const item of service.items ?? []) {
+        const rowTop = cursorY;
         const lineTotal = Number(item.subtotalAmount ?? 0);
-        doc.text(this.truncate(item.studyNameSnapshot ?? ''), colX.name, doc.y, {
-          width: 240,
-        });
-        doc.text(this.mapPriceTypeLabel(item.priceType), colX.type, doc.y);
-        doc.text(this.formatMoney(Number(item.unitPrice ?? 0)), colX.price, doc.y, {
+        const description = item.sourcePackageNameSnapshot ?? item.studyNameSnapshot ?? '';
+
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(9)
+          .text(this.truncate(item.studyNameSnapshot ?? '', 34), colX.name, rowTop, {
+            width: 190,
+          });
+        doc
+          .font('Helvetica')
+          .fontSize(6.8)
+          .fillColor(blueAccent)
+          .text(`DESCRIPCION: ${this.truncate(description, 34)}`, colX.name, rowTop + 11, {
+            width: 190,
+          })
+          .fillColor('black');
+        doc
+          .font('Helvetica')
+          .fontSize(8.4)
+          .text(this.mapPriceTypeLabel(item.priceType), colX.type, rowTop + 1, {
+            width: 44,
+            align: 'center',
+          });
+        doc.text(this.formatMoney(Number(item.unitPrice ?? 0)), colX.price, rowTop + 1, {
           width: 60,
           align: 'right',
         });
-        doc.text(`${Number(item.discountPercent ?? 0)} %`, colX.discount, doc.y, {
+        doc.text(`${Number(item.discountPercent ?? 0)} %`, colX.discount, rowTop + 1, {
           width: 50,
           align: 'right',
         });
-        doc.text(this.formatMoney(lineTotal), colX.total, doc.y, {
-          width: 60,
+        doc.text(this.formatMoney(lineTotal), colX.total, rowTop + 1, {
+          width: 50,
           align: 'right',
         });
-        doc.moveDown(0.6);
-      }
 
-      doc.moveDown(0.4);
-      doc.moveTo(340, doc.y).lineTo(555, doc.y).strokeColor('#bbbbbb').stroke();
-      doc.moveDown(0.4);
+        cursorY += 28;
+        doc.moveTo(left, cursorY).lineTo(right, cursorY).strokeColor(lightDividerColor).stroke();
+        cursorY += 6;
+      }
 
       const subtotal = Number(service.subtotalAmount ?? 0);
       const courtesy = Number(service.courtesyPercent ?? 0);
       const discount = Number(service.discountAmount ?? 0);
       const total = Number(service.totalAmount ?? 0);
+      const totalsTop = Math.max(cursorY + 16, doc.page.height - 150);
 
+      doc.moveTo(355, totalsTop - 10).lineTo(right, totalsTop - 10).strokeColor(dividerColor).stroke();
       doc.font('Helvetica').fontSize(9);
-      doc.text('SUBTOTAL:', 380, doc.y, { align: 'right' });
-      doc.text(this.formatMoney(subtotal), 510, doc.y, { align: 'right' });
-      doc.moveDown(0.4);
-      doc.text('CORTESIA:', 380, doc.y, { align: 'right' });
-      doc.text(`${courtesy} %`, 510, doc.y, { align: 'right' });
-      doc.moveDown(0.4);
-      doc.text('DESC. TOTAL:', 380, doc.y, { align: 'right' });
-      doc.text(this.formatMoney(discount), 510, doc.y, { align: 'right' });
-      doc.moveDown(0.4);
-      doc.font('Helvetica-Bold').text('TOTAL:', 380, doc.y, { align: 'right' });
-      doc.text(this.formatMoney(total), 510, doc.y, { align: 'right' });
-      doc.moveDown(1.2);
+      doc.text('SUBTOTAL:', 388, totalsTop, { width: 80, align: 'right' });
+      doc.text(this.formatMoney(subtotal), 470, totalsTop, { width: 65, align: 'right' });
+      doc.text('CORTESIA:', 388, totalsTop + 18, { width: 80, align: 'right' });
+      doc.text(`${courtesy} %`, 470, totalsTop + 18, { width: 65, align: 'right' });
+      doc.text('DESC. TOTAL:', 388, totalsTop + 36, { width: 80, align: 'right' });
+      doc.text(this.formatMoney(discount), 470, totalsTop + 36, { width: 65, align: 'right' });
+      doc
+        .font('Helvetica-Bold')
+        .text('TOTAL:', 388, totalsTop + 58, { width: 80, align: 'right' })
+        .text(this.formatMoney(total), 470, totalsTop + 58, {
+          width: 65,
+          align: 'right',
+        });
 
-      if (labPhone || labEmail) {
-        doc
-          .font('Helvetica')
-          .fontSize(8)
-          .text(`Tel: ${labPhone}`, 40, doc.y)
-          .text(`Email: ${labEmail}`, 40, doc.y + 10);
-      }
+      const footerY = doc.page.height - 48;
+      doc
+        .font('Helvetica')
+        .fontSize(7)
+        .fillColor('#555555')
+        .text(`Telefono: ${labPhone || 'N/D'}`, left, footerY, { width: 190 })
+        .text(`Correo: ${labEmail || 'N/D'}`, left, footerY + 12, {
+          width: 220,
+        })
+        .fillColor('black');
 
       doc.end();
     });
@@ -414,81 +573,215 @@ export class ServicesService {
 
   private async buildTicketPdfBuffer(service: ServiceOrder): Promise<Buffer> {
     const labName = process.env.LAB_NAME ?? 'ECONOLAB';
+    const labSubtitle =
+      process.env.LAB_SUBTITLE ?? 'LABORATORIO DE ANALISIS CLINICOS';
+    const labAddress = process.env.LAB_ADDRESS ?? '';
+    const labAddress2 = process.env.LAB_ADDRESS_2 ?? '';
+    const labPhone = process.env.LAB_PHONE ?? '';
     const patientName = service.patient
-      ? `${service.patient.firstName} ${service.patient.lastName} ${service.patient.middleName ?? ''}`.trim()
+      ? this.buildPersonName(service.patient)
       : 'N/D';
-    const barcodeBuffer = await this.buildBarcodeBuffer(
-      service.folio ?? String(service.id),
-      10,
-      2,
-    );
+    const items = service.items ?? [];
+    const pageHeight = Math.max(520, 265 + items.length * 34 + 120);
 
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 18, size: [226, 520] });
+      const doc = new PDFDocument({ margin: 18, size: [226, pageHeight] });
       const chunks: Buffer[] = [];
 
       doc.on('data', (chunk) => chunks.push(chunk));
       doc.on('error', (err) => reject(err));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
 
-      doc.font('Helvetica-Bold').fontSize(12).text(labName, {
-        align: 'center',
-      });
-      doc.font('Helvetica').fontSize(8).text('Ticket de servicio', {
-        align: 'center',
-      });
-      doc.moveDown(0.7);
+      const left = 18;
+      const right = doc.page.width - 18;
+      const dividerColor = '#c8ced6';
+      const blueAccent = '#3b6f9c';
+      let cursorY = 22;
 
-      doc.font('Helvetica-Bold').fontSize(9);
-      doc.text(`Folio: ${service.folio}`);
-      doc.font('Helvetica').fontSize(8);
-      doc.text(`Paciente: ${patientName}`);
-      doc.text(`Sucursal: ${service.branchName ?? 'N/D'}`);
-      doc.text(`Creado: ${this.formatDate(service.createdAt)}`);
-      doc.text(`Entrega: ${this.formatDate(service.deliveryAt)}`);
-      doc.moveDown(0.7);
-
-      if (barcodeBuffer) {
-        doc.image(barcodeBuffer, 34, doc.y, { width: 140, height: 26 });
-        doc.moveDown(2.2);
-      }
-
-      doc.moveTo(18, doc.y).lineTo(208, doc.y).strokeColor('#cccccc').stroke();
-      doc.moveDown(0.6);
-
-      doc.font('Helvetica-Bold').fontSize(8).text('ESTUDIO', 18, doc.y);
-      doc.text('TOTAL', 160, doc.y, { width: 48, align: 'right' });
-      doc.moveDown(0.4);
-      doc.font('Helvetica').fontSize(8);
-
-      for (const item of service.items ?? []) {
-        doc.text(this.truncate(item.studyNameSnapshot ?? '', 24), 18, doc.y, {
-          width: 130,
-        });
-        doc.text(this.formatMoney(Number(item.subtotalAmount ?? 0)), 160, doc.y, {
-          width: 48,
-          align: 'right',
-        });
-        doc.moveDown(0.5);
-      }
-
-      doc.moveDown(0.4);
-      doc.moveTo(18, doc.y).lineTo(208, doc.y).strokeColor('#cccccc').stroke();
-      doc.moveDown(0.6);
-
-      doc.text(`Subtotal: ${this.formatMoney(Number(service.subtotalAmount ?? 0))}`);
-      doc.text(`Cortesia: ${Number(service.courtesyPercent ?? 0)} %`);
-      doc.text(`Descuento: ${this.formatMoney(Number(service.discountAmount ?? 0))}`);
       doc
         .font('Helvetica-Bold')
-        .text(`Total: ${this.formatMoney(Number(service.totalAmount ?? 0))}`);
-      doc.moveDown(1);
-      doc.font('Helvetica').fontSize(7).text(
-        'Documento informativo generado desde el sistema.',
-        {
+        .fontSize(12)
+        .text(labName, left, cursorY, {
+          width: right - left,
           align: 'center',
+        });
+      cursorY += 16;
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(7.4)
+        .text(labSubtitle, left, cursorY, {
+          width: right - left,
+          align: 'center',
+        });
+      cursorY += 10;
+      if (labAddress) {
+        doc.font('Helvetica').fontSize(6.8).text(labAddress, left, cursorY, {
+          width: right - left,
+          align: 'center',
+        });
+        cursorY += 9;
+      }
+      if (labAddress2) {
+        doc.text(labAddress2, left, cursorY, {
+          width: right - left,
+          align: 'center',
+        });
+        cursorY += 9;
+      }
+      if (labPhone) {
+        doc.font('Helvetica-Bold').text(`TEL. ${labPhone}`, left, cursorY, {
+          width: right - left,
+          align: 'center',
+        });
+        cursorY += 12;
+      }
+
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(7.6)
+        .text(`FOLIO ${service.folio ?? 'N/D'}`, left, cursorY, { width: 120 })
+        .text(`SUC: ${service.branchName ?? 'N/D'}`, 128, cursorY, {
+          width: 80,
+          align: 'right',
+        });
+      cursorY += 12;
+
+      doc
+        .font('Helvetica')
+        .fontSize(7.1)
+        .text(`FECHA: ${this.formatDate(service.createdAt)}`, left, cursorY, {
+          width: right - left,
+        });
+      cursorY += 12;
+      doc.text(`PACIENTE: ${patientName}`, left, cursorY, {
+        width: right - left,
+      });
+      cursorY += 12;
+      doc
+        .text(`EDAD: ${this.calcAge(service.patient?.birthDate)}`, left, cursorY, {
+          width: 96,
+        })
+        .text(`SEXO: ${this.formatGenderLabel(service.patient?.gender)}`, 116, cursorY, {
+          width: 92,
+          align: 'right',
+        });
+      cursorY += 12;
+      doc.text(`TEL: ${service.patient?.phone ?? 'N/D'}`, left, cursorY, {
+        width: right - left,
+      });
+      cursorY += 12;
+      doc.text(`DIRECCION: ${service.patient?.addressLine ?? 'N/D'}`, left, cursorY, {
+        width: right - left,
+      });
+      cursorY += 12;
+      doc.text(
+        `ENTRE CALLES: ${service.patient?.addressBetween ?? 'N/D'}`,
+        left,
+        cursorY,
+        { width: right - left },
+      );
+      cursorY += 12;
+      doc.text(`FECHA DE ENTREGA: ${this.formatDate(service.deliveryAt)}`, left, cursorY, {
+        width: right - left,
+      });
+      cursorY += 12;
+
+      doc.moveTo(left, cursorY).lineTo(right, cursorY).strokeColor(dividerColor).stroke();
+      cursorY += 8;
+
+      const colX = { name: left, type: 108, price: 138, discount: 167, total: 208 };
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(7.2)
+        .text('ANALISIS CLINICO', colX.name, cursorY, { width: 86 })
+        .text('TP', colX.type, cursorY, { width: 20, align: 'center' })
+        .text('PRECIO', colX.price, cursorY, { width: 28, align: 'right' })
+        .text('DESC.', colX.discount, cursorY, { width: 24, align: 'right' })
+        .text('TOTAL', colX.total - 28, cursorY, { width: 28, align: 'right' });
+      cursorY += 14;
+      doc.moveTo(left, cursorY).lineTo(right, cursorY).strokeColor(dividerColor).stroke();
+      cursorY += 8;
+
+      for (const item of items) {
+        const rowTop = cursorY;
+        const description = item.sourcePackageNameSnapshot ?? item.studyNameSnapshot ?? '';
+
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(7.2)
+          .text(this.truncate(item.studyNameSnapshot ?? '', 20), colX.name, rowTop, {
+            width: 82,
+          });
+        doc
+          .font('Helvetica')
+          .fontSize(5.6)
+          .fillColor(blueAccent)
+          .text(`DESCRIPCION: ${this.truncate(description, 20)}`, colX.name, rowTop + 9, {
+            width: 82,
+          })
+          .fillColor('black');
+        doc
+          .font('Helvetica')
+          .fontSize(6.6)
+          .text(this.mapPriceTypeLabel(item.priceType), colX.type, rowTop + 2, {
+            width: 20,
+            align: 'center',
+          });
+        doc.text(this.formatMoney(Number(item.unitPrice ?? 0)), colX.price, rowTop + 2, {
+          width: 28,
+          align: 'right',
+        });
+        doc.text(`${Number(item.discountPercent ?? 0)} %`, colX.discount, rowTop + 2, {
+          width: 24,
+          align: 'right',
+        });
+        doc.text(this.formatMoney(Number(item.subtotalAmount ?? 0)), colX.total - 28, rowTop + 2, {
+          width: 28,
+          align: 'right',
+        });
+        cursorY += 28;
+      }
+
+      cursorY += 8;
+      doc.moveTo(120, cursorY).lineTo(right, cursorY).strokeColor(dividerColor).stroke();
+      cursorY += 10;
+
+      doc
+        .font('Helvetica')
+        .fontSize(7.5)
+        .text('SUBTOTAL:', 118, cursorY, { width: 52, align: 'right' })
+        .text(this.formatMoney(Number(service.subtotalAmount ?? 0)), 170, cursorY, {
+          width: 38,
+          align: 'right',
+        });
+      cursorY += 12;
+      doc.text('CORTESIA:', 118, cursorY, { width: 52, align: 'right' }).text(
+        `${Number(service.courtesyPercent ?? 0)} %`,
+        170,
+        cursorY,
+        {
+          width: 38,
+          align: 'right',
         },
       );
+      cursorY += 12;
+      doc.text('DESC. TOTAL:', 118, cursorY, { width: 52, align: 'right' }).text(
+        this.formatMoney(Number(service.discountAmount ?? 0)),
+        170,
+        cursorY,
+        {
+          width: 38,
+          align: 'right',
+        },
+      );
+      cursorY += 14;
+      doc
+        .font('Helvetica-Bold')
+        .text('TOTAL:', 118, cursorY, { width: 52, align: 'right' })
+        .text(this.formatMoney(Number(service.totalAmount ?? 0)), 170, cursorY, {
+          width: 38,
+          align: 'right',
+        });
 
       doc.end();
     });
