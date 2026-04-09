@@ -6,6 +6,7 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { execFile } from 'child_process';
 import { promises as fs } from 'fs';
@@ -109,7 +110,10 @@ export class AdminBackupsService implements OnModuleInit, OnModuleDestroy {
   };
   private automationTimer: NodeJS.Timeout | null = null;
 
-  constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly config: ConfigService,
+  ) {}
 
   async onModuleInit() {
     await this.ensureBackupsDir();
@@ -565,7 +569,7 @@ export class AdminBackupsService implements OnModuleInit, OnModuleDestroy {
 
   private async resolvePgToolPath(tool: 'pg_dump' | 'pg_restore') {
     const envVar = tool === 'pg_dump' ? PG_DUMP_ENV_VAR : PG_RESTORE_ENV_VAR;
-    const envPath = process.env[envVar];
+    const envPath = this.config.get<string>(envVar);
     if (envPath) {
       const envCandidate = await this.resolvePgToolPathFromEnv(envPath, tool);
       if (envCandidate) {
@@ -692,15 +696,16 @@ export class AdminBackupsService implements OnModuleInit, OnModuleDestroy {
   }
 
   private resolveDatabaseUrl() {
-    if (process.env.DATABASE_URL) {
-      return process.env.DATABASE_URL;
+    const databaseUrl = this.config.get<string>('DATABASE_URL');
+    if (databaseUrl) {
+      return databaseUrl;
     }
 
-    const host = process.env.DATABASE_HOST;
-    const port = process.env.DATABASE_PORT ?? '5432';
-    const user = process.env.DATABASE_USER;
-    const pass = process.env.DATABASE_PASS;
-    const name = process.env.DATABASE_NAME;
+    const host = this.config.get<string>('DATABASE_HOST');
+    const port = this.config.get<string>('DATABASE_PORT') ?? '5432';
+    const user = this.config.get<string>('DATABASE_USER');
+    const pass = this.config.get<string>('DATABASE_PASS');
+    const name = this.config.get<string>('DATABASE_NAME');
 
     if (!host || !user || !pass || !name) {
       throw new InternalServerErrorException(

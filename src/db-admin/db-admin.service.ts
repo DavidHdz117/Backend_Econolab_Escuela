@@ -1455,7 +1455,9 @@ export class DbAdminService {
   ): Promise<Record<string, unknown>[]> {
     const safeSchema = this.assertIdentifier(table.schema);
     const safeTable = this.assertIdentifier(table.name);
-    return this.dataSource.query(`SELECT * FROM ${safeSchema}.${safeTable}`);
+    return this.dataSource.query(
+      `SELECT * FROM "${safeSchema}"."${safeTable}"`,
+    );
   }
 
   private async getTableColumns(table: TableRef): Promise<string[]> {

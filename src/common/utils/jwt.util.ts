@@ -16,10 +16,7 @@ export interface AppJwtPayload extends jwt.JwtPayload {
   exp?: number;
 }
 
-export function generateJWT(payload: AppJwtPayload): string {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) throw new Error('Falta la variable de entorno JWT_SECRET');
-
+export function generateJWT(payload: AppJwtPayload, secret: string): string {
   return jwt.sign(payload, secret as Secret, {
     expiresIn: AUTH_SESSION_TTL,
     algorithm: 'HS256',

@@ -1,4 +1,5 @@
 import {ForbiddenException, Injectable, NotFoundException, UnauthorizedException} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -20,6 +21,7 @@ import { VerifyMfaDto } from './entities/verify-mfa.dto';
 @Injectable()
 export class AuthService {
   constructor(
+    private readonly config: ConfigService,
     private readonly users: UsersService,
     private readonly authEvents: AuthEventsService,
 
@@ -84,7 +86,10 @@ export class AuthService {
       jti: session.id,
     };
 
-    const token = generateJWT(payload);
+    const token = generateJWT(
+      payload,
+      this.config.getOrThrow<string>('JWT_SECRET'),
+    );
 
     return {
       token,

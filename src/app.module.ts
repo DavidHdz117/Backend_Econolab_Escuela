@@ -15,11 +15,14 @@ import { ResultsModule } from './results/results.module';
 import { DatabaseModule } from './database/database.module';
 import { DbAdminModule } from './db-admin/db-admin.module';
 import { LossPredictionsModule } from './loss-predictions/loss-predictions.module';
+import { SecurityModule } from './security/security.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      cache: true,
+      expandVariables: true,
     }),
     TypeOrmModule.forRootAsync({
       useFactory: typeOrmConfig,
@@ -36,6 +39,7 @@ import { LossPredictionsModule } from './loss-predictions/loss-predictions.modul
     DatabaseModule,
     DbAdminModule,
     LossPredictionsModule,
+    SecurityModule,
   ],
   controllers: [AppController],
   providers: [AppService],

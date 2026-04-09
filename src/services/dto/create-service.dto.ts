@@ -13,6 +13,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsNotInFutureDate } from 'src/common/validators/is-not-in-future-date.validator';
 import { ServiceStatus } from '../entities/service-order.entity';
 import { CreateServiceItemDto } from './service-item.dto';
 
@@ -44,6 +45,9 @@ export class CreateServiceDto {
 
   @IsOptional()
   @IsDateString({}, { message: 'La fecha/hora de toma de muestra no es valida.' })
+  @IsNotInFutureDate({
+    message: 'La fecha/hora de toma de muestra no puede estar en el futuro.',
+  })
   sampleAt?: string;
 
   @IsOptional()
@@ -67,7 +71,6 @@ export class CreateServiceDto {
   @IsOptional()
   @IsString({ message: 'Las notas deben ser una cadena de texto.' })
   notes?: string;
-
   @IsArray({ message: 'Los estudios deben venir en un arreglo.' })
   @ValidateNested({ each: true })
   @Type(() => CreateServiceItemDto)
