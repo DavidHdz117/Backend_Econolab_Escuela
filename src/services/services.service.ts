@@ -22,6 +22,15 @@ import PDFDocument = require('pdfkit');
 import * as fs from 'fs';
 import * as bwipjs from 'bwip-js';
 import { toCsv } from 'src/common/utils/csv.util';
+import {
+  DEFAULT_LAB_ADDRESS,
+  DEFAULT_LAB_ADDRESS_2,
+  DEFAULT_LAB_ADDRESS_3,
+  DEFAULT_LAB_NAME,
+  DEFAULT_LAB_PHONE,
+  DEFAULT_LAB_SUBTITLE,
+  resolveLabLogoPath,
+} from 'src/common/utils/pdf-branding.util';
 
 const AUTO_SERVICE_FOLIO_PREFIX = 'ECO';
 const AUTO_SEQUENCE_PAD = 4;
@@ -128,6 +137,11 @@ export class ServicesService {
     if (!text) return '';
     if (text.length <= max) return text;
     return `${text.slice(0, max - 3)}...`;
+  }
+
+  private formatBrandSubtitle(subtitle: string) {
+    if (!subtitle) return '';
+    return `${subtitle.charAt(0)}${subtitle.slice(1).toLowerCase()}`;
   }
 
   private buildPersonName(
@@ -316,14 +330,17 @@ export class ServicesService {
   }
 
   private async buildReceiptPdfBuffer(service: ServiceOrder): Promise<Buffer> {
-    const labName = process.env.LAB_NAME ?? 'ECONOLAB';
+    const labName = process.env.LAB_NAME ?? DEFAULT_LAB_NAME;
     const labSubtitle =
-      process.env.LAB_SUBTITLE ?? 'LABORATORIO DE ANALISIS CLINICOS';
-    const labAddress = process.env.LAB_ADDRESS ?? '';
-    const labAddress2 = process.env.LAB_ADDRESS_2 ?? '';
-    const labPhone = process.env.LAB_PHONE ?? '';
+      process.env.LAB_SUBTITLE ?? DEFAULT_LAB_SUBTITLE;
+    const labHeaderTitle =
+      process.env.LAB_HEADER_TITLE ?? `${labName} ${labSubtitle}`.trim();
+    const labAddress = process.env.LAB_ADDRESS ?? DEFAULT_LAB_ADDRESS;
+    const labAddress2 = process.env.LAB_ADDRESS_2 ?? DEFAULT_LAB_ADDRESS_2;
+    const labAddress3 = process.env.LAB_ADDRESS_3 ?? DEFAULT_LAB_ADDRESS_3;
+    const labPhone = process.env.LAB_PHONE ?? DEFAULT_LAB_PHONE;
     const labEmail = process.env.LAB_EMAIL ?? '';
-    const logoPath = process.env.LAB_LOGO_PATH ?? '';
+    const logoPath = resolveLabLogoPath(process.env.LAB_LOGO_PATH);
 
     const patient = service.patient;
     const doctor = service.doctor;
@@ -349,42 +366,61 @@ export class ServicesService {
       const infoLeftX = left;
       const infoRightX = 308;
       const infoWidth = 220;
+      const brandX = left;
+      const brandWidth = 104;
+      const centerX = 154;
+      const centerWidth = 220;
+      const addressX = 162;
+      const addressWidth = 204;
+      const brandSubtitle = this.formatBrandSubtitle(labSubtitle);
 
-      this.drawPdfLogo(doc, logoPath, left + 22, top, 92, 48);
+      this.drawPdfLogo(doc, logoPath, brandX, top + 18, brandWidth, 28);
+      if (brandSubtitle) {
+        doc
+          .font('Helvetica')
+          .fontSize(5.7)
+          .text(brandSubtitle, brandX, top + 49, {
+            width: brandWidth,
+            align: 'center',
+          });
+      }
 
       doc
         .font('Helvetica-Bold')
-        .fontSize(18)
-        .text(labName, 150, top - 2, {
-          width: 240,
-          align: 'center',
-        });
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(9)
-        .text(labSubtitle, 150, top + 24, {
-          width: 240,
+        .fontSize(8.8)
+        .text(labHeaderTitle, centerX, top - 2, {
+          width: centerWidth,
           align: 'center',
         });
       doc
         .font('Helvetica')
-        .fontSize(8.2)
-        .text(labAddress, 150, top + 38, {
-          width: 240,
+        .fontSize(5.8)
+        .text(labAddress, addressX, top + 17, {
+          width: addressWidth,
           align: 'center',
         });
       if (labAddress2) {
-        doc.text(labAddress2, 150, top + 50, {
-          width: 240,
+        doc.font('Helvetica').fontSize(5.8);
+        doc.text(labAddress2, addressX, top + 26, {
+          width: addressWidth,
           align: 'center',
         });
+      }
+      if (labAddress3) {
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(6)
+          .text(labAddress3, addressX, top + 35, {
+            width: addressWidth,
+            align: 'center',
+          });
       }
       if (labPhone) {
         doc
           .font('Helvetica-Bold')
-          .fontSize(8)
-          .text(`TELEFONO ${labPhone}`, 150, top + 62, {
-            width: 240,
+          .fontSize(6.2)
+          .text(`TEL. ${labPhone}`, addressX, top + 45, {
+            width: addressWidth,
             align: 'center',
           });
       }
@@ -572,17 +608,25 @@ export class ServicesService {
   }
 
   private async buildTicketPdfBuffer(service: ServiceOrder): Promise<Buffer> {
-    const labName = process.env.LAB_NAME ?? 'ECONOLAB';
+    const labName = process.env.LAB_NAME ?? DEFAULT_LAB_NAME;
     const labSubtitle =
-      process.env.LAB_SUBTITLE ?? 'LABORATORIO DE ANALISIS CLINICOS';
-    const labAddress = process.env.LAB_ADDRESS ?? '';
-    const labAddress2 = process.env.LAB_ADDRESS_2 ?? '';
-    const labPhone = process.env.LAB_PHONE ?? '';
+      process.env.LAB_SUBTITLE ?? DEFAULT_LAB_SUBTITLE;
+    const labHeaderTitle =
+      process.env.LAB_HEADER_TITLE ?? `${labName} ${labSubtitle}`.trim();
+    const labAddress = process.env.LAB_ADDRESS ?? DEFAULT_LAB_ADDRESS;
+    const labAddress2 = process.env.LAB_ADDRESS_2 ?? DEFAULT_LAB_ADDRESS_2;
+    const labAddress3 = process.env.LAB_ADDRESS_3 ?? DEFAULT_LAB_ADDRESS_3;
+    const labPhone = process.env.LAB_PHONE ?? DEFAULT_LAB_PHONE;
+    const logoPath = resolveLabLogoPath(process.env.LAB_LOGO_PATH);
     const patientName = service.patient
       ? this.buildPersonName(service.patient)
       : 'N/D';
     const items = service.items ?? [];
-    const pageHeight = Math.max(520, 265 + items.length * 34 + 120);
+    const logoHeaderHeight = 56;
+    const pageHeight = Math.max(
+      520 + logoHeaderHeight,
+      265 + logoHeaderHeight + items.length * 34 + 120,
+    );
 
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ margin: 18, size: [226, pageHeight] });
@@ -596,44 +640,71 @@ export class ServicesService {
       const right = doc.page.width - 18;
       const dividerColor = '#c8ced6';
       const blueAccent = '#3b6f9c';
+      const brandSubtitle = this.formatBrandSubtitle(labSubtitle);
       let cursorY = 22;
+
+      this.drawPdfLogo(
+        doc,
+        logoPath,
+        left + (right - left - 96) / 2,
+        cursorY,
+        96,
+        26,
+      );
+      cursorY += 28;
+
+      if (brandSubtitle) {
+        doc
+          .font('Helvetica')
+          .fontSize(4.8)
+          .text(brandSubtitle, left + (right - left - 96) / 2, cursorY, {
+            width: 96,
+            align: 'center',
+          });
+      }
+      cursorY += 10;
 
       doc
         .font('Helvetica-Bold')
-        .fontSize(12)
-        .text(labName, left, cursorY, {
+        .fontSize(6.3)
+        .text(labHeaderTitle, left, cursorY, {
           width: right - left,
           align: 'center',
         });
-      cursorY += 16;
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(7.4)
-        .text(labSubtitle, left, cursorY, {
-          width: right - left,
-          align: 'center',
-        });
-      cursorY += 10;
+      cursorY += 11;
       if (labAddress) {
-        doc.font('Helvetica').fontSize(6.8).text(labAddress, left, cursorY, {
+        doc.font('Helvetica').fontSize(5.3).text(labAddress, left, cursorY, {
           width: right - left,
           align: 'center',
         });
-        cursorY += 9;
+        cursorY += 8;
       }
       if (labAddress2) {
         doc.text(labAddress2, left, cursorY, {
           width: right - left,
           align: 'center',
         });
-        cursorY += 9;
+        cursorY += 8;
+      }
+      if (labAddress3) {
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(5.4)
+          .text(labAddress3, left, cursorY, {
+            width: right - left,
+            align: 'center',
+          });
+        cursorY += 8;
       }
       if (labPhone) {
-        doc.font('Helvetica-Bold').text(`TEL. ${labPhone}`, left, cursorY, {
-          width: right - left,
-          align: 'center',
-        });
-        cursorY += 12;
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(5.4)
+          .text(`TEL. ${labPhone}`, left, cursorY, {
+            width: right - left,
+            align: 'center',
+          });
+        cursorY += 11;
       }
 
       doc
@@ -788,7 +859,8 @@ export class ServicesService {
   }
 
   private async buildLabelsPdfBuffer(service: ServiceOrder): Promise<Buffer> {
-    const labName = process.env.LAB_NAME ?? 'ECONOLAB';
+    const labName = process.env.LAB_NAME ?? DEFAULT_LAB_NAME;
+    const logoPath = resolveLabLogoPath(process.env.LAB_LOGO_PATH);
     const patient = service.patient;
     const sampleAt = service.sampleAt ?? service.createdAt;
 
@@ -850,10 +922,12 @@ export class ServicesService {
           ? `${patient.firstName} ${patient.lastName} ${patient.middleName ?? ''}`.trim()
           : 'N/D';
 
+        this.drawPdfLogo(doc, logoPath, x + labelWidth - 60, y + 5, 52, 16);
+
         doc
           .font('Helvetica-Bold')
           .fontSize(7)
-          .text(labName, x + 4, y + 4, { width: labelWidth - 8 });
+          .text(labName, x + 4, y + 6, { width: labelWidth - 64 });
 
         doc
           .font('Helvetica-Bold')

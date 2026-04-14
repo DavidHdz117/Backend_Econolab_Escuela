@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import PDFDocument = require('pdfkit');
 import * as fs from 'fs';
+import * as bwipjs from 'bwip-js';
 import * as QRCode from 'qrcode';
 import {ServiceOrder,ServiceOrderItem,} from '../services/entities/service-order.entity';
 import {
@@ -13,6 +14,15 @@ import { StudyResult, StudyResultValue } from './entities/study-result.entity';
 import { CreateStudyResultDto } from './dto/create-study-result.dto';
 import { UpdateStudyResultDto } from './dto/update-study-result.dto';
 import { StudyResultValueDto } from './dto/study-result-value.dto';
+import {
+  DEFAULT_LAB_ADDRESS,
+  DEFAULT_LAB_ADDRESS_2,
+  DEFAULT_LAB_ADDRESS_3,
+  DEFAULT_LAB_NAME,
+  DEFAULT_LAB_PHONE,
+  DEFAULT_LAB_SUBTITLE,
+  resolveLabLogoPath,
+} from 'src/common/utils/pdf-branding.util';
 
 type ResultPdfCategoryLayout = 'continuous' | 'page-per-category';
 type ResultPdfStudyLayout = 'continuous' | 'page-per-study';
@@ -297,6 +307,34 @@ export class ResultsService {
       .fillColor('black');
   }
 
+  private formatBrandSubtitle(subtitle: string) {
+    if (!subtitle) return '';
+    return `${subtitle.charAt(0)}${subtitle.slice(1).toLowerCase()}`;
+  }
+
+  private sanitizeBarcodeToken(text: string, max = 10) {
+    if (!text) return 'NA';
+    const cleaned = text
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .slice(0, max);
+    return cleaned || 'NA';
+  }
+
+  private async buildBarcodeBuffer(text: string, height = 10, scale = 2) {
+    try {
+      return await bwipjs.toBuffer({
+        bcid: 'code128',
+        text,
+        scale,
+        height,
+        includetext: false,
+      });
+    } catch {
+      return null;
+    }
+  }
+
   private drawDetailBlock(
     doc: any,
     title: string,
@@ -320,12 +358,17 @@ export class ResultsService {
   private drawResultHeader(
     doc: any,
     options: {
-      labName: string;
+      labHeaderTitle: string;
       labSubtitle: string;
       labAddress: string;
       labAddress2: string;
+      labAddress3: string;
       labPhone: string;
       logoPath: string;
+      barcodeBuffer?: Buffer | null;
+      barcodeValue?: string;
+      barcodePatientLine?: string;
+      barcodeMetaLine?: string;
       branchName?: string | null;
       folio?: string | null;
     },
@@ -333,42 +376,61 @@ export class ResultsService {
     const left = 48;
     const right = doc.page.width - 48;
     const top = 42;
+    const brandX = left;
+    const brandWidth = 104;
+    const centerX = 154;
+    const centerWidth = 220;
+    const addressX = 162;
+    const addressWidth = 204;
+    const brandSubtitle = this.formatBrandSubtitle(options.labSubtitle);
 
-    this.drawPdfLogo(doc, options.logoPath, left, top, 90, 50);
+    this.drawPdfLogo(doc, options.logoPath, brandX, top + 18, brandWidth, 28);
+    if (brandSubtitle) {
+      doc
+        .font('Helvetica')
+        .fontSize(5.7)
+        .text(brandSubtitle, brandX, top + 49, {
+          width: brandWidth,
+          align: 'center',
+        });
+    }
 
     doc
       .font('Helvetica-Bold')
-      .fontSize(18)
-      .text(options.labName, 150, top - 2, {
-        width: 240,
-        align: 'center',
-      });
-    doc
-      .font('Helvetica-Bold')
-      .fontSize(9)
-      .text(options.labSubtitle, 150, top + 24, {
-        width: 240,
+      .fontSize(8.8)
+      .text(options.labHeaderTitle, centerX, top - 2, {
+        width: centerWidth,
         align: 'center',
       });
     doc
       .font('Helvetica')
-      .fontSize(8.3)
-      .text(options.labAddress, 150, top + 38, {
-        width: 240,
+      .fontSize(5.8)
+      .text(options.labAddress, addressX, top + 17, {
+        width: addressWidth,
         align: 'center',
       });
     if (options.labAddress2) {
-      doc.text(options.labAddress2, 150, top + 50, {
-        width: 240,
+      doc.font('Helvetica').fontSize(5.8);
+      doc.text(options.labAddress2, addressX, top + 26, {
+        width: addressWidth,
         align: 'center',
       });
+    }
+    if (options.labAddress3) {
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(6)
+        .text(options.labAddress3, addressX, top + 35, {
+          width: addressWidth,
+          align: 'center',
+        });
     }
     if (options.labPhone) {
       doc
         .font('Helvetica-Bold')
-        .fontSize(8)
-        .text(`TEL. ${options.labPhone}`, 150, top + 62, {
-          width: 240,
+        .fontSize(6.2)
+        .text(`TEL. ${options.labPhone}`, addressX, top + 45, {
+          width: addressWidth,
           align: 'center',
         });
     }
@@ -384,6 +446,40 @@ export class ResultsService {
         width: 210,
         align: 'right',
       });
+
+    if (options.barcodeBuffer) {
+      doc.image(options.barcodeBuffer, right - 150, top + 42, {
+        width: 140,
+        height: 24,
+      });
+    }
+    if (options.barcodeValue) {
+      doc
+        .font('Helvetica')
+        .fontSize(6)
+        .text(options.barcodeValue, right - 155, top + 66, {
+          width: 145,
+          align: 'center',
+        });
+    }
+    if (options.barcodePatientLine) {
+      doc
+        .font('Helvetica')
+        .fontSize(6.4)
+        .text(options.barcodePatientLine, right - 155, top + 76, {
+          width: 145,
+          align: 'left',
+        });
+    }
+    if (options.barcodeMetaLine) {
+      doc
+        .font('Helvetica')
+        .fontSize(6.4)
+        .text(options.barcodeMetaLine, right - 155, top + 86, {
+          width: 145,
+          align: 'left',
+        });
+    }
 
     const dividerY = top + 104;
     doc.moveTo(left, dividerY).lineTo(right, dividerY).strokeColor('#c8ced6').stroke();
@@ -572,7 +668,7 @@ export class ResultsService {
       const labSchedule = process.env.LAB_SCHEDULE ?? 'Horario no configurado';
       const labSampleSchedule =
         process.env.LAB_SAMPLE_SCHEDULE ?? 'Horario de toma no configurado';
-      const logoPath = process.env.LAB_LOGO_PATH ?? '';
+      const logoPath = resolveLabLogoPath(process.env.LAB_LOGO_PATH);
       const signaturePath = process.env.LAB_SIGNATURE_PATH ?? '';
       const responsibleName =
         process.env.LAB_RESPONSIBLE_NAME ?? 'Responsable Sanitario';
@@ -863,17 +959,20 @@ export class ResultsService {
       doc.on('error', (err) => reject(err));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
 
-      const labName = process.env.LAB_NAME ?? 'ECONOLAB';
+      const labName = process.env.LAB_NAME ?? DEFAULT_LAB_NAME;
       const labSubtitle =
-        process.env.LAB_SUBTITLE ?? 'LABORATORIO DE ANALISIS CLINICOS';
-      const labAddress = process.env.LAB_ADDRESS ?? 'Direccion no configurada';
-      const labAddress2 = process.env.LAB_ADDRESS_2 ?? '';
-      const labPhone = process.env.LAB_PHONE ?? 'Telefono no configurado';
+        process.env.LAB_SUBTITLE ?? DEFAULT_LAB_SUBTITLE;
+      const labHeaderTitle =
+        process.env.LAB_HEADER_TITLE ?? `${labName} ${labSubtitle}`.trim();
+      const labAddress = process.env.LAB_ADDRESS ?? DEFAULT_LAB_ADDRESS;
+      const labAddress2 = process.env.LAB_ADDRESS_2 ?? DEFAULT_LAB_ADDRESS_2;
+      const labAddress3 = process.env.LAB_ADDRESS_3 ?? DEFAULT_LAB_ADDRESS_3;
+      const labPhone = process.env.LAB_PHONE ?? DEFAULT_LAB_PHONE;
       const labEmail = process.env.LAB_EMAIL ?? 'Correo no configurado';
       const labSchedule = process.env.LAB_SCHEDULE ?? 'Horario no configurado';
       const labSampleSchedule =
         process.env.LAB_SAMPLE_SCHEDULE ?? 'Horario de toma no configurado';
-      const logoPath = process.env.LAB_LOGO_PATH ?? '';
+      const logoPath = resolveLabLogoPath(process.env.LAB_LOGO_PATH);
       const signaturePath = process.env.LAB_SIGNATURE_PATH ?? '';
       const responsibleName =
         process.env.LAB_RESPONSIBLE_NAME ?? 'Responsable Sanitario';
@@ -1211,6 +1310,14 @@ export class ResultsService {
         })
       : [];
     const qrBuffer = await this.buildQrBuffer(result);
+    const service = result.serviceOrder;
+    const studyName =
+      result.serviceOrderItem?.studyNameSnapshot ?? 'Estudio';
+    const barcodeText = service?.folio ?? String(service?.id ?? result.id);
+    const barcodeBuffer = await this.buildBarcodeBuffer(barcodeText, 12);
+    const barcodePatientLine = this.buildPersonName(service?.patient);
+    const barcodeMetaLine = `${this.formatGenderLabel(service?.patient?.gender)} - ${this.calcAgeLabel(service?.patient?.birthDate)}`;
+    const barcodeValue = `${barcodeText}-${this.sanitizeBarcodeToken(barcodePatientLine, 8)}-RES`;
 
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ margin: 48, size: 'A4' });
@@ -1220,26 +1327,25 @@ export class ResultsService {
       doc.on('error', (err) => reject(err));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
 
-      const labName = process.env.LAB_NAME ?? 'ECONOLAB';
+      const labName = process.env.LAB_NAME ?? DEFAULT_LAB_NAME;
       const labSubtitle =
-        process.env.LAB_SUBTITLE ?? 'LABORATORIO DE ANALISIS CLINICOS';
-      const labAddress = process.env.LAB_ADDRESS ?? 'Direccion no configurada';
-      const labAddress2 = process.env.LAB_ADDRESS_2 ?? '';
-      const labPhone = process.env.LAB_PHONE ?? 'Telefono no configurado';
+        process.env.LAB_SUBTITLE ?? DEFAULT_LAB_SUBTITLE;
+      const labHeaderTitle =
+        process.env.LAB_HEADER_TITLE ?? `${labName} ${labSubtitle}`.trim();
+      const labAddress = process.env.LAB_ADDRESS ?? DEFAULT_LAB_ADDRESS;
+      const labAddress2 = process.env.LAB_ADDRESS_2 ?? DEFAULT_LAB_ADDRESS_2;
+      const labAddress3 = process.env.LAB_ADDRESS_3 ?? DEFAULT_LAB_ADDRESS_3;
+      const labPhone = process.env.LAB_PHONE ?? DEFAULT_LAB_PHONE;
       const labEmail = process.env.LAB_EMAIL ?? 'Correo no configurado';
       const labSchedule = process.env.LAB_SCHEDULE ?? 'Horario no configurado';
       const labSampleSchedule =
         process.env.LAB_SAMPLE_SCHEDULE ?? 'Horario de toma no configurado';
-      const logoPath = process.env.LAB_LOGO_PATH ?? '';
+      const logoPath = resolveLabLogoPath(process.env.LAB_LOGO_PATH);
       const signaturePath = process.env.LAB_SIGNATURE_PATH ?? '';
       const responsibleName =
         process.env.LAB_RESPONSIBLE_NAME ?? 'Responsable Sanitario';
       const responsibleLicense =
         process.env.LAB_RESPONSIBLE_LICENSE ?? '';
-
-      const service = result.serviceOrder;
-      const studyName =
-        result.serviceOrderItem?.studyNameSnapshot ?? 'Estudio';
 
       const left = 48;
       const right = doc.page.width - 48;
@@ -1248,12 +1354,17 @@ export class ResultsService {
       const colWidth = { label: 225, value: 90, unit: 48, ref: 70 };
 
       this.drawResultHeader(doc, {
-        labName,
+        labHeaderTitle,
         labSubtitle,
         labAddress,
         labAddress2,
+        labAddress3,
         labPhone,
         logoPath,
+        barcodeBuffer,
+        barcodeValue,
+        barcodePatientLine,
+        barcodeMetaLine,
         branchName: service?.branchName,
         folio: service?.folio,
       });
@@ -1430,6 +1541,11 @@ export class ResultsService {
     const qrBuffer = sections[0]
       ? await this.buildQrBuffer(sections[0].result)
       : null;
+    const barcodeText = service.folio ?? String(service.id);
+    const barcodeBuffer = await this.buildBarcodeBuffer(barcodeText, 12);
+    const barcodePatientLine = this.buildPersonName(service.patient);
+    const barcodeMetaLine = `${this.formatGenderLabel(service.patient?.gender)} - ${this.calcAgeLabel(service.patient?.birthDate)}`;
+    const barcodeValue = `${barcodeText}-${this.sanitizeBarcodeToken(barcodePatientLine, 8)}-RES`;
 
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ margin: 48, size: 'A4' });
@@ -1439,17 +1555,20 @@ export class ResultsService {
       doc.on('error', (err) => reject(err));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
 
-      const labName = process.env.LAB_NAME ?? 'ECONOLAB';
+      const labName = process.env.LAB_NAME ?? DEFAULT_LAB_NAME;
       const labSubtitle =
-        process.env.LAB_SUBTITLE ?? 'LABORATORIO DE ANALISIS CLINICOS';
-      const labAddress = process.env.LAB_ADDRESS ?? 'Direccion no configurada';
-      const labAddress2 = process.env.LAB_ADDRESS_2 ?? '';
-      const labPhone = process.env.LAB_PHONE ?? 'Telefono no configurado';
+        process.env.LAB_SUBTITLE ?? DEFAULT_LAB_SUBTITLE;
+      const labHeaderTitle =
+        process.env.LAB_HEADER_TITLE ?? `${labName} ${labSubtitle}`.trim();
+      const labAddress = process.env.LAB_ADDRESS ?? DEFAULT_LAB_ADDRESS;
+      const labAddress2 = process.env.LAB_ADDRESS_2 ?? DEFAULT_LAB_ADDRESS_2;
+      const labAddress3 = process.env.LAB_ADDRESS_3 ?? DEFAULT_LAB_ADDRESS_3;
+      const labPhone = process.env.LAB_PHONE ?? DEFAULT_LAB_PHONE;
       const labEmail = process.env.LAB_EMAIL ?? 'Correo no configurado';
       const labSchedule = process.env.LAB_SCHEDULE ?? 'Horario no configurado';
       const labSampleSchedule =
         process.env.LAB_SAMPLE_SCHEDULE ?? 'Horario de toma no configurado';
-      const logoPath = process.env.LAB_LOGO_PATH ?? '';
+      const logoPath = resolveLabLogoPath(process.env.LAB_LOGO_PATH);
       const signaturePath = process.env.LAB_SIGNATURE_PATH ?? '';
       const responsibleName =
         process.env.LAB_RESPONSIBLE_NAME ?? 'Responsable Sanitario';
@@ -1466,12 +1585,17 @@ export class ResultsService {
         .join(', ');
 
       this.drawResultHeader(doc, {
-        labName,
+        labHeaderTitle,
         labSubtitle,
         labAddress,
         labAddress2,
+        labAddress3,
         labPhone,
         logoPath,
+        barcodeBuffer,
+        barcodeValue,
+        barcodePatientLine,
+        barcodeMetaLine,
         branchName: service.branchName,
         folio: service.folio,
       });
