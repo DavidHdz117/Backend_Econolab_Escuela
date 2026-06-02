@@ -26,6 +26,13 @@ type StudyImportOperation = {
   existing?: Study | null;
 };
 
+type PublicStudiesQuery = {
+  search?: string;
+  type?: StudyType;
+  limit?: number;
+  includeDetails?: boolean;
+};
+
 const AUTO_SEQUENCE_PAD = 4;
 const AUTO_STUDY_CODE_PREFIX: Record<StudyType, string> = {
   [StudyType.STUDY]: 'EST',
@@ -54,7 +61,11 @@ export class StudiesService {
     return `regexp_replace(lower(translate(coalesce(${field}, ''), 'áéíóúäëïöüàèìòùÁÉÍÓÚÄËÏÖÜÀÈÌÒÙñÑ', 'aeiouaeiouaeiouAEIOUAEIOUAEIOUnN')), '[^a-z0-9]+', '', 'g')`;
   }
 
-  private buildAutoStudyCode(type: StudyType, sequence: number, date = new Date()) {
+  private buildAutoStudyCode(
+    type: StudyType,
+    sequence: number,
+    date = new Date(),
+  ) {
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const d = String(date.getDate()).padStart(2, '0');
@@ -85,9 +96,11 @@ export class StudiesService {
       return false;
     }
 
-    const driverError = (error as QueryFailedError & {
-      driverError?: { code?: string };
-    }).driverError;
+    const driverError = (
+      error as QueryFailedError & {
+        driverError?: { code?: string };
+      }
+    ).driverError;
 
     return driverError?.code === '23505';
   }
@@ -104,7 +117,8 @@ export class StudiesService {
       .orderBy('study.code', 'DESC')
       .getOne();
 
-    const nextSequence = this.extractAutoSequenceValue(latest?.code, type, date) + 1;
+    const nextSequence =
+      this.extractAutoSequenceValue(latest?.code, type, date) + 1;
     return this.buildAutoStudyCode(type, nextSequence, date);
   }
 
@@ -142,7 +156,11 @@ export class StudiesService {
     type: StudyType,
     excludeId?: number,
   ) {
-    const duplicate = await this.findDuplicateStudyByName(name, type, excludeId);
+    const duplicate = await this.findDuplicateStudyByName(
+      name,
+      type,
+      excludeId,
+    );
 
     if (duplicate) {
       throw new ConflictException(
@@ -194,7 +212,9 @@ export class StudiesService {
     });
 
     if (!parent) {
-      throw new NotFoundException('El detalle padre no existe en este estudio.');
+      throw new NotFoundException(
+        'El detalle padre no existe en este estudio.',
+      );
     }
   }
 
@@ -209,7 +229,9 @@ export class StudiesService {
     const normalizedIds = [...new Set((packageStudyIds ?? []).filter(Boolean))];
 
     if (currentStudyId && normalizedIds.includes(currentStudyId)) {
-      throw new BadRequestException('Un paquete no puede incluirse a si mismo.');
+      throw new BadRequestException(
+        'Un paquete no puede incluirse a si mismo.',
+      );
     }
 
     if (normalizedIds.length === 0) {
@@ -600,9 +622,13 @@ export class StudiesService {
 
     for (const operation of analysis.operations) {
       if (operation.action === 'update' && operation.existing) {
-        const merged = this.studyRepo.merge(operation.existing, operation.payload, {
-          isActive: true,
-        });
+        const merged = this.studyRepo.merge(
+          operation.existing,
+          operation.payload,
+          {
+            isActive: true,
+          },
+        );
         await this.studyRepo.save(merged);
         updated += 1;
         continue;
@@ -623,9 +649,7 @@ export class StudiesService {
     };
   }
 
-  private async analyzeCsv(
-    buffer: Buffer,
-  ): Promise<{
+  private async analyzeCsv(buffer: Buffer): Promise<{
     preview: ImportPreviewResult;
     operations: StudyImportOperation[];
   }> {
@@ -674,7 +698,9 @@ export class StudiesService {
         specialPrice: this.parseDecimal(record.specialPrice),
         hospitalPrice: this.parseDecimal(record.hospitalPrice),
         otherPrice: this.parseDecimal(record.otherPrice),
-        defaultDiscountPercent: this.parseDecimal(record.defaultDiscountPercent),
+        defaultDiscountPercent: this.parseDecimal(
+          record.defaultDiscountPercent,
+        ),
         method: record.method,
         indicator: record.indicator,
         packageStudyIds: this.parseIntegerArray(record.packageStudyIds),
@@ -809,5 +835,191 @@ export class StudiesService {
     return value === StudyStatus.SUSPENDED
       ? StudyStatus.SUSPENDED
       : StudyStatus.ACTIVE;
+  }
+
+  private toNumber(value: number | string | null | undefined) {
+    const parsed = Number(value ?? 0);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  private buildPublicStudyResponse(
+    study: Study,
+    details: StudyDetail[] = [],
+    packageStudies: Study[] = [],
+  ) {
+    const normalPrice = this.toNumber(study.normalPrice);
+    const difPrice = this.toNumber(study.difPrice);
+    const specialPrice = this.toNumber(study.specialPrice);
+    const hospitalPrice = this.toNumber(study.hospitalPrice);
+    const otherPrice = this.toNumber(study.otherPrice);
+
+    return {
+      id: study.id,
+      code: study.code,
+      name: study.name,
+      type: study.type,
+      description: study.description ?? null,
+      durationMinutes: study.durationMinutes,
+      method: study.method ?? null,
+      indicator: study.indicator ?? null,
+      prices: {
+        normal: normalPrice,
+        dif: difPrice,
+        special: specialPrice,
+        hospital: hospitalPrice,
+        other: otherPrice,
+      },
+      defaultDiscountPercent: this.toNumber(study.defaultDiscountPercent),
+      packageStudyIds: study.packageStudyIds ?? [],
+      packageStudies: packageStudies.map((packageStudy) => ({
+        id: packageStudy.id,
+        code: packageStudy.code,
+        name: packageStudy.name,
+        normalPrice: this.toNumber(packageStudy.normalPrice),
+      })),
+      details: details.map((detail) => ({
+        id: detail.id,
+        parentId: detail.parentId ?? null,
+        dataType: detail.dataType,
+        name: detail.name,
+        unit: detail.unit ?? null,
+        referenceValue: detail.referenceValue ?? null,
+      })),
+      available: study.isActive && study.status === StudyStatus.ACTIVE,
+      spokenSummary: `${study.name} esta disponible con precio normal de ${normalPrice} pesos.`,
+    };
+  }
+
+  async listAvailableForPublic(query: PublicStudiesQuery = {}) {
+    const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
+    const qb = this.studyRepo
+      .createQueryBuilder('study')
+      .where('study.isActive = :isActive', { isActive: true })
+      .andWhere('study.status = :status', { status: StudyStatus.ACTIVE })
+      .orderBy('study.name', 'ASC')
+      .take(limit);
+
+    if (query.type) {
+      qb.andWhere('study.type = :type', { type: query.type });
+    }
+
+    const normalizedSearch = this.normalizeSearchValue(query.search ?? '');
+    if (normalizedSearch) {
+      const normalizedFields = [
+        this.buildNormalizedSql('study.name'),
+        this.buildNormalizedSql('study.code'),
+        this.buildNormalizedSql('study.description'),
+        this.buildNormalizedSql('study.method'),
+        this.buildNormalizedSql('study.indicator'),
+      ];
+
+      qb.andWhere(
+        `(${normalizedFields
+          .map((field) => `${field} LIKE :search`)
+          .join(' OR ')})`,
+        { search: `%${normalizedSearch}%` },
+      );
+    }
+
+    const studies = await qb.getMany();
+    const detailMap = new Map<number, StudyDetail[]>();
+    const packageMap = new Map<number, Study[]>();
+
+    if (query.includeDetails && studies.length > 0) {
+      const details = await this.detailRepo.find({
+        where: {
+          studyId: In(studies.map((study) => study.id)),
+          isActive: true,
+        },
+        order: { sortOrder: 'ASC', name: 'ASC' },
+      });
+
+      for (const detail of details) {
+        detailMap.set(detail.studyId, [
+          ...(detailMap.get(detail.studyId) ?? []),
+          detail,
+        ]);
+      }
+    }
+
+    const packageIds = [
+      ...new Set(studies.flatMap((study) => study.packageStudyIds ?? [])),
+    ];
+
+    if (packageIds.length > 0) {
+      const packageItems = await this.studyRepo.findBy({
+        id: In(packageIds),
+        isActive: true,
+        status: StudyStatus.ACTIVE,
+      });
+      const packageItemsById = new Map(
+        packageItems.map((packageItem) => [packageItem.id, packageItem]),
+      );
+
+      for (const study of studies) {
+        packageMap.set(
+          study.id,
+          (study.packageStudyIds ?? [])
+            .map((id) => packageItemsById.get(id))
+            .filter((packageItem): packageItem is Study => !!packageItem),
+        );
+      }
+    }
+
+    return {
+      data: studies.map((study) =>
+        this.buildPublicStudyResponse(
+          study,
+          detailMap.get(study.id) ?? [],
+          packageMap.get(study.id) ?? [],
+        ),
+      ),
+      meta: {
+        total: studies.length,
+        limit,
+      },
+    };
+  }
+
+  async findAvailableForPublic(codeOrId: string, includeDetails = true) {
+    const trimmedValue = codeOrId.trim();
+    const parsedId = Number.parseInt(trimmedValue, 10);
+    const qb = this.studyRepo
+      .createQueryBuilder('study')
+      .where('study.isActive = :isActive', { isActive: true })
+      .andWhere('study.status = :status', { status: StudyStatus.ACTIVE });
+
+    if (Number.isFinite(parsedId) && String(parsedId) === trimmedValue) {
+      qb.andWhere('study.id = :id', { id: parsedId });
+    } else {
+      qb.andWhere('upper(study.code) = :code', {
+        code: trimmedValue.toUpperCase(),
+      });
+    }
+
+    const study = await qb.getOne();
+    if (!study) {
+      throw new NotFoundException('Estudio disponible no encontrado.');
+    }
+
+    const details = includeDetails
+      ? await this.detailRepo.find({
+          where: { studyId: study.id, isActive: true },
+          order: { sortOrder: 'ASC', name: 'ASC' },
+        })
+      : [];
+
+    const packageStudies =
+      study.packageStudyIds.length > 0
+        ? await this.studyRepo.findBy({
+            id: In(study.packageStudyIds),
+            isActive: true,
+            status: StudyStatus.ACTIVE,
+          })
+        : [];
+
+    return {
+      data: this.buildPublicStudyResponse(study, details, packageStudies),
+    };
   }
 }
