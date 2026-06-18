@@ -3,12 +3,17 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { StudiesService } from './studies.service';
 import { StudiesController } from './studies.controller';
 import { PublicStudiesController } from './public-studies.controller';
+import { PublicBrandController } from './public-brand.controller';
 import { Study } from './entities/study.entity';
 import { StudyDetail } from './entities/study-detail.entity';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Study, StudyDetail])],
-  controllers: [StudiesController, PublicStudiesController],
+  controllers: [
+    StudiesController,
+    PublicStudiesController,
+    PublicBrandController,
+  ],
   providers: [StudiesService],
   exports: [StudiesService],
 })
