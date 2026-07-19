@@ -10,12 +10,17 @@ import {
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { StudyStatus, StudyType } from '../entities/study.entity';
+import {
+  StudySampleType,
+  StudyStatus,
+  StudyType,
+} from '../entities/study.entity';
 
 export class CreateStudyDto {
   @IsString({ message: 'El nombre debe ser una cadena de texto.' })
   @Length(1, 200, {
-    message: 'El nombre del analisis es obligatorio y maximo de 200 caracteres.',
+    message:
+      'El nombre del analisis es obligatorio y maximo de 200 caracteres.',
   })
   name: string;
 
@@ -41,7 +46,8 @@ export class CreateStudyDto {
   durationMinutes: number;
 
   @IsEnum(StudyType, {
-    message: 'El tipo de estudio es invalido. Valores permitidos: study, package, other.',
+    message:
+      'El tipo de estudio es invalido. Valores permitidos: study, package, other.',
   })
   type: StudyType;
 
@@ -80,13 +86,26 @@ export class CreateStudyDto {
   method?: string;
 
   @IsOptional()
+  @IsEnum(StudySampleType, {
+    message: 'El tipo de muestra es invalido.',
+  })
+  sampleType?: StudySampleType;
+
+  @IsOptional()
+  @IsBoolean({ message: 'El procesamiento especial debe ser booleano.' })
+  requiresSpecialProcessing?: boolean;
+
+  @IsOptional()
   @IsString({ message: 'El indicador debe ser una cadena de texto.' })
   indicator?: string;
 
   @IsOptional()
   @IsArray({ message: 'Los estudios del paquete deben venir en un arreglo.' })
   @Type(() => Number)
-  @IsInt({ each: true, message: 'Cada estudio del paquete debe ser un entero.' })
+  @IsInt({
+    each: true,
+    message: 'Cada estudio del paquete debe ser un entero.',
+  })
   packageStudyIds?: number[];
 
   @IsOptional()

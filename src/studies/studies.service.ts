@@ -18,7 +18,12 @@ import { UpdateStudyDetailStatusDto } from './dto/update-study-detail-status.dto
 import { UpdateStudyDetailDto } from './dto/update-study-detail.dto';
 import { UpdateStudyDto } from './dto/update-study.dto';
 import { StudyDetail, StudyDetailType } from './entities/study-detail.entity';
-import { Study, StudyStatus, StudyType } from './entities/study.entity';
+import {
+  Study,
+  StudySampleType,
+  StudyStatus,
+  StudyType,
+} from './entities/study.entity';
 import { EstimateStudyDto } from './dto/estimate-study.dto';
 import { StudyEstimationModel } from './models/study-estimation.model';
 
@@ -631,6 +636,8 @@ export class StudiesService {
         'otherPrice',
         'defaultDiscountPercent',
         'method',
+        'sampleType',
+        'requiresSpecialProcessing',
         'indicator',
         'packageStudyIds',
         'status',
@@ -648,6 +655,10 @@ export class StudiesService {
         study.otherPrice,
         study.defaultDiscountPercent,
         study.method,
+        study.sampleType,
+        study.requiresSpecialProcessing == null
+          ? ''
+          : String(study.requiresSpecialProcessing),
         study.indicator,
         (study.packageStudyIds ?? []).join(','),
         study.status,
@@ -747,6 +758,10 @@ export class StudiesService {
           record.defaultDiscountPercent,
         ),
         method: record.method,
+        sampleType: this.parseSampleType(record.sampleType),
+        requiresSpecialProcessing: this.parseOptionalBoolean(
+          record.requiresSpecialProcessing,
+        ),
         indicator: record.indicator,
         packageStudyIds: this.parseIntegerArray(record.packageStudyIds),
         status: this.parseStudyStatus(record.status),
@@ -882,6 +897,22 @@ export class StudiesService {
       : StudyStatus.ACTIVE;
   }
 
+  private parseSampleType(value?: string): StudySampleType {
+    const normalized = (value ?? '').trim().toLowerCase();
+    return Object.values(StudySampleType).includes(
+      normalized as StudySampleType,
+    )
+      ? (normalized as StudySampleType)
+      : StudySampleType.UNKNOWN;
+  }
+
+  private parseOptionalBoolean(value?: string): boolean | undefined {
+    const normalized = (value ?? '').trim().toLowerCase();
+    if (['true', '1', 'yes', 'si', 'sí'].includes(normalized)) return true;
+    if (['false', '0', 'no'].includes(normalized)) return false;
+    return undefined;
+  }
+
   private toNumber(value: number | string | null | undefined) {
     const parsed = Number(value ?? 0);
     return Number.isFinite(parsed) ? parsed : 0;
@@ -906,6 +937,8 @@ export class StudiesService {
       description: study.description ?? null,
       durationMinutes: study.durationMinutes,
       method: study.method ?? null,
+      sampleType: study.sampleType,
+      requiresSpecialProcessing: study.requiresSpecialProcessing ?? null,
       indicator: study.indicator ?? null,
       prices: {
         normal: normalPrice,

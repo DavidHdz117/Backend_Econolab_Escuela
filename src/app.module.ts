@@ -16,6 +16,7 @@ import { DatabaseModule } from './database/database.module';
 import { DbAdminModule } from './db-admin/db-admin.module';
 import { LossPredictionsModule } from './loss-predictions/loss-predictions.module';
 import { SecurityModule } from './security/security.module';
+import { StudyClusteringModule } from './study-clustering/study-clustering.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { SecurityModule } from './security/security.module';
     DbAdminModule,
     LossPredictionsModule,
     SecurityModule,
+    StudyClusteringModule,
   ],
   controllers: [AppController],
   providers: [AppService],
