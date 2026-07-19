@@ -6,7 +6,6 @@ export type StudyEstimationTrainingRow = {
   parameterCount: number;
   method?: string;
   normalPrice: number;
-  durationMinutes: number;
 };
 
 export type StudyEstimationInput = {
@@ -32,23 +31,18 @@ type FeatureConfig = {
 /**
  * Modelo de regresion lineal de ECONOLAB.
  *
- * Se entrenan dos regresiones con el catalogo real:
- * una para precio normal y otra para duracion en minutos.
+ * Se entrena una regresion con el catalogo real para sugerir el precio normal.
  */
 @Injectable()
 export class StudyEstimationModel {
   predict(input: StudyEstimationInput, rows: StudyEstimationTrainingRow[]) {
     const trainingRows = rows.filter(
-      (row) =>
-        Number.isFinite(row.normalPrice) &&
-        row.normalPrice > 0 &&
-        Number.isFinite(row.durationMinutes) &&
-        row.durationMinutes > 0,
+      (row) => Number.isFinite(row.normalPrice) && row.normalPrice > 0,
     );
 
     if (trainingRows.length < 3) {
       throw new BadRequestException(
-        'Se necesitan al menos 3 estudios con precio y duracion para entrenar el modelo.',
+        'Se necesitan al menos 3 estudios con precio para entrenar el modelo.',
       );
     }
 
@@ -60,25 +54,14 @@ export class StudyEstimationModel {
       features,
       trainingRows.map((row) => row.normalPrice),
     );
-    const durationModel = this.fit(
-      features,
-      trainingRows.map((row) => row.durationMinutes),
-    );
     const inputFeatures = this.toFeatures(input, featureConfig);
 
     const rawPrice = this.dot(inputFeatures, priceModel.coefficients);
-    const rawDuration = this.dot(inputFeatures, durationModel.coefficients);
     const suggestedNormalPrice = this.roundToStep(Math.max(0, rawPrice), 10);
-    const suggestedDurationMinutes = this.roundToStep(
-      Math.max(15, rawDuration),
-      15,
-    );
     const priceMargin = Math.max(10, priceModel.meanAbsoluteError);
-    const durationMargin = Math.max(15, durationModel.meanAbsoluteError);
 
     return {
       suggestedNormalPrice,
-      suggestedDurationMinutes,
       priceRange: {
         min: this.roundToStep(
           Math.max(0, suggestedNormalPrice - priceMargin),
@@ -86,19 +69,11 @@ export class StudyEstimationModel {
         ),
         max: this.roundToStep(suggestedNormalPrice + priceMargin, 10),
       },
-      durationRangeMinutes: {
-        min: this.roundToStep(
-          Math.max(15, suggestedDurationMinutes - durationMargin),
-          15,
-        ),
-        max: this.roundToStep(suggestedDurationMinutes + durationMargin, 15),
-      },
       model: {
         algorithm: 'linear_regression',
         version: '1.0',
         trainingSamples: trainingRows.length,
         priceMeanAbsoluteError: this.round(priceModel.meanAbsoluteError),
-        durationMeanAbsoluteError: this.round(durationModel.meanAbsoluteError),
         featuresUsed: [
           'tipo',
           ...(featureConfig.methodCategories.length > 0 ? ['metodo'] : []),

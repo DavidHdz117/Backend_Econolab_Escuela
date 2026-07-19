@@ -1,5 +1,5 @@
 -- ================================================================
--- ECONOLAB: dataset sintetico para el modelo de precio y duracion
+-- ECONOLAB: dataset sintetico para el modelo de precio
 -- PostgreSQL
 --
 -- Crea 1,000 estudios de entrenamiento y sus parametros.
@@ -37,17 +37,7 @@ features AS (
       WHEN 'ELISA' THEN 150
       WHEN 'QUIMIOLUMINISCENCIA' THEN 180
       WHEN 'PCR' THEN 350
-    END AS price_method_effect,
-    CASE method
-      WHEN 'ENZIMATICO' THEN 15
-      WHEN 'INMUNOENSAYO' THEN 60
-      WHEN 'ESPECTROFOTOMETRIA' THEN 30
-      WHEN 'COLORIMETRIA' THEN 20
-      WHEN 'COAGULOMETRIA' THEN 45
-      WHEN 'ELISA' THEN 90
-      WHEN 'QUIMIOLUMINISCENCIA' THEN 120
-      WHEN 'PCR' THEN 360
-    END AS duration_method_effect
+    END AS price_method_effect
   FROM base
 ),
 training_rows AS (
@@ -61,16 +51,7 @@ training_rows AS (
         + price_method_effect
         + ((series_number * 37) % 51 - 25)
       ) / 10.0) * 10
-    )::numeric(10, 2) AS normal_price,
-    GREATEST(
-      15,
-      ROUND((
-        15
-        + parameter_count * 4
-        + duration_method_effect
-        + ((series_number * 13) % 21 - 10)
-      ) / 15.0) * 15
-    )::integer AS duration_minutes
+    )::numeric(10, 2) AS normal_price
   FROM features
 )
 INSERT INTO operativo.studies (
@@ -95,7 +76,8 @@ SELECT
   'ESTUDIO SINTETICO ML ' || LPAD(series_number::text, 6, '0'),
   'MLTRAIN-' || LPAD(series_number::text, 6, '0'),
   'Registro sintetico para entrenar el modelo. No usar en operacion.',
-  duration_minutes,
+  -- La tabla exige una duracion, pero el modelo no la usa ni la predice.
+  60,
   normal_price,
   ROUND(normal_price * 0.80, 2),
   ROUND(normal_price * 0.90, 2),
@@ -176,10 +158,7 @@ SELECT
   COUNT(*) AS synthetic_studies,
   MIN("normalPrice") AS minimum_price,
   ROUND(AVG("normalPrice"), 2) AS average_price,
-  MAX("normalPrice") AS maximum_price,
-  MIN("durationMinutes") AS minimum_duration_minutes,
-  ROUND(AVG("durationMinutes"), 2) AS average_duration_minutes,
-  MAX("durationMinutes") AS maximum_duration_minutes
+  MAX("normalPrice") AS maximum_price
 FROM operativo.studies
 WHERE code ~ '^MLTRAIN-[0-9]{6}$'
   AND indicator = 'DATOS SINTETICOS';

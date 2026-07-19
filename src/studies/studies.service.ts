@@ -261,7 +261,6 @@ export class StudiesService {
       parameterCount: parameterCounts.get(study.id) ?? 0,
       method: study.method,
       normalPrice: Number(study.normalPrice),
-      durationMinutes: study.durationMinutes,
     }));
 
     // Aqui se manda llamar y se utiliza el modelo.
