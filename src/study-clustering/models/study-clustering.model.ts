@@ -43,6 +43,19 @@ type FittedKMeans = {
 
 type NumericKey = 'price' | 'deliveryHours' | 'parameterCount' | 'requestCount';
 
+type NumericDistribution = Record<
+  NumericKey,
+  { p33: number; median: number; p66: number }
+>;
+
+export type StudyClusteringFindingDraft = {
+  findingId: string;
+  type: 'opportunity' | 'risk' | 'outlier' | 'data_quality' | 'observation';
+  titleTemplate: string;
+  descriptionTemplate: string;
+  profileCluster?: number;
+};
+
 const NUMERIC_FEATURES: NumericKey[] = [
   'price',
   'deliveryHours',
@@ -52,6 +65,12 @@ const NUMERIC_FEATURES: NumericKey[] = [
 const MAX_CATEGORIES = 20;
 const MAX_ITERATIONS = 100;
 const EPSILON = 1e-6;
+const UNKNOWN_CATEGORIES = new Set([
+  'unknown',
+  'sin_especificar',
+  'desconocido',
+  'no_especificado',
+]);
 
 @Injectable()
 export class StudyClusteringModel {
@@ -139,12 +158,16 @@ export class StudyClusteringModel {
     }
 
     const selected = fittedByK.get(selectedK)!;
-    const result = this.buildResult(cleanRows, selected);
+    const result = this.buildResult(
+      cleanRows,
+      selected,
+      new Set(encoded.featureNames),
+    );
 
     return {
       model: {
         algorithm: 'kmeans' as const,
-        version: '1.0',
+        version: '2.0',
         selectedK,
         elbowK,
         selectionMethod: options.requestedK
@@ -171,6 +194,8 @@ export class StudyClusteringModel {
       })),
       profiles: result.profiles,
       studies: result.studies,
+      findings: result.findings,
+      interpretationThresholds: result.interpretationThresholds,
       dataQuality: {
         receivedRows: rows.length,
         usableRows: cleanRows.length,
@@ -193,6 +218,11 @@ export class StudyClusteringModel {
         )
           ? [
               `La seleccion automatica descarto valores de k con grupos menores a ${minimumStableClusterSize} estudios para evitar clusters formados por casos aislados.`,
+            ]
+          : []),
+        ...(encoded.ignoredConstantFeatures.length > 0
+          ? [
+              `Se excluyeron variables constantes o con cobertura insuficiente: ${encoded.ignoredConstantFeatures.join(', ')}.`,
             ]
           : []),
       ],
@@ -361,6 +391,12 @@ export class StudyClusteringModel {
     const methodConfig = this.categoryConfig(
       rows.map((row) => row.analysisMethod),
     );
+    if (sampleConfig.excludedForCoverage) {
+      ignoredConstantFeatures.push('sample_type (cobertura insuficiente)');
+    }
+    if (methodConfig.excludedForCoverage) {
+      ignoredConstantFeatures.push('analysis_method (cobertura insuficiente)');
+    }
     const allFeatureNames = [
       'price',
       'delivery_hours',
@@ -416,13 +452,29 @@ export class StudyClusteringModel {
 
   private categoryConfig(values: string[]) {
     const frequencies = new Map<string, number>();
-    for (const value of values) {
+    const knownValues = values.filter(
+      (value) => !this.isUnknownCategory(value),
+    );
+    if (knownValues.length < 3 || knownValues.length / values.length < 0.5) {
+      return {
+        categories: [] as string[],
+        map: (value: string): string | null => {
+          void value;
+          return null;
+        },
+        excludedForCoverage: true,
+      };
+    }
+    for (const value of knownValues) {
       frequencies.set(value, (frequencies.get(value) ?? 0) + 1);
     }
     const ordered = [...frequencies.entries()].sort(
       (left, right) => right[1] - left[1] || left[0].localeCompare(right[0]),
     );
-    const minimumFrequency = Math.max(2, Math.ceil(values.length * 0.01));
+    const minimumFrequency = Math.max(
+      2,
+      Math.ceil(Math.max(knownValues.length, 1) * 0.01),
+    );
     const kept = ordered
       .filter(([, count]) => count >= minimumFrequency)
       .slice(0, MAX_CATEGORIES - 1)
@@ -431,7 +483,11 @@ export class StudyClusteringModel {
     const categories = [...kept, ...(hasOther ? ['otros'] : [])].sort();
     return {
       categories,
-      map: (value: string) => (kept.includes(value) ? value : 'otros'),
+      map: (value: string): string | null => {
+        if (this.isUnknownCategory(value)) return null;
+        return kept.includes(value) ? value : 'otros';
+      },
+      excludedForCoverage: false,
     };
   }
 
@@ -662,7 +718,11 @@ export class StudyClusteringModel {
       )[0].k;
   }
 
-  private buildResult(rows: CleanRow[], fitted: FittedKMeans) {
+  private buildResult(
+    rows: CleanRow[],
+    fitted: FittedKMeans,
+    featureNames: Set<string>,
+  ) {
     const rawClusters = Array.from(
       { length: fitted.centroids.length },
       (_, cluster) =>
@@ -670,7 +730,7 @@ export class StudyClusteringModel {
           .map((_, index) => index)
           .filter((index) => fitted.labels[index] === cluster),
     );
-    const globalAverages = this.averages(rows);
+    const interpretationThresholds = this.numericDistributions(rows);
     const orderedClusters = rawClusters
       .map((indices, rawCluster) => ({
         rawCluster,
@@ -739,40 +799,87 @@ export class StudyClusteringModel {
       };
     });
 
-    const profiles = orderedClusters.map((cluster, index) => {
+    const profilesWithQualifiers = orderedClusters.map((cluster, index) => {
       const clusterNumber = index + 1;
       const clusterRows = cluster.indices.map((rowIndex) => rows[rowIndex]);
       const clusterStudies = studies.filter(
         (study) => study.cluster === clusterNumber,
       );
-      const traits = this.traits(cluster.averages, globalAverages, clusterRows);
+      const specialProcessingPercentage = this.round(
+        (clusterRows.filter((row) => row.requiresSpecialProcessing).length /
+          clusterRows.length) *
+          100,
+        1,
+      );
+      const sampleTypes = this.categorySummary(
+        clusterRows.map((row) => row.sampleType),
+      );
+      const analysisMethods = this.categorySummary(
+        clusterRows.map((row) => row.analysisMethod),
+      );
+      const predominantSampleType = this.hasCategoryFeature(
+        featureNames,
+        'sample_type=',
+      )
+        ? this.predominantCategory(clusterRows.map((row) => row.sampleType))
+        : null;
+      const predominantMethod = this.hasCategoryFeature(
+        featureNames,
+        'analysis_method=',
+      )
+        ? this.predominantCategory(clusterRows.map((row) => row.analysisMethod))
+        : null;
+      const outlierCount = clusterStudies.filter(
+        (study) => study.isOutlier,
+      ).length;
+      const interpretation = this.interpretProfile({
+        averages: cluster.averages,
+        distributions: interpretationThresholds,
+        featureNames,
+        studyCount: clusterRows.length,
+        outlierCount,
+        specialProcessingPercentage,
+        predominantMethod,
+        predominantSampleType,
+      });
       return {
         cluster: clusterNumber,
-        label: `Grupo ${clusterNumber} · ${traits.slice(0, 2).join(' y ') || 'operacion estandar'}`,
+        suggestedName: interpretation.suggestedName,
+        shortDescription: interpretation.shortDescription,
+        keyCharacteristics: interpretation.keyCharacteristics,
+        nameQualifiers: interpretation.nameQualifiers,
         studyCount: clusterRows.length,
         percentage: this.round((clusterRows.length / rows.length) * 100, 1),
-        outlierCount: clusterStudies.filter((study) => study.isOutlier).length,
+        outlierCount,
         outlierThreshold: Number.isFinite(thresholds.get(cluster.rawCluster)!)
           ? this.round(thresholds.get(cluster.rawCluster)!, 4)
           : null,
         averages: this.roundAverages(cluster.averages),
-        specialProcessingPercentage: this.round(
-          (clusterRows.filter((row) => row.requiresSpecialProcessing).length /
-            clusterRows.length) *
-            100,
-          1,
-        ),
-        sampleTypes: this.categorySummary(
-          clusterRows.map((row) => row.sampleType),
-        ),
-        analysisMethods: this.categorySummary(
-          clusterRows.map((row) => row.analysisMethod),
-        ),
-        traits,
+        predominantMethod,
+        predominantSampleType,
+        specialProcessingPercentage,
+        sampleTypes,
+        analysisMethods,
+        traits: interpretation.traits,
       };
     });
 
-    return { profiles, studies };
+    const profiles = this.resolveSuggestedNameCollisions(
+      profilesWithQualifiers,
+    ).map(({ nameQualifiers, ...profile }) => {
+      void nameQualifiers;
+      return profile;
+    });
+    const findings = this.buildFindings(profiles, studies, rows);
+
+    return {
+      profiles,
+      studies,
+      findings,
+      interpretationThresholds: this.roundDistributions(
+        interpretationThresholds,
+      ),
+    };
   }
 
   private averages(rows: CleanRow[]) {
@@ -786,56 +893,13 @@ export class StudyClusteringModel {
     };
   }
 
-  private traits(
-    cluster: ReturnType<StudyClusteringModel['averages']>,
-    global: ReturnType<StudyClusteringModel['averages']>,
-    rows: CleanRow[],
-  ) {
-    const traits: string[] = [];
-    if (global.price > 0 && cluster.price <= global.price * 0.85)
-      traits.push('precio bajo');
-    if (global.price > 0 && cluster.price >= global.price * 1.15)
-      traits.push('precio alto');
-    if (
-      global.requestCount > 0 &&
-      cluster.requestCount >= global.requestCount * 1.15
-    )
-      traits.push('demanda alta');
-    if (
-      global.requestCount > 0 &&
-      cluster.requestCount <= global.requestCount * 0.85
-    )
-      traits.push('demanda baja');
-    if (
-      global.deliveryHours > 0 &&
-      cluster.deliveryHours >= global.deliveryHours * 1.15
-    )
-      traits.push('entrega prolongada');
-    if (
-      global.deliveryHours > 0 &&
-      cluster.deliveryHours <= global.deliveryHours * 0.85
-    )
-      traits.push('entrega rapida');
-    if (
-      global.parameterCount > 0 &&
-      cluster.parameterCount >= global.parameterCount * 1.15
-    )
-      traits.push('multiparametro');
-    if (
-      rows.filter((row) => row.requiresSpecialProcessing).length /
-        rows.length >=
-      0.5
-    ) {
-      traits.push('procesamiento especial frecuente');
-    }
-    return traits;
-  }
-
   private categorySummary(values: string[]) {
     const frequencies = new Map<string, number>();
-    values.forEach((value) =>
-      frequencies.set(value, (frequencies.get(value) ?? 0) + 1),
-    );
+    values
+      .filter((value) => !this.isUnknownCategory(value))
+      .forEach((value) =>
+        frequencies.set(value, (frequencies.get(value) ?? 0) + 1),
+      );
     return [...frequencies.entries()]
       .sort(
         (left, right) => right[1] - left[1] || left[0].localeCompare(right[0]),
@@ -846,6 +910,378 @@ export class StudyClusteringModel {
         count,
         percentage: this.round((count / values.length) * 100, 1),
       }));
+  }
+
+  private numericDistributions(rows: CleanRow[]): NumericDistribution {
+    return Object.fromEntries(
+      NUMERIC_FEATURES.map((key) => {
+        const values = rows
+          .map((row) => row[key])
+          .sort((left, right) => left - right);
+        return [
+          key,
+          {
+            p33: this.quantile(values, 0.33),
+            median: this.quantile(values, 0.5),
+            p66: this.quantile(values, 0.66),
+          },
+        ];
+      }),
+    ) as NumericDistribution;
+  }
+
+  private roundDistributions(distributions: NumericDistribution) {
+    return Object.fromEntries(
+      NUMERIC_FEATURES.map((key) => [
+        key,
+        {
+          p33: this.round(distributions[key].p33, 2),
+          median: this.round(distributions[key].median, 2),
+          p66: this.round(distributions[key].p66, 2),
+        },
+      ]),
+    );
+  }
+
+  private interpretProfile(input: {
+    averages: ReturnType<StudyClusteringModel['averages']>;
+    distributions: NumericDistribution;
+    featureNames: Set<string>;
+    studyCount: number;
+    outlierCount: number;
+    specialProcessingPercentage: number;
+    predominantMethod: string | null;
+    predominantSampleType: string | null;
+  }) {
+    const traits: string[] = [];
+    const nameQualifiers: string[] = [];
+    const keyCharacteristics: string[] = [];
+    const add = (
+      condition: boolean,
+      trait: string,
+      nameQualifier: string,
+      characteristic: string,
+    ) => {
+      if (!condition) return;
+      traits.push(trait);
+      nameQualifiers.push(nameQualifier);
+      keyCharacteristics.push(characteristic);
+    };
+    const { averages, distributions, featureNames } = input;
+
+    add(
+      this.hasNumericFeature(featureNames, 'price') &&
+        averages.price < distributions.price.p33,
+      'precio bajo',
+      'accesibles',
+      `Precio promedio ${this.formatCurrency(averages.price)}, dentro del tercio inferior del catálogo.`,
+    );
+    add(
+      this.hasNumericFeature(featureNames, 'price') &&
+        averages.price > distributions.price.p66,
+      'precio alto',
+      'de mayor costo',
+      `Precio promedio ${this.formatCurrency(averages.price)}, dentro del tercio superior del catálogo.`,
+    );
+    add(
+      this.hasNumericFeature(featureNames, 'requestCount') &&
+        averages.requestCount > distributions.requestCount.p66,
+      'demanda alta',
+      'frecuentes',
+      `${this.round(averages.requestCount, 1)} solicitudes promedio, dentro del tercio de mayor demanda.`,
+    );
+    add(
+      this.hasNumericFeature(featureNames, 'requestCount') &&
+        averages.requestCount < distributions.requestCount.p33,
+      'demanda baja',
+      'de demanda ocasional',
+      `${this.round(averages.requestCount, 1)} solicitudes promedio, dentro del tercio de menor demanda.`,
+    );
+    add(
+      this.hasNumericFeature(featureNames, 'deliveryHours') &&
+        averages.deliveryHours < distributions.deliveryHours.p33,
+      'entrega rápida',
+      'de entrega rápida',
+      `${this.round(averages.deliveryHours, 1)} horas de entrega promedio, dentro del tercio más rápido.`,
+    );
+    add(
+      this.hasNumericFeature(featureNames, 'deliveryHours') &&
+        averages.deliveryHours > distributions.deliveryHours.p66,
+      'entrega prolongada',
+      'de entrega prolongada',
+      `${this.round(averages.deliveryHours, 1)} horas de entrega promedio, dentro del tercio más prolongado.`,
+    );
+    add(
+      this.hasNumericFeature(featureNames, 'parameterCount') &&
+        averages.parameterCount > distributions.parameterCount.p66,
+      'multiparámetro',
+      'multiparámetro',
+      `${this.round(averages.parameterCount, 1)} parámetros promedio, dentro del tercio superior.`,
+    );
+    add(
+      featureNames.has('requires_special_processing') &&
+        input.specialProcessingPercentage >= 60,
+      'procesamiento especial frecuente',
+      'de procesamiento especializado',
+      `${this.round(input.specialProcessingPercentage, 1)}% requiere procesamiento especial.`,
+    );
+
+    if (input.predominantMethod) {
+      keyCharacteristics.push(
+        `Método predominante: ${input.predominantMethod}.`,
+      );
+    }
+    if (input.predominantSampleType) {
+      keyCharacteristics.push(
+        `Muestra predominante: ${input.predominantSampleType}.`,
+      );
+    }
+    if (input.outlierCount > 0) {
+      keyCharacteristics.push(
+        `${input.outlierCount} ${input.outlierCount === 1 ? 'estudio atípico detectado' : 'estudios atípicos detectados'}.`,
+      );
+    }
+
+    const fallbackQualifier = input.predominantMethod
+      ? `de ${input.predominantMethod}`
+      : input.predominantSampleType
+        ? `con muestra ${input.predominantSampleType}`
+        : 'de operación estándar';
+    const selectedQualifiers = nameQualifiers.slice(0, 2);
+    const suggestedName = `Estudios ${
+      selectedQualifiers.length > 0
+        ? selectedQualifiers.join(' y ')
+        : fallbackQualifier
+    }`;
+    const shortDescription = `${input.studyCount} estudios con precio promedio de ${this.formatCurrency(averages.price)}, entrega de ${this.round(averages.deliveryHours, 1)} horas, ${this.round(averages.parameterCount, 1)} parámetros y ${this.round(averages.requestCount, 1)} solicitudes en el periodo.`;
+
+    return {
+      suggestedName,
+      shortDescription,
+      keyCharacteristics: keyCharacteristics.slice(0, 6),
+      nameQualifiers,
+      traits,
+    };
+  }
+
+  private resolveSuggestedNameCollisions<
+    T extends {
+      suggestedName: string;
+      nameQualifiers: string[];
+      predominantMethod: string | null;
+      predominantSampleType: string | null;
+      averages: ReturnType<StudyClusteringModel['roundAverages']>;
+    },
+  >(profiles: T[]): T[] {
+    const used = new Set<string>();
+    return profiles.map((profile) => {
+      const baseName = profile.suggestedName;
+      const candidates = [
+        baseName,
+        ...(profile.nameQualifiers[2]
+          ? [`${baseName} y ${profile.nameQualifiers[2]}`]
+          : []),
+        ...(profile.predominantMethod
+          ? [`${baseName} · ${profile.predominantMethod}`]
+          : []),
+        ...(profile.predominantSampleType
+          ? [`${baseName} · muestra ${profile.predominantSampleType}`]
+          : []),
+        `${baseName} · precio promedio ${this.formatCurrency(profile.averages.price)}`,
+        `${baseName} · entrega promedio ${this.round(profile.averages.deliveryHours, 1)} h`,
+        `${baseName} · ${this.round(profile.averages.parameterCount, 1)} parámetros`,
+        `${baseName} · ${this.round(profile.averages.requestCount, 1)} solicitudes`,
+      ];
+      const selected =
+        candidates.find(
+          (candidate) => !used.has(this.normalizeNameKey(candidate)),
+        ) ?? baseName;
+      profile.suggestedName = selected.slice(0, 150);
+      used.add(this.normalizeNameKey(profile.suggestedName));
+      return profile;
+    });
+  }
+
+  private buildFindings(
+    profiles: Array<{
+      cluster: number;
+      suggestedName: string;
+      averages: ReturnType<StudyClusteringModel['roundAverages']>;
+      traits: string[];
+      outlierCount: number;
+      specialProcessingPercentage: number;
+    }>,
+    studies: Array<{ isOutlier: boolean }>,
+    rows: CleanRow[],
+  ): StudyClusteringFindingDraft[] {
+    const drafts: Omit<StudyClusteringFindingDraft, 'findingId'>[] = [];
+
+    for (const profile of profiles) {
+      const uses = (trait: string) => profile.traits.includes(trait);
+      if (uses('demanda alta') && uses('entrega rápida')) {
+        drafts.push({
+          type: 'opportunity',
+          titleTemplate: 'Capacidad operativa en {profileName}',
+          descriptionTemplate: `{profileName} concentra ${profile.averages.requestCount} solicitudes promedio con una entrega de ${profile.averages.deliveryHours} horas; es un segmento prioritario para vigilar capacidad y continuidad.`,
+          profileCluster: profile.cluster,
+        });
+      }
+      if (uses('precio alto') && uses('demanda baja')) {
+        drafts.push({
+          type: 'observation',
+          titleTemplate: 'Alto valor y baja frecuencia en {profileName}',
+          descriptionTemplate: `{profileName} combina un precio promedio de ${this.formatCurrency(profile.averages.price)} con ${profile.averages.requestCount} solicitudes; conviene revisar disponibilidad y costos administrativos sin convertirlo en recomendación clínica.`,
+          profileCluster: profile.cluster,
+        });
+      }
+      if (uses('entrega prolongada')) {
+        drafts.push({
+          type: 'risk',
+          titleTemplate: 'Seguimiento de entrega en {profileName}',
+          descriptionTemplate: `{profileName} registra ${profile.averages.deliveryHours} horas de entrega promedio, dentro del tercio más prolongado del catálogo.`,
+          profileCluster: profile.cluster,
+        });
+      }
+      if (profile.specialProcessingPercentage >= 60) {
+        drafts.push({
+          type: 'risk',
+          titleTemplate: 'Procesamiento especial en {profileName}',
+          descriptionTemplate: `El ${profile.specialProcessingPercentage}% de {profileName} requiere procesamiento especial; el hallazgo sirve para planeación operativa y no para decisiones clínicas.`,
+          profileCluster: profile.cluster,
+        });
+      }
+      if (profile.outlierCount > 0) {
+        drafts.push({
+          type: 'outlier',
+          titleTemplate: 'Valores atípicos en {profileName}',
+          descriptionTemplate: `{profileName} contiene ${profile.outlierCount} ${profile.outlierCount === 1 ? 'estudio que presenta' : 'estudios que presentan'} diferencias respecto al comportamiento habitual de estudios similares; conviene revisar sus datos administrativos.`,
+          profileCluster: profile.cluster,
+        });
+      }
+    }
+
+    const unknownSamples = rows.filter((row) =>
+      this.isUnknownCategory(row.sampleType),
+    ).length;
+    const unknownMethods = rows.filter((row) =>
+      this.isUnknownCategory(row.analysisMethod),
+    ).length;
+    if (
+      unknownSamples / rows.length >= 0.25 ||
+      unknownMethods / rows.length >= 0.25
+    ) {
+      drafts.push({
+        type: 'data_quality',
+        titleTemplate: 'Cobertura incompleta de variables categóricas',
+        descriptionTemplate: `${unknownSamples} estudios no tienen tipo de muestra confirmado y ${unknownMethods} no tienen método de análisis; esos valores desconocidos se excluyeron de la interpretación para que no dominaran los perfiles.`,
+      });
+    }
+
+    const totalOutliers = studies.filter((study) => study.isOutlier).length;
+    if (totalOutliers > 0) {
+      drafts.push({
+        type: 'outlier',
+        titleTemplate: 'Revisión general de estudios atípicos',
+        descriptionTemplate: `${totalOutliers} ${totalOutliers === 1 ? 'estudio presenta' : 'estudios presentan'} diferencias respecto al comportamiento habitual de estudios similares; conviene revisarlos como posibles diferencias operativas o problemas de captura.`,
+      });
+    }
+
+    if (drafts.length === 0) {
+      const largest = [...profiles].sort(
+        (left, right) =>
+          right.averages.requestCount - left.averages.requestCount,
+      )[0];
+      drafts.push({
+        type: 'observation',
+        titleTemplate: 'Distribución operativa estable',
+        descriptionTemplate: `No se detectaron alertas fuertes; {profileName} presenta la mayor demanda promedio del análisis con ${largest.averages.requestCount} solicitudes.`,
+        profileCluster: largest.cluster,
+      });
+    }
+
+    return drafts.slice(0, 12).map((finding, index) => ({
+      findingId: `finding-${index + 1}`,
+      ...finding,
+    }));
+  }
+
+  private predominantCategory(values: string[]): string | null {
+    const known = values.filter((value) => !this.isUnknownCategory(value));
+    if (known.length < 3 || known.length / values.length < 0.5) return null;
+    const frequencies = new Map<string, number>();
+    known.forEach((value) =>
+      frequencies.set(value, (frequencies.get(value) ?? 0) + 1),
+    );
+    const dominant = [...frequencies.entries()].sort(
+      (left, right) => right[1] - left[1] || left[0].localeCompare(right[0]),
+    )[0];
+    if (!dominant || dominant[1] / known.length < 0.6) return null;
+    return this.toDisplayCategory(dominant[0]);
+  }
+
+  private hasNumericFeature(featureNames: Set<string>, key: NumericKey) {
+    const names: Record<NumericKey, string> = {
+      price: 'price',
+      deliveryHours: 'delivery_hours',
+      parameterCount: 'parameter_count',
+      requestCount: 'request_count',
+    };
+    return featureNames.has(names[key]);
+  }
+
+  private hasCategoryFeature(featureNames: Set<string>, prefix: string) {
+    return [...featureNames].some((name) => name.startsWith(prefix));
+  }
+
+  private isUnknownCategory(value: string) {
+    return UNKNOWN_CATEGORIES.has(value.trim().toLowerCase());
+  }
+
+  private toDisplayCategory(value: string) {
+    const normalized = value.trim().toLowerCase().replace(/[_-]+/g, ' ');
+    const translations: Record<string, string> = {
+      blood: 'Sangre total',
+      serum: 'Suero',
+      plasma: 'Plasma',
+      urine: 'Orina',
+      stool: 'Heces',
+      swab: 'Hisopo',
+      other: 'Otra',
+      pcr: 'PCR',
+      elisa: 'ELISA',
+      enzimatico: 'Enzimático',
+      inmunoensayo: 'Inmunoensayo',
+      espectrofotometria: 'Espectrofotometría',
+      colorimetria: 'Colorimetría',
+      coagulometria: 'Coagulometría',
+      quimioluminiscencia: 'Quimioluminiscencia',
+      'quimica seca': 'Química seca',
+      microbiologia: 'Microbiología',
+      inmunofluorescencia: 'Inmunofluorescencia',
+      cromatografia: 'Cromatografía',
+      electroforesis: 'Electroforesis',
+    };
+    if (translations[normalized]) return translations[normalized];
+    return normalized
+      .replace(/[_-]+/g, ' ')
+      .replace(/\b\p{L}/gu, (letter) => letter.toUpperCase());
+  }
+
+  private normalizeNameKey(value: string) {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' ');
+  }
+
+  private formatCurrency(value: number) {
+    return new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: 'MXN',
+      maximumFractionDigits: 0,
+    }).format(value);
   }
 
   private roundAverages(values: ReturnType<StudyClusteringModel['averages']>) {
