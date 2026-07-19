@@ -6,6 +6,7 @@ import { PublicStudiesController } from './public-studies.controller';
 import { PublicBrandController } from './public-brand.controller';
 import { Study } from './entities/study.entity';
 import { StudyDetail } from './entities/study-detail.entity';
+import { StudyEstimationModel } from './models/study-estimation.model';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Study, StudyDetail])],
@@ -14,7 +15,7 @@ import { StudyDetail } from './entities/study-detail.entity';
     PublicStudiesController,
     PublicBrandController,
   ],
-  providers: [StudiesService],
+  providers: [StudiesService, StudyEstimationModel],
   exports: [StudiesService],
 })
 export class StudiesModule {}

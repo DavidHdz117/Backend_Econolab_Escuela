@@ -23,6 +23,7 @@ import { UpdateStudyDetailStatusDto } from './dto/update-study-detail-status.dto
 import { StudyStatus, StudyType } from './entities/study.entity';
 import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { EstimateStudyDto } from './dto/estimate-study.dto';
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('studies')
@@ -48,6 +49,14 @@ export class StudiesController {
   @Get('next-code')
   getSuggestedCode(@Query('type') type?: StudyType) {
     return this.studiesService.getSuggestedCode(type ?? StudyType.STUDY);
+  }
+
+  @Post('estimate')
+  async estimate(@Body() dto: EstimateStudyDto) {
+    return {
+      message: 'Estimacion generada correctamente.',
+      data: await this.studiesService.estimate(dto),
+    };
   }
 
   @Post()
