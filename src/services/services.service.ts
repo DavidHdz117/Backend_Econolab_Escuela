@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -15,6 +16,7 @@ import {
 import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
 import { UpdateServiceStatusDto } from './dto/update-service-status.dto';
+import { PredictServiceOutcomeDto } from './dto/predict-service-outcome.dto';
 import { Patient } from '../patients/entities/patient.entity';
 import { Doctor } from '../doctors/entities/doctor.entity';
 import { Study, StudyStatus, StudyType } from '../studies/entities/study.entity';
@@ -31,12 +33,65 @@ import {
   DEFAULT_LAB_SUBTITLE,
   resolveLabLogoPath,
 } from 'src/common/utils/pdf-branding.util';
+import {
+  SERVICE_OUTCOME_MINIMUM_SAMPLES_PER_CLASS,
+  SERVICE_OUTCOME_MODEL_VERSION,
+  ServiceOutcomeModelUnavailableError,
+  ServiceOutcomePredictionModel,
+  type ServiceOutcomeClass,
+  type ServiceOutcomeFeatures,
+  type ServiceOutcomePredictionResult as ServiceOutcomeModelResult,
+  type ServiceOutcomeTrainingRow,
+} from './models/service-outcome-prediction.model';
 
 const AUTO_SERVICE_FOLIO_PREFIX = 'ECO';
 const AUTO_SEQUENCE_PAD = 4;
+const OUTCOME_LABELS: Record<ServiceOutcomeClass, string> = {
+  completed_on_time: 'Conclusión en tiempo',
+  delayed: 'Retraso',
+  cancelled: 'Cancelación',
+};
+
+type ServiceOutcomeFeatureSource = {
+  branchName?: string | null;
+  sampleAt?: Date | string | null;
+  deliveryAt?: Date | string | null;
+  createdAt: Date | string;
+  subtotalAmount: number;
+  courtesyPercent: number;
+  discountAmount: number;
+  totalAmount: number;
+  items: ServiceOrderItem[];
+};
+
+type PublicServiceOutcomePrediction =
+  | {
+      available: false;
+      message: string;
+      model: {
+        version: string;
+        trainingSamples: number;
+        minimumSamplesPerClass: number;
+        classDistribution: Record<ServiceOutcomeClass, number>;
+      };
+    }
+  | {
+      available: true;
+      predictedOutcome: ServiceOutcomeClass;
+      label: string;
+      confidence: number;
+      probabilities: Array<{
+        outcome: ServiceOutcomeClass;
+        label: string;
+        probability: number;
+      }>;
+      model: ServiceOutcomeModelResult['model'];
+    };
 
 @Injectable()
 export class ServicesService {
+  private readonly logger = new Logger(ServicesService.name);
+
   constructor(
     @InjectRepository(ServiceOrder)
     private readonly serviceRepo: Repository<ServiceOrder>,
@@ -48,6 +103,7 @@ export class ServicesService {
     private readonly doctorRepo: Repository<Doctor>,
     @InjectRepository(Study)
     private readonly studyRepo: Repository<Study>,
+    private readonly serviceOutcomePredictionModel: ServiceOutcomePredictionModel,
   ) {}
 
   private normalizeSearchValue(value: string) {
@@ -281,6 +337,194 @@ export class ServicesService {
       discountAmount,
       totalAmount: subtotal - discountAmount,
     };
+  }
+
+  private toValidDate(value?: Date | string | null) {
+    if (!value) return null;
+    const parsed = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  /** Convierte una orden en las mismas variables que usa el clasificador. */
+  private buildOutcomeFeatures(
+    source: ServiceOutcomeFeatureSource,
+  ): ServiceOutcomeFeatures | null {
+    const createdAt = this.toValidDate(source.createdAt);
+    const deliveryAt = this.toValidDate(source.deliveryAt);
+    const sampleAt = this.toValidDate(source.sampleAt);
+
+    if (!createdAt || !deliveryAt) return null;
+
+    const promisedStart = sampleAt ?? createdAt;
+    const promisedLeadHours =
+      (deliveryAt.getTime() - promisedStart.getTime()) / (60 * 60 * 1000);
+
+    if (!Number.isFinite(promisedLeadHours) || promisedLeadHours <= 0) {
+      return null;
+    }
+
+    const items = source.items ?? [];
+    if (items.length === 0) return null;
+
+    const priceTypeFrequency = new Map<string, number>();
+    for (const item of items) {
+      const quantity = Math.max(0, Number(item.quantity) || 0);
+      priceTypeFrequency.set(
+        item.priceType,
+        (priceTypeFrequency.get(item.priceType) ?? 0) + quantity,
+      );
+    }
+
+    const dominantPriceType = [...priceTypeFrequency.entries()].sort(
+      (left, right) => right[1] - left[1] || left[0].localeCompare(right[0]),
+    )[0]?.[0];
+
+    return {
+      promisedLeadHours,
+      registrationHour: createdAt.getHours() + createdAt.getMinutes() / 60,
+      registrationWeekday: createdAt.getDay(),
+      itemCount: items.length,
+      totalQuantity: items.reduce(
+        (total, item) => total + Math.max(0, Number(item.quantity) || 0),
+        0,
+      ),
+      distinctStudyCount: new Set(items.map((item) => item.studyId)).size,
+      packageComponentCount: items.filter((item) => item.sourcePackageId)
+        .length,
+      subtotalAmount: Number(source.subtotalAmount),
+      courtesyPercent: Number(source.courtesyPercent),
+      discountAmount: Number(source.discountAmount),
+      totalAmount: Number(source.totalAmount),
+      branchName: source.branchName,
+      dominantPriceType,
+
+      // El catálogo no guarda snapshots históricos de estas variables; usar
+      // su valor actual para una orden vieja introduciría inconsistencia.
+      maxStudyDurationMinutes: undefined,
+      averageStudyDurationMinutes: undefined,
+      totalParameterCount: undefined,
+      specialProcessingCount: undefined,
+      dominantSampleType: undefined,
+      dominantAnalysisMethod: undefined,
+    };
+  }
+
+  private getHistoricalOutcome(
+    order: ServiceOrder,
+  ): ServiceOutcomeClass | null {
+    if (order.status === ServiceStatus.CANCELLED) return 'cancelled';
+    if (order.status === ServiceStatus.DELAYED) return 'delayed';
+    if (order.status !== ServiceStatus.COMPLETED) return null;
+
+    const deliveryAt = this.toValidDate(order.deliveryAt);
+    const completedAt = this.toValidDate(order.completedAt);
+    if (!deliveryAt || !completedAt) return null;
+
+    return completedAt.getTime() <= deliveryAt.getTime()
+      ? 'completed_on_time'
+      : 'delayed';
+  }
+
+  /** Dataset supervisado: el estado final solo se utiliza para construir Y. */
+  private async buildOutcomeTrainingDataset() {
+    const historicalOrders = await this.serviceRepo.find({
+      where: {
+        isActive: true,
+        status: In([
+          ServiceStatus.COMPLETED,
+          ServiceStatus.DELAYED,
+          ServiceStatus.CANCELLED,
+        ]),
+      },
+      order: { id: 'ASC' },
+    });
+    const dataset: ServiceOutcomeTrainingRow[] = [];
+
+    for (const order of historicalOrders) {
+      const outcome = this.getHistoricalOutcome(order);
+      const features = this.buildOutcomeFeatures({
+        branchName: order.branchName,
+        sampleAt: order.sampleAt,
+        deliveryAt: order.deliveryAt,
+        createdAt: order.createdAt,
+        subtotalAmount: Number(order.subtotalAmount),
+        courtesyPercent: Number(order.courtesyPercent),
+        discountAmount: Number(order.discountAmount),
+        totalAmount: Number(order.totalAmount),
+        items: order.items ?? [],
+      });
+
+      if (!outcome || !features) continue;
+      dataset.push({ orderId: order.id, outcome, ...features });
+    }
+
+    return dataset;
+  }
+
+  private buildUnavailableOutcomePrediction(
+    dataset: ServiceOutcomeTrainingRow[],
+    message = `Aún no hay al menos ${SERVICE_OUTCOME_MINIMUM_SAMPLES_PER_CLASS} órdenes históricas válidas de cada resultado para calcular el pronóstico.`,
+  ): PublicServiceOutcomePrediction {
+    const classDistribution: Record<ServiceOutcomeClass, number> = {
+      completed_on_time: 0,
+      delayed: 0,
+      cancelled: 0,
+    };
+    for (const row of dataset) classDistribution[row.outcome] += 1;
+
+    return {
+      available: false,
+      message,
+      model: {
+        version: SERVICE_OUTCOME_MODEL_VERSION,
+        trainingSamples: dataset.length,
+        minimumSamplesPerClass:
+          SERVICE_OUTCOME_MINIMUM_SAMPLES_PER_CLASS,
+        classDistribution,
+      },
+    };
+  }
+
+  private runOutcomeModel(
+    inputs: ServiceOutcomeFeatures[],
+    dataset: ServiceOutcomeTrainingRow[],
+  ): PublicServiceOutcomePrediction[] {
+    try {
+      // Aquí se manda llamar y se utiliza el modelo de clasificación.
+      const result = this.serviceOutcomePredictionModel.predictMany(
+        inputs,
+        dataset,
+      );
+
+      return result.predictions.map((prediction) => ({
+        available: true,
+        predictedOutcome: prediction.outcome,
+        label: OUTCOME_LABELS[prediction.outcome],
+        confidence: prediction.probability,
+        probabilities: (
+          Object.keys(OUTCOME_LABELS) as ServiceOutcomeClass[]
+        ).map((outcome) => ({
+          outcome,
+          label: OUTCOME_LABELS[outcome],
+          probability: prediction.probabilities[outcome],
+        })),
+        model: result.model,
+      }));
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Error desconocido del modelo.';
+
+      if (error instanceof ServiceOutcomeModelUnavailableError) {
+        this.logger.warn(`Pronóstico de orden no disponible: ${errorMessage}`);
+      } else {
+        this.logger.error(
+          `Falló el pronóstico de orden: ${errorMessage}`,
+          error instanceof Error ? error.stack : undefined,
+        );
+      }
+
+      return inputs.map(() => this.buildUnavailableOutcomePrediction(dataset));
+    }
   }
 
   private isUniqueConstraintError(error: unknown) {
@@ -1177,6 +1421,117 @@ export class ServicesService {
       .map((item) => item.id);
 
     return { items, removedItemIds };
+  }
+
+  /** Inferencia individual usada por el formulario antes de guardar. */
+  async predictOutcome(
+    dto: PredictServiceOutcomeDto,
+  ): Promise<PublicServiceOutcomePrediction> {
+    const dataset = await this.buildOutcomeTrainingDataset();
+
+    if (!dto.deliveryAt || !dto.items?.length) {
+      return this.buildUnavailableOutcomePrediction(
+        dataset,
+        'Captura la fecha de entrega y al menos un estudio para consultar el pronóstico.',
+      );
+    }
+
+    const preparedItems = await this.buildServiceItems(dto.items);
+    const courtesyPercent = Number(dto.courtesyPercent ?? 0);
+    const totals = this.calculateTotals(
+      preparedItems.subtotal,
+      courtesyPercent,
+    );
+    const features = this.buildOutcomeFeatures({
+      branchName: dto.branchName,
+      sampleAt: dto.sampleAt,
+      deliveryAt: dto.deliveryAt,
+      createdAt: new Date(),
+      subtotalAmount: preparedItems.subtotal,
+      courtesyPercent,
+      discountAmount: totals.discountAmount,
+      totalAmount: totals.totalAmount,
+      items: preparedItems.items,
+    });
+
+    if (!features) {
+      return this.buildUnavailableOutcomePrediction(
+        dataset,
+        'La fecha de entrega debe ser posterior al inicio de la orden para consultar el pronóstico.',
+      );
+    }
+
+    return (
+      this.runOutcomeModel([features], dataset)[0] ??
+      this.buildUnavailableOutcomePrediction(dataset)
+    );
+  }
+
+  /** Una sola carga y un solo entrenamiento para todas las órdenes visibles. */
+  async predictOutcomesBatch(serviceIds: number[]) {
+    const uniqueIds = [...new Set(serviceIds)];
+    if (uniqueIds.length === 0) return { predictions: [] };
+
+    const [orders, dataset] = await Promise.all([
+      this.serviceRepo.find({
+        where: {
+          id: In(uniqueIds),
+          isActive: true,
+          status: In([ServiceStatus.PENDING, ServiceStatus.IN_PROGRESS]),
+        },
+      }),
+      this.buildOutcomeTrainingDataset(),
+    ]);
+    const orderById = new Map(orders.map((order) => [order.id, order]));
+    const featuresByServiceId = new Map<number, ServiceOutcomeFeatures>();
+
+    for (const order of orders) {
+      const features = this.buildOutcomeFeatures({
+        branchName: order.branchName,
+        sampleAt: order.sampleAt,
+        deliveryAt: order.deliveryAt,
+        createdAt: order.createdAt,
+        subtotalAmount: Number(order.subtotalAmount),
+        courtesyPercent: Number(order.courtesyPercent),
+        discountAmount: Number(order.discountAmount),
+        totalAmount: Number(order.totalAmount),
+        items: order.items ?? [],
+      });
+      if (features) featuresByServiceId.set(order.id, features);
+    }
+
+    const modeledIds = uniqueIds.filter((id) => featuresByServiceId.has(id));
+    const modeledPredictions =
+      modeledIds.length > 0
+        ? this.runOutcomeModel(
+            modeledIds.map((id) => featuresByServiceId.get(id)!),
+            dataset,
+          )
+        : [];
+    const predictionByServiceId = new Map(
+      modeledIds.map((id, index) => [id, modeledPredictions[index]]),
+    );
+
+    return {
+      predictions: uniqueIds.map((serviceId) => {
+        const order = orderById.get(serviceId);
+        let prediction = predictionByServiceId.get(serviceId);
+
+        if (!order) {
+          prediction = this.buildUnavailableOutcomePrediction(
+            dataset,
+            'El pronóstico solo se muestra en órdenes pendientes o en curso.',
+          );
+        } else if (!prediction) {
+          prediction = this.buildUnavailableOutcomePrediction(
+            dataset,
+            'La orden no tiene suficientes datos para calcular el pronóstico.',
+          );
+        }
+
+        return { serviceId, prediction };
+      }),
+    };
   }
 
   async create(dto: CreateServiceDto) {

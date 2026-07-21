@@ -17,6 +17,8 @@ import { UpdateServiceDto } from './dto/update-service.dto';
 import { UpdateServiceStatusDto } from './dto/update-service-status.dto';
 import { ServiceStatus } from './entities/service-order.entity';
 import { Response } from 'express';
+import { PredictServiceOutcomeDto } from './dto/predict-service-outcome.dto';
+import { BatchPredictServiceOutcomeDto } from './dto/batch-predict-service-outcome.dto';
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('services')
@@ -29,6 +31,22 @@ export class ServicesController {
     return {
       message: 'Servicio creado correctamente.',
       data: service,
+    };
+  }
+
+  @Post('outcome-prediction')
+  async predictOutcome(@Body() dto: PredictServiceOutcomeDto) {
+    return {
+      message: 'Pronóstico consultado correctamente.',
+      data: await this.servicesService.predictOutcome(dto),
+    };
+  }
+
+  @Post('outcome-predictions/batch')
+  async predictOutcomesBatch(@Body() dto: BatchPredictServiceOutcomeDto) {
+    return {
+      message: 'Pronósticos consultados correctamente.',
+      data: await this.servicesService.predictOutcomesBatch(dto.serviceIds),
     };
   }
 

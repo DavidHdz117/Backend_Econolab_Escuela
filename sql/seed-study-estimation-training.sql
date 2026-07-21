@@ -1,15 +1,17 @@
--- ================================================================
--- ECONOLAB: dataset sintetico para el modelo de precio
+-- ============================================================================
+-- ECONOLAB: catalogo operativo de 1,000 estudios para entrenamiento de precio
 -- PostgreSQL
 --
--- Crea 1,000 estudios de entrenamiento y sus parametros.
--- Es idempotente: puede ejecutarse nuevamente sin duplicar registros.
--- Los registros quedan suspendidos y ocultos del catalogo operativo.
--- ================================================================
+-- Convierte el lote historico MLTRAIN en estudios activos y visibles. Si el
+-- lote todavia no existe, crea los registros faltantes. Es idempotente y no
+-- depende de los IDs: reconoce tanto la firma anterior MLTRAIN/DATOS
+-- SINTETICOS como los codigos reservados ECN-CAT-* generados por este script.
+--
+-- IMPORTANTE: ECN-CAT-* queda reservado exclusivamente para este lote.
+-- ============================================================================
 
 BEGIN;
 
--- El mismo dataset tambien puede utilizarse en el modo academico del clustering.
 ALTER TABLE operativo.studies
   ADD COLUMN IF NOT EXISTS "sampleType" varchar(50) NOT NULL DEFAULT 'unknown',
   ADD COLUMN IF NOT EXISTS "requiresSpecialProcessing" boolean DEFAULT NULL;
@@ -25,83 +27,292 @@ CREATE TABLE IF NOT EXISTS operativo.study_request_metrics (
   CONSTRAINT uq_study_request_metrics_period UNIQUE (study_id, period_month)
 );
 
+-- La tabla temporal centraliza la transformacion para que UPDATE e INSERT
+-- produzcan exactamente los mismos datos en cada ejecucion.
+CREATE TEMP TABLE econolab_catalog_seed ON COMMIT DROP AS
 WITH base AS (
   SELECT
     series_number,
-    1 + ((series_number * 7) % 30) AS parameter_count,
-    (ARRAY[
-      'blood',
-      'serum',
-      'plasma',
-      'urine',
-      'stool',
-      'swab',
-      'other'
-    ])[1 + ((series_number * 3) % 7)] AS sample_type,
-    (ARRAY[
-      'ENZIMATICO',
-      'INMUNOENSAYO',
-      'ESPECTROFOTOMETRIA',
-      'COLORIMETRIA',
-      'COAGULOMETRIA',
-      'ELISA',
-      'QUIMIOLUMINISCENCIA',
-      'PCR'
-    ])[1 + ((series_number - 1) % 8)] AS method
+    1 + ((series_number - 1) % 8) AS area_number,
+    1 + ((series_number - 1) / 8) AS area_variant,
+    1 + (((series_number - 1) / 8) % 25) AS analyte_number,
+    1 + ((series_number * 7) % 30) AS parameter_count
   FROM generate_series(1, 1000) AS series_number
-),
-features AS (
+), catalog AS (
+  SELECT
+    *,
+    CASE area_number
+      WHEN 1 THEN 'QC'
+      WHEN 2 THEN 'HEM'
+      WHEN 3 THEN 'INM'
+      WHEN 4 THEN 'MIC'
+      WHEN 5 THEN 'COA'
+      WHEN 6 THEN 'END'
+      WHEN 7 THEN 'URO'
+      WHEN 8 THEN 'MOL'
+    END AS area_code,
+    CASE area_number
+      WHEN 1 THEN 'Química clínica'
+      WHEN 2 THEN 'Hematología'
+      WHEN 3 THEN 'Inmunología'
+      WHEN 4 THEN 'Microbiología'
+      WHEN 5 THEN 'Coagulación'
+      WHEN 6 THEN 'Endocrinología'
+      WHEN 7 THEN 'Uroanálisis'
+      WHEN 8 THEN 'Biología molecular'
+    END AS indicator,
+    CASE area_number
+      WHEN 1 THEN (ARRAY[
+        'Glucosa', 'Urea', 'Creatinina', 'Ácido úrico', 'Colesterol total',
+        'Triglicéridos', 'Bilirrubina total', 'Bilirrubina directa',
+        'Alanina aminotransferasa', 'Aspartato aminotransferasa',
+        'Fosfatasa alcalina', 'Gamma glutamil transferasa', 'Albúmina',
+        'Proteínas totales', 'Calcio', 'Fósforo', 'Magnesio', 'Sodio',
+        'Potasio', 'Cloro', 'Hierro sérico', 'Amilasa', 'Lipasa',
+        'Lactato deshidrogenasa', 'Hemoglobina glucosilada'
+      ])[1 + ((area_variant - 1) % 25)]
+      WHEN 2 THEN (ARRAY[
+        'Biometría hemática', 'Hemoglobina', 'Hematocrito', 'Eritrocitos',
+        'Leucocitos', 'Plaquetas', 'Reticulocitos', 'Volumen corpuscular medio',
+        'Hemoglobina corpuscular media', 'Concentración media de hemoglobina',
+        'Ancho de distribución eritrocitaria', 'Neutrófilos', 'Linfocitos',
+        'Monocitos', 'Eosinófilos', 'Basófilos', 'Velocidad de sedimentación',
+        'Frotis de sangre periférica', 'Conteo diferencial', 'Índice plaquetario',
+        'Morfología eritrocitaria', 'Morfología leucocitaria',
+        'Morfología plaquetaria', 'Hemoparásitos', 'Prueba de falciformación'
+      ])[1 + ((area_variant - 1) % 25)]
+      WHEN 3 THEN (ARRAY[
+        'Proteína C reactiva', 'Factor reumatoide', 'Antiestreptolisinas O',
+        'Inmunoglobulina A', 'Inmunoglobulina G', 'Inmunoglobulina M',
+        'Inmunoglobulina E', 'Complemento C3', 'Complemento C4',
+        'Anticuerpos antinucleares', 'Anticuerpos anti-DNA',
+        'Anticuerpos anticardiolipina', 'Procalcitonina', 'Ferritina',
+        'Troponina I', 'Antígeno carcinoembrionario', 'Alfafetoproteína',
+        'CA 125', 'CA 19-9', 'CA 15-3', 'Antígeno prostático total',
+        'Antígeno prostático libre', 'Serología para dengue',
+        'Serología para rubéola', 'Serología para toxoplasma'
+      ])[1 + ((area_variant - 1) % 25)]
+      WHEN 4 THEN (ARRAY[
+        'Urocultivo', 'Coprocultivo', 'Exudado faríngeo', 'Exudado nasal',
+        'Exudado vaginal', 'Exudado uretral', 'Hemocultivo', 'Cultivo de esputo',
+        'Cultivo de heridas', 'Cultivo de secreciones', 'Antibiograma',
+        'Tinción de Gram', 'Baciloscopía', 'Búsqueda de hongos',
+        'Coprológico', 'Amiba en fresco', 'Sangre oculta en heces',
+        'Rotavirus en heces', 'Adenovirus en heces', 'Helicobacter pylori',
+        'Clostridioides difficile', 'Estreptococo del grupo A',
+        'Salmonella', 'Shigella', 'Candida albicans'
+      ])[1 + ((area_variant - 1) % 25)]
+      WHEN 5 THEN (ARRAY[
+        'Tiempo de protrombina', 'Tiempo de tromboplastina parcial',
+        'Tiempo de trombina', 'Fibrinógeno', 'Dímero D', 'INR',
+        'Actividad de factor VIII', 'Actividad de factor IX',
+        'Actividad de factor XI', 'Actividad de factor XII',
+        'Antitrombina III', 'Proteína C funcional', 'Proteína S funcional',
+        'Anticoagulante lúpico', 'Resistencia a proteína C activada',
+        'Agregación plaquetaria', 'Tiempo de sangrado', 'Tiempo de coagulación',
+        'Productos de degradación de fibrina', 'Factor de von Willebrand',
+        'Mezcla de TTPa', 'Mezcla de TP', 'Factor V', 'Factor VII', 'Factor X'
+      ])[1 + ((area_variant - 1) % 25)]
+      WHEN 6 THEN (ARRAY[
+        'Hormona estimulante de tiroides', 'Tiroxina libre', 'Tiroxina total',
+        'Triyodotironina libre', 'Triyodotironina total', 'Insulina',
+        'Cortisol', 'Hormona adrenocorticotropa', 'Hormona de crecimiento',
+        'Prolactina', 'Hormona luteinizante', 'Hormona foliculoestimulante',
+        'Estradiol', 'Progesterona', 'Testosterona total', 'Testosterona libre',
+        'Dehidroepiandrosterona', 'Aldosterona', 'Renina', 'Paratohormona',
+        'Calcitonina', 'Péptido C', '17-hidroxiprogesterona',
+        'Hormona antimülleriana', 'Somatomedina C'
+      ])[1 + ((area_variant - 1) % 25)]
+      WHEN 7 THEN (ARRAY[
+        'Examen general de orina', 'Microalbúmina en orina',
+        'Proteínas en orina', 'Glucosa en orina', 'Creatinina en orina',
+        'Calcio en orina', 'Ácido úrico en orina', 'Sodio en orina',
+        'Potasio en orina', 'Cloro en orina', 'Fósforo en orina',
+        'Magnesio en orina', 'Urea en orina', 'Osmolalidad urinaria',
+        'Depuración de creatinina', 'Sedimento urinario', 'Cetonas en orina',
+        'Hemoglobina en orina', 'Nitritos en orina', 'Leucocitos en orina',
+        'Cristales en orina', 'Cilindros urinarios', 'Urobilinógeno en orina',
+        'Bilirrubina en orina', 'Relación albúmina creatinina'
+      ])[1 + ((area_variant - 1) % 25)]
+      WHEN 8 THEN (ARRAY[
+        'Detección molecular de SARS-CoV-2', 'Virus de influenza A',
+        'Virus de influenza B', 'Virus del papiloma humano',
+        'Virus de hepatitis B', 'Virus de hepatitis C', 'Virus de Epstein-Barr',
+        'Citomegalovirus', 'Virus herpes simple 1', 'Virus herpes simple 2',
+        'Chlamydia trachomatis', 'Neisseria gonorrhoeae',
+        'Mycobacterium tuberculosis', 'Bordetella pertussis',
+        'Parvovirus B19', 'Dengue por PCR', 'Zika por PCR',
+        'Chikungunya por PCR', 'Panel respiratorio molecular',
+        'Panel gastrointestinal molecular', 'Trombofilia hereditaria',
+        'Mutación JAK2', 'BCR-ABL cuantitativo', 'HLA-B27',
+        'Carga viral cuantitativa'
+      ])[1 + ((area_variant - 1) % 25)]
+    END AS analyte,
+    (ARRAY[
+      'Determinación', 'Cuantificación', 'Evaluación', 'Control', 'Confirmación'
+    ])[1 + ((area_variant - 1) / 25)] AS presentation,
+    CASE area_number
+      WHEN 1 THEN CASE
+        WHEN analyte_number = 25 THEN 'blood'
+        ELSE (ARRAY['serum', 'plasma'])[1 + ((area_variant - 1) % 2)]
+      END
+      WHEN 2 THEN 'blood'
+      WHEN 3 THEN 'serum'
+      WHEN 4 THEN CASE
+        WHEN analyte_number = 1 THEN 'urine'
+        WHEN analyte_number IN (2, 15, 16, 17, 18, 19, 20, 21, 23, 24)
+          THEN 'stool'
+        WHEN analyte_number IN (3, 4, 5, 6, 9, 10, 22, 25) THEN 'swab'
+        WHEN analyte_number = 7 THEN 'blood'
+        ELSE 'other'
+      END
+      WHEN 5 THEN 'plasma'
+      WHEN 6 THEN (ARRAY['serum', 'plasma'])[1 + ((area_variant - 1) % 2)]
+      WHEN 7 THEN 'urine'
+      WHEN 8 THEN CASE
+        WHEN analyte_number IN (1, 2, 3, 4, 9, 10, 11, 12, 14, 19)
+          THEN 'swab'
+        WHEN analyte_number IN (5, 6, 25) THEN 'plasma'
+        WHEN analyte_number IN (13, 20) THEN 'other'
+        ELSE 'blood'
+      END
+    END AS sample_type,
+    CASE area_number
+      WHEN 1 THEN (ARRAY[
+        'ENZIMÁTICO', 'ESPECTROFOTOMETRÍA', 'COLORIMETRÍA'
+      ])[1 + ((area_variant - 1) % 3)]
+      WHEN 2 THEN (ARRAY[
+        'IMPEDANCIA', 'CITOMETRÍA', 'MICROSCOPÍA'
+      ])[1 + ((area_variant - 1) % 3)]
+      WHEN 3 THEN (ARRAY[
+        'INMUNOENSAYO', 'ELISA', 'QUIMIOLUMINISCENCIA'
+      ])[1 + ((area_variant - 1) % 3)]
+      WHEN 4 THEN CASE
+        WHEN analyte_number IN (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 23, 24, 25)
+          THEN 'CULTIVO'
+        WHEN analyte_number IN (12, 13, 14, 15, 16) THEN 'MICROSCOPÍA'
+        WHEN analyte_number IN (17, 18, 19, 20, 21, 22)
+          THEN 'INMUNOCROMATOGRAFÍA'
+        ELSE 'PCR'
+      END
+      WHEN 5 THEN 'COAGULOMETRÍA'
+      WHEN 6 THEN (ARRAY[
+        'INMUNOENSAYO', 'QUIMIOLUMINISCENCIA', 'ELISA'
+      ])[1 + ((area_variant - 1) % 3)]
+      WHEN 7 THEN (ARRAY[
+        'TIRA REACTIVA', 'MICROSCOPÍA', 'COLORIMETRÍA'
+      ])[1 + ((area_variant - 1) % 3)]
+      WHEN 8 THEN CASE
+        WHEN analyte_number IN (1, 2, 3, 16, 17, 18, 19, 20) THEN 'RT-PCR'
+        ELSE 'PCR'
+      END
+    END AS method
+  FROM base
+), features AS (
   SELECT
     *,
     CASE method
-      WHEN 'ENZIMATICO' THEN 40
+      WHEN 'ENZIMÁTICO' THEN 40
       WHEN 'INMUNOENSAYO' THEN 120
-      WHEN 'ESPECTROFOTOMETRIA' THEN 70
-      WHEN 'COLORIMETRIA' THEN 50
-      WHEN 'COAGULOMETRIA' THEN 90
+      WHEN 'ESPECTROFOTOMETRÍA' THEN 70
+      WHEN 'COLORIMETRÍA' THEN 50
+      WHEN 'COAGULOMETRÍA' THEN 90
       WHEN 'ELISA' THEN 150
       WHEN 'QUIMIOLUMINISCENCIA' THEN 180
       WHEN 'PCR' THEN 350
-    END AS price_method_effect,
+      WHEN 'RT-PCR' THEN 380
+      WHEN 'IMPEDANCIA' THEN 80
+      WHEN 'CITOMETRÍA' THEN 180
+      WHEN 'MICROSCOPÍA' THEN 60
+      WHEN 'CULTIVO' THEN 160
+      WHEN 'INMUNOCROMATOGRAFÍA' THEN 100
+      WHEN 'TIRA REACTIVA' THEN 35
+    END AS method_price_effect,
     CASE method
-      WHEN 'ENZIMATICO' THEN 15
+      WHEN 'ENZIMÁTICO' THEN 15
       WHEN 'INMUNOENSAYO' THEN 60
-      WHEN 'ESPECTROFOTOMETRIA' THEN 30
-      WHEN 'COLORIMETRIA' THEN 20
-      WHEN 'COAGULOMETRIA' THEN 45
+      WHEN 'ESPECTROFOTOMETRÍA' THEN 30
+      WHEN 'COLORIMETRÍA' THEN 20
+      WHEN 'COAGULOMETRÍA' THEN 45
       WHEN 'ELISA' THEN 90
       WHEN 'QUIMIOLUMINISCENCIA' THEN 120
       WHEN 'PCR' THEN 360
-    END AS duration_method_effect
-  FROM base
-),
-training_rows AS (
+      WHEN 'RT-PCR' THEN 300
+      WHEN 'IMPEDANCIA' THEN 30
+      WHEN 'CITOMETRÍA' THEN 75
+      WHEN 'MICROSCOPÍA' THEN 60
+      WHEN 'CULTIVO' THEN 720
+      WHEN 'INMUNOCROMATOGRAFÍA' THEN 30
+      WHEN 'TIRA REACTIVA' THEN 15
+    END AS method_duration_effect
+  FROM catalog
+), desired AS (
   SELECT
-    *,
-    GREATEST(
-      50,
-      ROUND((
-        70
-        + parameter_count * 22
-        + price_method_effect
-        + ((series_number * 37) % 51 - 25)
-      ) / 10.0) * 10
-    )::numeric(10, 2) AS normal_price,
+    series_number,
+    'MLTRAIN-' || LPAD(series_number::text, 6, '0') AS legacy_code,
+    'ECN-CAT-' || area_code || '-' || LPAD(area_variant::text, 3, '0') AS final_code,
+    presentation || ' de ' || analyte AS study_name,
+    'Estudio de ' || LOWER(indicator) || ' para ' || LOWER(presentation) ||
+      ' de ' || analyte || ', procesado mediante ' || method ||
+      ' en muestra de ' ||
+      CASE sample_type
+        WHEN 'blood' THEN 'sangre total'
+        WHEN 'serum' THEN 'suero'
+        WHEN 'plasma' THEN 'plasma'
+        WHEN 'urine' THEN 'orina'
+        WHEN 'stool' THEN 'heces'
+        WHEN 'swab' THEN 'hisopo'
+        ELSE 'muestra biológica'
+      END || '.' AS description,
     GREATEST(
       15,
-      ROUND((
-        15
-        + parameter_count * 4
-        + duration_method_effect
-        + ((series_number * 13) % 21 - 10)
-      ) / 15.0) * 15
+      ROUND((15 + parameter_count * 4 + method_duration_effect +
+        ((series_number * 13) % 21 - 10)) / 15.0) * 15
     )::integer AS duration_minutes,
-    (
-      method IN ('PCR', 'QUIMIOLUMINISCENCIA')
-      OR parameter_count >= 25
-    ) AS requires_special_processing
+    GREATEST(
+      50,
+      ROUND((70 + parameter_count * 22 + method_price_effect +
+        area_number * 12 + ((series_number * 37) % 51 - 25)) / 10.0) * 10
+    )::numeric(10, 2) AS normal_price,
+    method,
+    sample_type,
+    (method IN ('PCR', 'RT-PCR') OR parameter_count >= 25 OR
+      (area_number = 4 AND area_variant % 4 = 0)) AS requires_special_processing,
+    indicator,
+    parameter_count
   FROM features
 )
+SELECT * FROM desired;
+
+-- Conserva los IDs actuales y, por lo tanto, todas sus relaciones.
+UPDATE operativo.studies AS study
+SET
+  name = desired.study_name,
+  code = desired.final_code,
+  description = desired.description,
+  "durationMinutes" = desired.duration_minutes,
+  "normalPrice" = desired.normal_price,
+  "difPrice" = ROUND(desired.normal_price * 0.80, 2),
+  "specialPrice" = ROUND(desired.normal_price * 0.90, 2),
+  "hospitalPrice" = ROUND(desired.normal_price * 1.15, 2),
+  "otherPrice" = ROUND(desired.normal_price * 1.20, 2),
+  "defaultDiscountPercent" = 0,
+  method = desired.method,
+  "sampleType" = desired.sample_type,
+  "requiresSpecialProcessing" = desired.requires_special_processing,
+  indicator = desired.indicator,
+  "isActive" = true,
+  type = 'study'::operativo.studies_type_enum,
+  status = 'active'::operativo.studies_status_enum,
+  "packageStudyIds" = ARRAY[]::integer[],
+  "updatedAt" = NOW()
+FROM econolab_catalog_seed AS desired
+WHERE
+  (study.code = desired.legacy_code AND
+    UPPER(TRIM(COALESCE(study.indicator, ''))) = 'DATOS SINTETICOS')
+  OR study.code = desired.final_code;
+
+-- Crea unicamente los registros que falten del lote reservado.
 INSERT INTO operativo.studies (
   name,
   code,
@@ -123,54 +334,34 @@ INSERT INTO operativo.studies (
   "packageStudyIds"
 )
 SELECT
-  'ESTUDIO SINTETICO ML ' || LPAD(series_number::text, 6, '0'),
-  'MLTRAIN-' || LPAD(series_number::text, 6, '0'),
-  'Registro sintetico para entrenar el modelo. No usar en operacion.',
-  -- Es una variable operativa del clustering; la regresion no la predice.
-  duration_minutes,
-  normal_price,
-  ROUND(normal_price * 0.80, 2),
-  ROUND(normal_price * 0.90, 2),
-  ROUND(normal_price * 1.15, 2),
-  ROUND(normal_price * 1.20, 2),
+  desired.study_name,
+  desired.final_code,
+  desired.description,
+  desired.duration_minutes,
+  desired.normal_price,
+  ROUND(desired.normal_price * 0.80, 2),
+  ROUND(desired.normal_price * 0.90, 2),
+  ROUND(desired.normal_price * 1.15, 2),
+  ROUND(desired.normal_price * 1.20, 2),
   0,
-  method,
-  sample_type,
-  requires_special_processing,
-  'DATOS SINTETICOS',
-  false,
+  desired.method,
+  desired.sample_type,
+  desired.requires_special_processing,
+  desired.indicator,
+  true,
   'study'::operativo.studies_type_enum,
-  'suspended'::operativo.studies_status_enum,
+  'active'::operativo.studies_status_enum,
   ARRAY[]::integer[]
-FROM training_rows
-ON CONFLICT (code) DO UPDATE SET
-  name = EXCLUDED.name,
-  description = EXCLUDED.description,
-  "durationMinutes" = EXCLUDED."durationMinutes",
-  "normalPrice" = EXCLUDED."normalPrice",
-  "difPrice" = EXCLUDED."difPrice",
-  "specialPrice" = EXCLUDED."specialPrice",
-  "hospitalPrice" = EXCLUDED."hospitalPrice",
-  "otherPrice" = EXCLUDED."otherPrice",
-  "defaultDiscountPercent" = EXCLUDED."defaultDiscountPercent",
-  method = EXCLUDED.method,
-  "sampleType" = EXCLUDED."sampleType",
-  "requiresSpecialProcessing" = EXCLUDED."requiresSpecialProcessing",
-  indicator = EXCLUDED.indicator,
-  "isActive" = EXCLUDED."isActive",
-  type = EXCLUDED.type,
-  status = EXCLUDED.status,
-  "packageStudyIds" = EXCLUDED."packageStudyIds",
-  "updatedAt" = NOW();
+FROM econolab_catalog_seed AS desired
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM operativo.studies AS existing
+  WHERE existing.code = desired.final_code
+);
 
--- Demanda mensual sintetica para los ultimos 24 meses, incluido el actual.
-WITH synthetic_studies AS (
-  SELECT id, REPLACE(code, 'MLTRAIN-', '')::integer AS series_number
-  FROM operativo.studies
-  WHERE code ~ '^MLTRAIN-[0-9]{6}$'
-    AND indicator = 'DATOS SINTETICOS'
-),
-months AS (
+-- Demanda mensual variada para los ultimos 24 meses. Las metricas quedan
+-- marcadas como operativas para mantener coherencia con el catalogo visible.
+WITH months AS (
   SELECT generate_series(
     (date_trunc('month', CURRENT_DATE) - INTERVAL '23 months')::date,
     date_trunc('month', CURRENT_DATE)::date,
@@ -186,24 +377,62 @@ INSERT INTO operativo.study_request_metrics (
 SELECT
   study.id,
   month.period_month,
-  1 + ((study.series_number * 29 + EXTRACT(MONTH FROM month.period_month)::integer * 11) % 45),
-  true
-FROM synthetic_studies AS study
+  1 + ((desired.series_number * 29 +
+    EXTRACT(MONTH FROM month.period_month)::integer * 11) % 65),
+  false
+FROM econolab_catalog_seed AS desired
+INNER JOIN operativo.studies AS study ON study.code = desired.final_code
 CROSS JOIN months AS month
 ON CONFLICT (study_id, period_month) DO UPDATE SET
   request_count = EXCLUDED.request_count,
-  is_synthetic = true,
+  is_synthetic = false,
   updated_at = NOW();
 
--- Cada estudio recibe entre 1 y 30 parametros.
-WITH synthetic_studies AS (
-  SELECT
-    id,
-    1 + ((REPLACE(code, 'MLTRAIN-', '')::integer * 7) % 30) AS parameter_count
-  FROM operativo.studies
-  WHERE code ~ '^MLTRAIN-[0-9]{6}$'
-    AND indicator = 'DATOS SINTETICOS'
-)
+-- Parametros plausibles. Primero se renombran los parametros historicos y
+-- despues se crean los faltantes sin duplicar posiciones existentes.
+CREATE TEMP TABLE econolab_parameter_seed ON COMMIT DROP AS
+SELECT
+  study.id AS study_id,
+  parameter_number AS sort_order,
+  (ARRAY[
+    'Glucosa', 'Urea', 'Creatinina', 'Ácido úrico', 'Colesterol total',
+    'Triglicéridos', 'Proteínas totales', 'Albúmina', 'Bilirrubina total',
+    'Bilirrubina directa', 'Sodio', 'Potasio', 'Cloro', 'Calcio', 'Fósforo',
+    'Magnesio', 'Hierro', 'Hemoglobina', 'Hematocrito', 'Leucocitos',
+    'Plaquetas', 'Neutrófilos', 'Linfocitos', 'Monocitos', 'Eosinófilos',
+    'Basófilos', 'Fosfatasa alcalina', 'Alanina aminotransferasa',
+    'Aspartato aminotransferasa', 'Gamma glutamil transferasa'
+  ])[1 + ((desired.series_number + parameter_number - 2) % 30)] AS parameter_name,
+  (ARRAY[
+    'mg/dL', 'mg/dL', 'mg/dL', 'mg/dL', 'mg/dL', 'mg/dL', 'g/dL', 'g/dL',
+    'mg/dL', 'mg/dL', 'mmol/L', 'mmol/L', 'mmol/L', 'mg/dL', 'mg/dL',
+    'mg/dL', 'ug/dL', 'g/dL', '%', '10^3/uL', '10^3/uL', '%', '%', '%',
+    '%', '%', 'U/L', 'U/L', 'U/L', 'U/L'
+  ])[1 + ((desired.series_number + parameter_number - 2) % 30)] AS unit,
+  (ARRAY[
+    '70-100', '15-40', '0.6-1.3', '3.5-7.2', 'Menor de 200',
+    'Menor de 150', '6.0-8.3', '3.5-5.2', '0.2-1.2', '0.0-0.3',
+    '135-145', '3.5-5.1', '98-107', '8.5-10.5', '2.5-4.5', '1.7-2.4',
+    '50-170', '12.0-17.5', '36-52', '4.0-11.0', '150-450', '40-75',
+    '20-45', '2-10', '1-6', '0-2', '44-147', '7-56', '10-40', '9-48'
+  ])[1 + ((desired.series_number + parameter_number - 2) % 30)] AS reference_value
+FROM econolab_catalog_seed AS desired
+INNER JOIN operativo.studies AS study ON study.code = desired.final_code
+CROSS JOIN LATERAL generate_series(1, desired.parameter_count) AS parameter_number;
+
+UPDATE operativo.study_details AS detail
+SET
+  name = desired.parameter_name,
+  unit = desired.unit,
+  "referenceValue" = desired.reference_value,
+  "isActive" = true,
+  "updatedAt" = NOW()
+FROM econolab_parameter_seed AS desired
+WHERE detail.study_id = desired.study_id
+  AND detail."dataType" = 'parameter'::operativo.study_details_datatype_enum
+  AND detail."sortOrder" = desired.sort_order
+  AND detail.name LIKE 'ML PARAMETRO %';
+
 INSERT INTO operativo.study_details (
   study_id,
   parent_id,
@@ -215,73 +444,74 @@ INSERT INTO operativo.study_details (
   "isActive"
 )
 SELECT
-  study.id,
+  desired.study_id,
   NULL,
   'parameter'::operativo.study_details_datatype_enum,
-  'ML PARAMETRO ' || LPAD(parameter_number::text, 3, '0'),
-  parameter_number,
-  'unidad',
-  'Rango de referencia sintetico',
+  desired.parameter_name,
+  desired.sort_order,
+  desired.unit,
+  desired.reference_value,
   true
-FROM synthetic_studies AS study
-CROSS JOIN LATERAL generate_series(1, study.parameter_count) AS parameter_number
+FROM econolab_parameter_seed AS desired
 WHERE NOT EXISTS (
   SELECT 1
   FROM operativo.study_details AS detail
-  WHERE detail.study_id = study.id
+  WHERE detail.study_id = desired.study_id
     AND detail."dataType" = 'parameter'::operativo.study_details_datatype_enum
-    AND detail."sortOrder" = parameter_number
-    AND detail.name LIKE 'ML PARAMETRO %'
+    AND detail."sortOrder" = desired.sort_order
 );
 
 COMMIT;
 
--- ================================================================
--- VERIFICACION: debe devolver 1,000 estudios.
--- ================================================================
+-- ============================================================================
+-- VERIFICACION
+-- Debe devolver 1,000 estudios activos y cero registros MLTRAIN pendientes.
+-- ============================================================================
 
 SELECT
-  COUNT(*) AS synthetic_studies,
+  COUNT(*) AS catalog_studies,
+  COUNT(*) FILTER (WHERE "isActive" AND status = 'active') AS active_studies,
+  COUNT(DISTINCT indicator) AS areas,
+  COUNT(DISTINCT method) AS methods,
   MIN("normalPrice") AS minimum_price,
   ROUND(AVG("normalPrice"), 2) AS average_price,
   MAX("normalPrice") AS maximum_price
 FROM operativo.studies
-WHERE code ~ '^MLTRAIN-[0-9]{6}$'
-  AND indicator = 'DATOS SINTETICOS';
+WHERE code ~ '^ECN-CAT-(QC|HEM|INM|MIC|COA|END|URO|MOL)-[0-9]{3}$';
 
-SELECT COUNT(*) AS synthetic_parameters
+SELECT COUNT(*) AS legacy_rows_remaining
+FROM operativo.studies
+WHERE code ~ '^MLTRAIN-[0-9]{6}$'
+  AND UPPER(TRIM(COALESCE(indicator, ''))) = 'DATOS SINTETICOS';
+
+SELECT indicator, COUNT(*) AS studies
+FROM operativo.studies
+WHERE code ~ '^ECN-CAT-(QC|HEM|INM|MIC|COA|END|URO|MOL)-[0-9]{3}$'
+GROUP BY indicator
+ORDER BY indicator;
+
+SELECT COUNT(*) AS catalog_parameters
 FROM operativo.study_details AS detail
 INNER JOIN operativo.studies AS study ON study.id = detail.study_id
-WHERE study.code ~ '^MLTRAIN-[0-9]{6}$'
-  AND study.indicator = 'DATOS SINTETICOS';
+WHERE study.code ~ '^ECN-CAT-(QC|HEM|INM|MIC|COA|END|URO|MOL)-[0-9]{3}$'
+  AND detail."dataType" = 'parameter'::operativo.study_details_datatype_enum;
 
-SELECT COUNT(*) AS synthetic_demand_rows
-FROM operativo.study_request_metrics AS metric
-INNER JOIN operativo.studies AS study ON study.id = metric.study_id
-WHERE study.code ~ '^MLTRAIN-[0-9]{6}$'
-  AND study.indicator = 'DATOS SINTETICOS'
-  AND metric.is_synthetic = true;
-
--- ================================================================
--- ROLLBACK MANUAL (ejecutar solo si se desea retirar el dataset).
--- Las lineas estan comentadas para evitar borrados accidentales.
--- ================================================================
+-- ============================================================================
+-- ROLLBACK MANUAL (ejecutar solo si se desea retirar exclusivamente el lote).
+-- Las sentencias permanecen comentadas para evitar borrados accidentales.
+-- ============================================================================
 
 -- BEGIN;
 -- DELETE FROM operativo.study_request_metrics
 -- WHERE study_id IN (
 --   SELECT id FROM operativo.studies
---   WHERE code ~ '^MLTRAIN-[0-9]{6}$'
---     AND indicator = 'DATOS SINTETICOS'
+--   WHERE code ~ '^ECN-CAT-(QC|HEM|INM|MIC|COA|END|URO|MOL)-[0-9]{3}$'
 -- );
 -- DELETE FROM operativo.study_details
 -- WHERE study_id IN (
---   SELECT id
---   FROM operativo.studies
---   WHERE code ~ '^MLTRAIN-[0-9]{6}$'
---     AND indicator = 'DATOS SINTETICOS'
+--   SELECT id FROM operativo.studies
+--   WHERE code ~ '^ECN-CAT-(QC|HEM|INM|MIC|COA|END|URO|MOL)-[0-9]{3}$'
 -- );
 -- DELETE FROM operativo.studies
--- WHERE code ~ '^MLTRAIN-[0-9]{6}$'
---   AND indicator = 'DATOS SINTETICOS';
+-- WHERE code ~ '^ECN-CAT-(QC|HEM|INM|MIC|COA|END|URO|MOL)-[0-9]{3}$';
 -- COMMIT;
