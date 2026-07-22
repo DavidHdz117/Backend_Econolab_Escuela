@@ -1,0 +1,16 @@
+{
+  "exportedAtUtc": "2026-07-22T06:45:00.789Z",
+  "snapshotType": "point_in_time_catalog_snapshot",
+  "temporalCoverage": {
+    "available": false,
+    "reason": "El dataset no incluye una fecha de observacion por estudio; no representa una serie temporal."
+  },
+  "sourceQuery": "04_ETL/02_regresion_extraer_dataset.sql",
+  "sourceTables": [
+    "operativo.studies",
+    "operativo.study_details"
+  ],
+  "dataset": "05_Datasets/02_regresion_estudios_dataset.csv",
+  "rows": 1048,
+  "sha256": "cd18cfee75ba536865b9f44a3e84608e52ed0830c15565a3f9784227b5c90e61"
+}

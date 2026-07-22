@@ -33,9 +33,9 @@ RIDGE_ALPHA = 0.10
 
 
 def project_root() -> Path:
-    """Obtiene la raiz a partir del archivo, no de la PC del desarrollador."""
+    """Obtiene la raiz del backend, no la de una computadora especifica."""
 
-    return Path(__file__).resolve().parents[3]
+    return Path(__file__).resolve().parents[2]
 
 
 def normalize_category(value: object, fallback: str) -> str:
@@ -109,6 +109,7 @@ def rounded_metrics(values: dict) -> dict:
 def train_and_export(root: Path | None = None) -> dict:
     root = root or project_root()
     dataset_path = root / "05_Datasets" / "02_regresion_estudios_dataset.csv"
+    ml_root = root / "ml" / "regression"
     dataset = clean_dataset(pd.read_csv(dataset_path))
 
     if len(dataset) < 10:
@@ -137,12 +138,23 @@ def train_and_export(root: Path | None = None) -> dict:
     test_rows = test_rows.sort_values("study_id").reset_index(drop=True)
 
     dataset_directory = root / "05_Datasets"
+    ml_data_directory = ml_root / "data"
     dataset_directory.mkdir(parents=True, exist_ok=True)
+    ml_data_directory.mkdir(parents=True, exist_ok=True)
     train_rows.to_csv(
         dataset_directory / "02_regresion_estudios_train.csv", index=False
     )
     test_rows.to_csv(
         dataset_directory / "02_regresion_estudios_test.csv", index=False
+    )
+    dataset.to_csv(
+        ml_data_directory / "02_regresion_estudios_dataset.csv", index=False
+    )
+    train_rows.to_csv(
+        ml_data_directory / "02_regresion_estudios_train.csv", index=False
+    )
+    test_rows.to_csv(
+        ml_data_directory / "02_regresion_estudios_test.csv", index=False
     )
 
     numeric_pipeline = Pipeline(
@@ -220,6 +232,9 @@ def train_and_export(root: Path | None = None) -> dict:
     )
     residuals.to_csv(
         dataset_directory / "02_regresion_reales_predichos_test.csv", index=False
+    )
+    residuals.to_csv(
+        ml_data_directory / "02_regresion_reales_predichos_test.csv", index=False
     )
 
     fitted_preprocessor = model.named_steps["preprocessor"]
@@ -312,13 +327,24 @@ def train_and_export(root: Path | None = None) -> dict:
     }
 
     model_directory = root / "07_Modelos"
-    deployment_directory = root / "backend" / "ml-artifacts"
+    academic_ml_artifact_directory = ml_root / "artifacts"
+    report_directory = ml_root / "reports"
+    deployment_directory = root / "ml-artifacts"
     model_directory.mkdir(parents=True, exist_ok=True)
+    academic_ml_artifact_directory.mkdir(parents=True, exist_ok=True)
+    report_directory.mkdir(parents=True, exist_ok=True)
     deployment_directory.mkdir(parents=True, exist_ok=True)
     academic_artifact = model_directory / "regression_price_model.json"
+    notebook_artifact = (
+        academic_ml_artifact_directory / "regression_price_model.json"
+    )
     deployment_artifact = deployment_directory / "regression_price_model.json"
     metrics_path = model_directory / "regression_metrics.json"
+    notebook_metrics_path = report_directory / "regression_metrics.json"
     academic_artifact.write_text(
+        json.dumps(artifact, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    notebook_artifact.write_text(
         json.dumps(artifact, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
     shutil.copyfile(academic_artifact, deployment_artifact)
@@ -326,10 +352,15 @@ def train_and_export(root: Path | None = None) -> dict:
         json.dumps(artifact["metrics"], indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
+    notebook_metrics_path.write_text(
+        json.dumps(artifact["metrics"], indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
 
     return {
         "artifact": artifact,
         "artifact_path": str(academic_artifact),
+        "notebook_artifact_path": str(notebook_artifact),
         "deployment_path": str(deployment_artifact),
         "residuals_path": str(
             dataset_directory / "02_regresion_reales_predichos_test.csv"

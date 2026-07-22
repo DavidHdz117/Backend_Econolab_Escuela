@@ -1,4 +1,4 @@
-import {
+﻿import {
   BadRequestException,
   ConflictException,
   Injectable,
@@ -50,9 +50,9 @@ import {
 const AUTO_SERVICE_FOLIO_PREFIX = 'ECO';
 const AUTO_SEQUENCE_PAD = 4;
 const OUTCOME_LABELS: Record<ServiceOutcomeClass, string> = {
-  completed_on_time: 'Conclusión en tiempo',
+  completed_on_time: 'ConclusiÃ³n en tiempo',
   delayed: 'Retraso',
-  cancelled: 'Cancelación',
+  cancelled: 'CancelaciÃ³n',
 };
 
 type ServiceOutcomeFeatureSource = {
@@ -118,7 +118,7 @@ export class ServicesService {
   }
 
   private buildNormalizedSql(field: string) {
-    return `regexp_replace(lower(translate(coalesce(${field}, ''), 'áéíóúäëïöüàèìòùÁÉÍÓÚÄËÏÖÜÀÈÌÒÙñÑ', 'aeiouaeiouaeiouAEIOUAEIOUAEIOUnN')), '[^a-z0-9]+', '', 'g')`;
+    return `regexp_replace(lower(translate(coalesce(${field}, ''), 'Ã¡Ã©Ã­Ã³ÃºÃ¤Ã«Ã¯Ã¶Ã¼Ã Ã¨Ã¬Ã²Ã¹ÃÃ‰ÃÃ“ÃšÃ„Ã‹ÃÃ–ÃœÃ€ÃˆÃŒÃ’Ã™Ã±Ã‘', 'aeiouaeiouaeiouAEIOUAEIOUAEIOUnN')), '[^a-z0-9]+', '', 'g')`;
   }
 
   private getPriceByType(study: Study, type: ServiceItemPriceType): number {
@@ -354,7 +354,7 @@ export class ServicesService {
   /**
    * PASO 2 - CREAR X (variables de entrada).
    * Convierte una orden de la BD o del formulario en las mismas variables
-   * numéricas y categóricas que entiende el modelo de clasificación.
+   * numÃ©ricas y categÃ³ricas que entiende el modelo de clasificaciÃ³n.
    */
   private buildOutcomeFeatures(
     source: ServiceOutcomeFeatureSource,
@@ -408,8 +408,8 @@ export class ServicesService {
       branchName: source.branchName,
       dominantPriceType,
 
-      // El catálogo no guarda snapshots históricos de estas variables; usar
-      // su valor actual para una orden vieja introduciría inconsistencia.
+      // El catÃ¡logo no guarda snapshots histÃ³ricos de estas variables; usar
+      // su valor actual para una orden vieja introducirÃ­a inconsistencia.
       maxStudyDurationMinutes: undefined,
       averageStudyDurationMinutes: undefined,
       totalParameterCount: undefined,
@@ -420,7 +420,7 @@ export class ServicesService {
   }
 
   private buildUnavailableOutcomePrediction(
-    message = 'El artefacto de clasificación no está disponible. Ejecuta npm run classification:train.',
+    message = 'El artefacto de clasificaciÃ³n no estÃ¡ disponible. Ejecuta npm run classification:train.',
   ): PublicServiceOutcomePrediction {
     const metadata = this.serviceOutcomePredictionModel.getArtifactMetadata();
 
@@ -446,9 +446,12 @@ export class ServicesService {
     inputs: ServiceOutcomeFeatures[],
   ): PublicServiceOutcomePrediction[] {
     try {
-      // AQUÍ SE USA EL MODELO YA ENTRENADO.
+      // AQUÃ SE USA EL MODELO YA ENTRENADO.
       // El JSON se lee una vez y NO se reentrena al atender la solicitud.
-      const result =
+      // PUNTO DONDE SE USA LA CLASIFICACION EN EL BACKEND:
+    // aqui NO se consulta la BD ni se entrena; solo se arma la entrada con los
+    // datos del formulario y se manda al artefacto ya entrenado.
+    const result =
         this.serviceOutcomePredictionModel.predictUsingArtifact(inputs);
 
       return result.predictions.map((prediction) => ({
@@ -472,10 +475,10 @@ export class ServicesService {
           : 'Error desconocido del modelo.';
 
       if (error instanceof ServiceOutcomeModelUnavailableError) {
-        this.logger.warn(`Pronóstico de orden no disponible: ${errorMessage}`);
+        this.logger.warn(`PronÃ³stico de orden no disponible: ${errorMessage}`);
       } else {
         this.logger.error(
-          `Falló el pronóstico de orden: ${errorMessage}`,
+          `FallÃ³ el pronÃ³stico de orden: ${errorMessage}`,
           error instanceof Error ? error.stack : undefined,
         );
       }
@@ -1542,14 +1545,14 @@ export class ServicesService {
 
   /**
    * PASO 5 - USO INDIVIDUAL.
-   * El formulario llama este método antes de guardar un servicio nuevo.
+   * El formulario llama este mÃ©todo antes de guardar un servicio nuevo.
    */
   async predictOutcome(
     dto: PredictServiceOutcomeDto,
   ): Promise<PublicServiceOutcomePrediction> {
     if (!dto.deliveryAt || !dto.items?.length) {
       return this.buildUnavailableOutcomePrediction(
-        'Captura la fecha de entrega y al menos un estudio para consultar el pronóstico.',
+        'Captura la fecha de entrega y al menos un estudio para consultar el pronÃ³stico.',
       );
     }
 
@@ -1573,11 +1576,11 @@ export class ServicesService {
 
     if (!features) {
       return this.buildUnavailableOutcomePrediction(
-        'La fecha de entrega debe ser posterior al inicio de la orden para consultar el pronóstico.',
+        'La fecha de entrega debe ser posterior al inicio de la orden para consultar el pronÃ³stico.',
       );
     }
 
-    // Envía X al artefacto previamente entrenado.
+    // EnvÃ­a X al artefacto previamente entrenado.
     return (
       this.runOutcomeModel([features])[0] ??
       this.buildUnavailableOutcomePrediction()
@@ -1586,7 +1589,7 @@ export class ServicesService {
 
   /**
    * PASO 5 - USO POR LOTE.
-   * La lista de servicios llama este método para pronosticar todas las órdenes
+   * La lista de servicios llama este mÃ©todo para pronosticar todas las Ã³rdenes
    * pendientes o en curso usando el mismo artefacto cargado en memoria.
    */
   async predictOutcomesBatch(serviceIds: number[]) {
@@ -1636,11 +1639,11 @@ export class ServicesService {
 
         if (!order) {
           prediction = this.buildUnavailableOutcomePrediction(
-            'El pronóstico solo se muestra en órdenes pendientes o en curso.',
+            'El pronÃ³stico solo se muestra en Ã³rdenes pendientes o en curso.',
           );
         } else if (!prediction) {
           prediction = this.buildUnavailableOutcomePrediction(
-            'La orden no tiene suficientes datos para calcular el pronóstico.',
+            'La orden no tiene suficientes datos para calcular el pronÃ³stico.',
           );
         }
 
@@ -2054,3 +2057,4 @@ export class ServicesService {
     );
   }
 }
+

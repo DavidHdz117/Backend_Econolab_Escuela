@@ -1,4 +1,4 @@
-import {
+﻿import {
   BadRequestException,
   ConflictException,
   Injectable,
@@ -66,7 +66,7 @@ export class StudiesService {
   }
 
   private buildNormalizedSql(field: string) {
-    return `regexp_replace(lower(translate(coalesce(${field}, ''), 'áéíóúäëïöüàèìòùÁÉÍÓÚÄËÏÖÜÀÈÌÒÙñÑ', 'aeiouaeiouaeiouAEIOUAEIOUAEIOUnN')), '[^a-z0-9]+', '', 'g')`;
+    return `regexp_replace(lower(translate(coalesce(${field}, ''), 'Ã¡Ã©Ã­Ã³ÃºÃ¤Ã«Ã¯Ã¶Ã¼Ã Ã¨Ã¬Ã²Ã¹ÃÃ‰ÃÃ“ÃšÃ„Ã‹ÃÃ–ÃœÃ€ÃˆÃŒÃ’Ã™Ã±Ã‘', 'aeiouaeiouaeiouAEIOUAEIOUAEIOUnN')), '[^a-z0-9]+', '', 'g')`;
   }
 
   private buildAutoStudyCode(
@@ -875,7 +875,7 @@ export class StudiesService {
 
   private parseOptionalBoolean(value?: string): boolean | undefined {
     const normalized = (value ?? '').trim().toLowerCase();
-    if (['true', '1', 'yes', 'si', 'sí'].includes(normalized)) return true;
+    if (['true', '1', 'yes', 'si', 'sÃ­'].includes(normalized)) return true;
     if (['false', '0', 'no'].includes(normalized)) return false;
     return undefined;
   }
@@ -1068,3 +1068,4 @@ export class StudiesService {
     };
   }
 }
+

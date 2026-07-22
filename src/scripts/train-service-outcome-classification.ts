@@ -37,7 +37,6 @@ type DatabaseRow = Record<string, unknown> & {
 };
 
 const BACKEND_ROOT = process.cwd();
-const PROJECT_ROOT = resolve(BACKEND_ROOT, '..');
 const ML_ROOT = resolve(BACKEND_ROOT, 'ml', 'classification');
 const QUERY_PATH = resolve(ML_ROOT, '01_extract_classification_dataset.sql');
 const CSV_PATH = resolve(
@@ -66,37 +65,37 @@ const REPORT_PATH = resolve(
   'classification_training_report.json',
 );
 const CANONICAL_QUERY_PATH = resolve(
-  PROJECT_ROOT,
+  BACKEND_ROOT,
   '04_ETL',
   '03_clasificacion_extraer_dataset.sql',
 );
 const CANONICAL_CSV_PATH = resolve(
-  PROJECT_ROOT,
+  BACKEND_ROOT,
   '05_Datasets',
   '03_clasificacion_resultado_servicios.csv',
 );
 const CANONICAL_TRAIN_CSV_PATH = resolve(
-  PROJECT_ROOT,
+  BACKEND_ROOT,
   '05_Datasets',
   '03_clasificacion_resultado_servicios_train.csv',
 );
 const CANONICAL_TEST_CSV_PATH = resolve(
-  PROJECT_ROOT,
+  BACKEND_ROOT,
   '05_Datasets',
   '03_clasificacion_resultado_servicios_test.csv',
 );
 const CANONICAL_ARTIFACT_PATH = resolve(
-  PROJECT_ROOT,
+  BACKEND_ROOT,
   '07_Modelos',
   'classification_service_outcome_model.json',
 );
 const CANONICAL_REPORT_PATH = resolve(
-  PROJECT_ROOT,
+  BACKEND_ROOT,
   '07_Modelos',
   'classification_training_report.json',
 );
 const CANONICAL_MODEL_CARD_PATH = resolve(
-  PROJECT_ROOT,
+  BACKEND_ROOT,
   '07_Modelos',
   'classification_model_card.md',
 );
@@ -308,7 +307,7 @@ async function main() {
     mkdirSync(resolve(ML_ROOT, directory), { recursive: true });
   }
   for (const directory of ['04_ETL', '05_Datasets', '07_Modelos']) {
-    mkdirSync(resolve(PROJECT_ROOT, directory), { recursive: true });
+    mkdirSync(resolve(BACKEND_ROOT, directory), { recursive: true });
   }
   copyFileSync(QUERY_PATH, CANONICAL_QUERY_PATH);
 

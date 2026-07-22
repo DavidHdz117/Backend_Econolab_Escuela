@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
 import {
   BadRequestException,
@@ -6,6 +6,9 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { StudyType } from '../entities/study.entity';
+
+const STUDY_PRICE_ARTIFACT_RELATIVE_PATH =
+  'ml/regression/artifacts/regression_price_model.json';
 
 export type StudyEstimationInput = {
   type: StudyType;
@@ -149,10 +152,19 @@ export class StudyEstimationModel {
         : resolve(process.cwd(), configuredPath);
     }
 
-    // Funciona con `npm run start:dev`, Jest y `node dist/main.js`.
-    return resolve(
-      __dirname,
-      '../../../ml-artifacts/regression_price_model.json',
+    // Primero busca el artefacto academico generado por la libreta; si no existe,
+    // conserva compatibilidad con la copia historica de `ml-artifacts`.
+    const candidates = [
+      resolve(process.cwd(), STUDY_PRICE_ARTIFACT_RELATIVE_PATH),
+      resolve(
+        __dirname,
+        '../../../',
+        STUDY_PRICE_ARTIFACT_RELATIVE_PATH,
+      ),
+      resolve(__dirname, '../../../ml-artifacts/regression_price_model.json'),
+    ];
+    return (
+      candidates.find((candidate) => existsSync(candidate)) ?? candidates[0]
     );
   }
 
@@ -161,7 +173,7 @@ export class StudyEstimationModel {
       throw new ServiceUnavailableException(
         'El modelo de precio no esta disponible porque falta o es invalido el ' +
           `artefacto JSON (${this.artifactProblem ?? 'sin detalle'}). ` +
-          'Ejecute: npm run regression:export y npm run regression:train.',
+          'Ejecute: npm run regression:export y npm run regression:train o la libreta de regresion.',
       );
     }
 

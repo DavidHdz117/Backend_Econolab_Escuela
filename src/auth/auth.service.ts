@@ -141,7 +141,7 @@ export class AuthService {
       await this.authEvents.logFailure(dto.email, ip, userAgent);
       throw new ForbiddenException('Rol pendiente de asignación');
     }
-
+  
     await this.resetLoginAttempts(user);
     await this.clearPendingMfa(user);
     const authSession = await this.createAuthenticatedSession(user, ip, userAgent);

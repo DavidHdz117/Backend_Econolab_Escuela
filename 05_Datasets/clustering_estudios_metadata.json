@@ -1,0 +1,36 @@
+{
+  "generatedAt": "2026-07-22T06:53:07.419Z",
+  "periodStart": "2026-02-01T00:00:00.000Z",
+  "periodEnd": "2026-07-22T06:53:07.419Z",
+  "periodMonths": 6,
+  "unitOfAnalysis": "Un estudio individual activo del catalogo ECONOLAB",
+  "datasetFingerprintSha256": "ccc1d2e53a54412fff2b0cd8753d925e6d6f90aa9c2e8746fe7f5321f703b92f",
+  "composition": {
+    "totalRows": 1048,
+    "realRows": 48,
+    "syntheticRows": 1000,
+    "syntheticPercentage": 95.42,
+    "totalRequestCount": 962,
+    "syntheticRequestCount": 930,
+    "syntheticRequestPercentage": 96.67
+  },
+  "sources": {
+    "price": "operativo.studies.normalPrice",
+    "deliveryHours": "operativo.studies.durationMinutes / 60",
+    "parameterCount": "operativo.study_details",
+    "requestCount": "operativo.service_order_items + operativo.service_orders",
+    "syntheticRequestCount": "misma fuente; SUM(quantity) cuando folio LIKE 'ECO-ML-%' (solo auditoria)",
+    "sampleType": "operativo.studies.sampleType",
+    "analysisMethod": "operativo.studies.method",
+    "requiresSpecialProcessing": "operativo.studies.requiresSpecialProcessing",
+    "isSynthetic": "operativo.studies.code LIKE 'ECN-CAT-%' (solo auditoria; no entra al modelo)"
+  },
+  "exclusions": [
+    "Paquetes, estudios inactivos o suspendidos",
+    "MLTRAIN y registros marcados como DATOS SINTETICOS",
+    "Ordenes canceladas para calcular request_count"
+  ],
+  "deployment": {
+    "persisted": false
+  }
+}

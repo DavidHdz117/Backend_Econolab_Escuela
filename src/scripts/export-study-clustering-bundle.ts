@@ -20,9 +20,8 @@ function csvCell(value: unknown) {
 async function main() {
   const periodMonths = Number(argument('periodMonths') ?? '6');
   const periodEnd = new Date(argument('periodEnd') ?? new Date().toISOString());
-  const outputRoot = resolve(
-    argument('outputRoot') ?? resolve(process.cwd(), '..'),
-  );
+  const outputRoot = resolve(argument('outputRoot') ?? process.cwd());
+  const mlRoot = resolve(outputRoot, 'ml', 'clustering');
   const application = await NestFactory.createApplicationContext(AppModule, {
     logger: ['error', 'warn'],
   });
@@ -69,9 +68,15 @@ async function main() {
     }
     const datasetDirectory = resolve(outputRoot, '05_Datasets');
     const modelDirectory = resolve(outputRoot, '07_Modelos');
+    const mlDataDirectory = resolve(mlRoot, 'data');
+    const mlArtifactDirectory = resolve(mlRoot, 'artifacts');
+    const mlReportDirectory = resolve(mlRoot, 'reports');
     await Promise.all([
       mkdir(datasetDirectory, { recursive: true }),
       mkdir(modelDirectory, { recursive: true }),
+      mkdir(mlDataDirectory, { recursive: true }),
+      mkdir(mlArtifactDirectory, { recursive: true }),
+      mkdir(mlReportDirectory, { recursive: true }),
     ]);
 
     const headers = [
@@ -127,15 +132,35 @@ async function main() {
       modelDirectory,
       'clustering_estudios_model.json',
     );
+    const mlDatasetPath = resolve(mlDataDirectory, 'clustering_estudios.csv');
+    const mlMetadataPath = resolve(
+      mlReportDirectory,
+      'clustering_estudios_metadata.json',
+    );
+    const mlArtifactPath = resolve(
+      mlArtifactDirectory,
+      'clustering_estudios_model.json',
+    );
     await Promise.all([
       writeFile(datasetPath, csv, 'utf8'),
+      writeFile(mlDatasetPath, csv, 'utf8'),
       writeFile(
         metadataPath,
         `${JSON.stringify(metadataDocument, null, 2)}\n`,
         'utf8',
       ),
       writeFile(
+        mlMetadataPath,
+        `${JSON.stringify(metadataDocument, null, 2)}\n`,
+        'utf8',
+      ),
+      writeFile(
         artifactPath,
+        `${JSON.stringify(artifactDocument, null, 2)}\n`,
+        'utf8',
+      ),
+      writeFile(
+        mlArtifactPath,
         `${JSON.stringify(artifactDocument, null, 2)}\n`,
         'utf8',
       ),

@@ -36,6 +36,7 @@ function findProjectRoot() {
 
 async function main() {
   const projectRoot = findProjectRoot();
+  const regressionRoot = join(projectRoot, 'ml', 'regression');
   const sqlPath = join(
     projectRoot,
     '04_ETL',
@@ -45,6 +46,15 @@ async function main() {
   const outputPath = join(outputDirectory, '02_regresion_estudios_dataset.csv');
   const metadataPath = join(
     outputDirectory,
+    '02_regresion_estudios_metadata.json',
+  );
+  const mlDataDirectory = join(regressionRoot, 'data');
+  const mlOutputPath = join(
+    mlDataDirectory,
+    '02_regresion_estudios_dataset.csv',
+  );
+  const mlMetadataPath = join(
+    mlDataDirectory,
     '02_regresion_estudios_metadata.json',
   );
 
@@ -91,7 +101,11 @@ async function main() {
     );
 
     await mkdir(outputDirectory, { recursive: true });
-    await writeFile(outputPath, csv, 'utf8');
+    await mkdir(mlDataDirectory, { recursive: true });
+    await Promise.all([
+      writeFile(outputPath, csv, 'utf8'),
+      writeFile(mlOutputPath, csv, 'utf8'),
+    ]);
 
     // PASO 2B: registra cuándo y con qué consulta se obtuvo este snapshot.
     // El CSV no tiene una fecha por estudio, por eso no se inventa un periodo:
@@ -110,13 +124,20 @@ async function main() {
       rows: rows.length,
       sha256: createHash('sha256').update(csv, 'utf8').digest('hex'),
     };
-    await writeFile(
-      metadataPath,
-      `${JSON.stringify(metadata, null, 2)}\n`,
-      'utf8',
-    );
+    await Promise.all([
+      writeFile(
+        metadataPath,
+        `${JSON.stringify(metadata, null, 2)}\n`,
+        'utf8',
+      ),
+      writeFile(
+        mlMetadataPath,
+        `${JSON.stringify(metadata, null, 2)}\n`,
+        'utf8',
+      ),
+    ]);
     process.stdout.write(
-      `Dataset de regresion exportado: ${rows.length} filas -> ${outputPath}\nMetadatos del snapshot -> ${metadataPath}\n`,
+      `Dataset de regresion exportado: ${rows.length} filas -> ${outputPath}\nCopia para libreta -> ${mlOutputPath}\nMetadatos del snapshot -> ${metadataPath}\n`,
     );
   } finally {
     await application.close();

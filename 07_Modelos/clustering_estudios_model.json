@@ -1,0 +1,470 @@
+{
+  "artifactType": "econolab-study-clustering",
+  "schemaVersion": "1.0",
+  "algorithm": "kmeans",
+  "modelVersion": "2.1",
+  "randomSeed": 20260721,
+  "initialization": "deterministic_farthest_point_3_starts",
+  "selectedK": 2,
+  "featureNames": [
+    "price",
+    "delivery_hours",
+    "parameter_count",
+    "request_count",
+    "sample_type=blood",
+    "sample_type=other",
+    "sample_type=plasma",
+    "sample_type=serum",
+    "sample_type=stool",
+    "sample_type=swab",
+    "sample_type=urine",
+    "analysis_method=citometria",
+    "analysis_method=coagulometria",
+    "analysis_method=colorimetria",
+    "analysis_method=cultivo",
+    "analysis_method=elisa",
+    "analysis_method=enzimatico",
+    "analysis_method=espectrofotometria",
+    "analysis_method=impedancia",
+    "analysis_method=inmunocromatografia",
+    "analysis_method=inmunoensayo",
+    "analysis_method=microscopia",
+    "analysis_method=otros",
+    "analysis_method=pcr",
+    "analysis_method=quimioluminiscencia",
+    "analysis_method=rt-pcr",
+    "analysis_method=tira reactiva",
+    "requires_special_processing"
+  ],
+  "displayOnlyFields": [
+    "studyId",
+    "code",
+    "name"
+  ],
+  "preprocessing": {
+    "numeric": {
+      "price": {
+        "median": 590,
+        "lowerBound": 110,
+        "upperBound": 1135.2999999999997,
+        "mean": 583.500286259542,
+        "standardDeviation": 231.16841224228796
+      },
+      "deliveryHours": {
+        "median": 2.5,
+        "lowerBound": 0.3333333333333333,
+        "upperBound": 14,
+        "mean": 3.479691475826972,
+        "standardDeviation": 3.204539616240727
+      },
+      "parameterCount": {
+        "median": 15,
+        "lowerBound": 1,
+        "upperBound": 30,
+        "mean": 15.465648854961833,
+        "standardDeviation": 8.460548508668744
+      },
+      "requestCount": {
+        "median": 1,
+        "lowerBound": 0,
+        "upperBound": 3,
+        "mean": 0.9103053435114504,
+        "standardDeviation": 0.8411918470594164
+      }
+    },
+    "sampleTypeCategories": [
+      "blood",
+      "other",
+      "plasma",
+      "serum",
+      "stool",
+      "swab",
+      "urine"
+    ],
+    "analysisMethodCategories": [
+      "citometria",
+      "coagulometria",
+      "colorimetria",
+      "cultivo",
+      "elisa",
+      "enzimatico",
+      "espectrofotometria",
+      "impedancia",
+      "inmunocromatografia",
+      "inmunoensayo",
+      "microscopia",
+      "otros",
+      "pcr",
+      "quimioluminiscencia",
+      "rt-pcr",
+      "tira reactiva"
+    ],
+    "requiresSpecialProcessingMode": false
+  },
+  "clusters": [
+    {
+      "cluster": 1,
+      "centroid": [
+        -0.7553256408,
+        -0.4060425917,
+        -0.7139783962,
+        -0.0164965604,
+        0.1571428571,
+        0.0267857143,
+        0.2696428571,
+        0.2553571429,
+        0.0446428571,
+        0.0375,
+        0.1357142857,
+        0.0321428571,
+        0.1339285714,
+        0.0928571429,
+        0.0285714286,
+        0.0625,
+        0.075,
+        0.0571428571,
+        0.0464285714,
+        0.0339285714,
+        0.1017857143,
+        0.1321428571,
+        0.0178571429,
+        0.0339285714,
+        0.0928571429,
+        0.0125,
+        0.0446428571,
+        0.0714285714
+      ],
+      "outlierThreshold": 2.6636183566
+    },
+    {
+      "cluster": 2,
+      "centroid": [
+        0.8667671288,
+        0.4659505151,
+        0.819319471,
+        0.0189304791,
+        0.1987704918,
+        0.0409836066,
+        0.2295081967,
+        0.2213114754,
+        0.0512295082,
+        0.1454918033,
+        0.1106557377,
+        0.0491803279,
+        0.106557377,
+        0.0676229508,
+        0.112704918,
+        0.1004098361,
+        0.018442623,
+        0.0348360656,
+        0.0327868852,
+        0.0225409836,
+        0.0676229508,
+        0.0737704918,
+        0.0040983607,
+        0.1352459016,
+        0.0696721311,
+        0.0696721311,
+        0.0348360656,
+        0.5901639344
+      ],
+      "outlierThreshold": 2.8080490982
+    }
+  ],
+  "generatedAt": "2026-07-22T06:53:07.419Z",
+  "trainingPeriod": {
+    "start": "2026-02-01T00:00:00.000Z",
+    "end": "2026-07-22T06:53:07.419Z",
+    "months": 6
+  },
+  "datasetFingerprintSha256": "ccc1d2e53a54412fff2b0cd8753d925e6d6f90aa9c2e8746fe7f5321f703b92f",
+  "datasetComposition": {
+    "totalRows": 1048,
+    "realRows": 48,
+    "syntheticRows": 1000,
+    "syntheticPercentage": 95.42,
+    "totalRequestCount": 962,
+    "syntheticRequestCount": 930,
+    "syntheticRequestPercentage": 96.67
+  },
+  "deployment": {
+    "persisted": false
+  },
+  "evaluation": {
+    "selectedK": 2,
+    "elbowK": 3,
+    "silhouetteScore": 0.2275,
+    "daviesBouldinScore": 1.6587,
+    "inertia": 4623.31,
+    "alternatives": [
+      {
+        "k": 2,
+        "inertia": 4623.31,
+        "silhouette": 0.2275,
+        "daviesBouldin": 1.6587,
+        "iterations": 18,
+        "minimumClusterSize": 488,
+        "stableForAutomaticSelection": true,
+        "isElbow": false,
+        "isSelected": true
+      },
+      {
+        "k": 3,
+        "inertia": 3878.95,
+        "silhouette": 0.2218,
+        "daviesBouldin": 1.6036,
+        "iterations": 8,
+        "minimumClusterSize": 190,
+        "stableForAutomaticSelection": true,
+        "isElbow": true,
+        "isSelected": false
+      },
+      {
+        "k": 4,
+        "inertia": 3557.56,
+        "silhouette": 0.2252,
+        "daviesBouldin": 1.6115,
+        "iterations": 17,
+        "minimumClusterSize": 73,
+        "stableForAutomaticSelection": true,
+        "isElbow": false,
+        "isSelected": false
+      },
+      {
+        "k": 5,
+        "inertia": 3197.72,
+        "silhouette": 0.1914,
+        "daviesBouldin": 1.6927,
+        "iterations": 14,
+        "minimumClusterSize": 73,
+        "stableForAutomaticSelection": true,
+        "isElbow": false,
+        "isSelected": false
+      },
+      {
+        "k": 6,
+        "inertia": 2981.72,
+        "silhouette": 0.1891,
+        "daviesBouldin": 1.6057,
+        "iterations": 14,
+        "minimumClusterSize": 69,
+        "stableForAutomaticSelection": true,
+        "isElbow": false,
+        "isSelected": false
+      }
+    ]
+  },
+  "profiles": [
+    {
+      "cluster": 1,
+      "suggestedName": "Estudios accesibles",
+      "shortDescription": "560 estudios con precio promedio de $408, entrega de 2.2 horas, 9.4 parámetros y 0.9 solicitudes en el periodo.",
+      "keyCharacteristics": [
+        "Precio promedio $408, dentro del tercio inferior del catálogo.",
+        "42 estudios atípicos detectados."
+      ],
+      "suggestedAction": "Mantener existencias minimas y monitorear el volumen para conservar una operacion eficiente.",
+      "studyCount": 560,
+      "percentage": 53.4,
+      "outlierCount": 42,
+      "outlierThreshold": 2.6636,
+      "averages": {
+        "price": 408.49,
+        "deliveryHours": 2.18,
+        "parameterCount": 9.43,
+        "requestCount": 0.91
+      },
+      "predominantMethod": null,
+      "predominantSampleType": null,
+      "specialProcessingPercentage": 7.1,
+      "sampleTypes": [
+        {
+          "value": "plasma",
+          "count": 151,
+          "percentage": 27
+        },
+        {
+          "value": "serum",
+          "count": 143,
+          "percentage": 25.5
+        },
+        {
+          "value": "blood",
+          "count": 88,
+          "percentage": 15.7
+        },
+        {
+          "value": "urine",
+          "count": 76,
+          "percentage": 13.6
+        },
+        {
+          "value": "stool",
+          "count": 25,
+          "percentage": 4.5
+        }
+      ],
+      "analysisMethods": [
+        {
+          "value": "coagulometria",
+          "count": 75,
+          "percentage": 13.4
+        },
+        {
+          "value": "microscopia",
+          "count": 74,
+          "percentage": 13.2
+        },
+        {
+          "value": "inmunoensayo",
+          "count": 57,
+          "percentage": 10.2
+        },
+        {
+          "value": "colorimetria",
+          "count": 52,
+          "percentage": 9.3
+        },
+        {
+          "value": "quimioluminiscencia",
+          "count": 52,
+          "percentage": 9.3
+        }
+      ],
+      "traits": [
+        "precio bajo"
+      ]
+    },
+    {
+      "cluster": 2,
+      "suggestedName": "Estudios de mayor costo y de entrega prolongada",
+      "shortDescription": "488 estudios con precio promedio de $785, entrega de 5.1 horas, 22.4 parámetros y 0.9 solicitudes en el periodo.",
+      "keyCharacteristics": [
+        "Precio promedio $785, dentro del tercio superior del catálogo.",
+        "5.1 horas de entrega promedio, dentro del tercio más prolongado.",
+        "22.4 parámetros promedio, dentro del tercio superior.",
+        "66 estudios atípicos detectados."
+      ],
+      "suggestedAction": "Revisar disponibilidad de equipo, reactivos y tiempos comprometidos para prevenir retrasos operativos.",
+      "studyCount": 488,
+      "percentage": 46.6,
+      "outlierCount": 66,
+      "outlierThreshold": 2.808,
+      "averages": {
+        "price": 784.53,
+        "deliveryHours": 5.14,
+        "parameterCount": 22.4,
+        "requestCount": 0.93
+      },
+      "predominantMethod": null,
+      "predominantSampleType": null,
+      "specialProcessingPercentage": 59,
+      "sampleTypes": [
+        {
+          "value": "plasma",
+          "count": 112,
+          "percentage": 23
+        },
+        {
+          "value": "serum",
+          "count": 108,
+          "percentage": 22.1
+        },
+        {
+          "value": "blood",
+          "count": 97,
+          "percentage": 19.9
+        },
+        {
+          "value": "swab",
+          "count": 71,
+          "percentage": 14.5
+        },
+        {
+          "value": "urine",
+          "count": 54,
+          "percentage": 11.1
+        }
+      ],
+      "analysisMethods": [
+        {
+          "value": "pcr",
+          "count": 66,
+          "percentage": 13.5
+        },
+        {
+          "value": "cultivo",
+          "count": 55,
+          "percentage": 11.3
+        },
+        {
+          "value": "coagulometria",
+          "count": 52,
+          "percentage": 10.7
+        },
+        {
+          "value": "elisa",
+          "count": 49,
+          "percentage": 10
+        },
+        {
+          "value": "microscopia",
+          "count": 36,
+          "percentage": 7.4
+        }
+      ],
+      "traits": [
+        "precio alto",
+        "entrega prolongada",
+        "multiparámetro"
+      ]
+    }
+  ],
+  "dataQuality": {
+    "receivedRows": 1048,
+    "usableRows": 1048,
+    "excludedRows": 0,
+    "duplicateRows": 0,
+    "imputedValues": {
+      "price": 0,
+      "deliveryHours": 0,
+      "parameterCount": 47,
+      "requestCount": 0,
+      "requiresSpecialProcessing": 42
+    },
+    "winsorizedValues": {
+      "price": 21,
+      "deliveryHours": 14,
+      "parameterCount": 0,
+      "requestCount": 5
+    },
+    "winsorizationPercentiles": {
+      "lower": 1,
+      "upper": 99
+    },
+    "ignoredConstantFeatures": [],
+    "realRows": 48,
+    "syntheticRows": 1000,
+    "syntheticPercentage": 95.42,
+    "syntheticDemandRows": 653,
+    "syntheticRequestCount": 930
+  },
+  "warnings": [
+    "Los valores numericos faltantes o incorrectos se imputaron con la mediana.",
+    "Los valores desconocidos de procesamiento especial se imputaron con la moda.",
+    "El analisis incluye estudios sinteticos ECN-CAT identificados para auditoria; isSynthetic no se usa como variable de K-Means.",
+    "Los extremos numericos se limitaron a los percentiles 1 y 99 solo para evitar que dominaran K-Means; los valores originales se conservan en los resultados.",
+    "request_count incluye demanda demostrativa ECO-ML; synthetic_request_count se conserva solo para auditoria y no entra como variable adicional."
+  ],
+  "sources": {
+    "price": "operativo.studies.normalPrice",
+    "deliveryHours": "operativo.studies.durationMinutes / 60",
+    "parameterCount": "operativo.study_details",
+    "requestCount": "operativo.service_order_items + operativo.service_orders",
+    "syntheticRequestCount": "misma fuente; SUM(quantity) cuando folio LIKE 'ECO-ML-%' (solo auditoria)",
+    "sampleType": "operativo.studies.sampleType",
+    "analysisMethod": "operativo.studies.method",
+    "requiresSpecialProcessing": "operativo.studies.requiresSpecialProcessing",
+    "isSynthetic": "operativo.studies.code LIKE 'ECN-CAT-%' (solo auditoria; no entra al modelo)"
+  }
+}

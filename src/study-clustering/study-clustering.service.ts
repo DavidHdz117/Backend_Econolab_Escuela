@@ -1,4 +1,4 @@
-import {
+﻿import {
   BadRequestException,
   ConflictException,
   Injectable,
@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash } from 'crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { isAbsolute, resolve } from 'node:path';
 import { In, Repository } from 'typeorm';
 import {
   ServiceOrderItem,
@@ -67,6 +69,8 @@ const INTERNAL_MAX_K = 6;
 const PROFILE_NAME_PLACEHOLDER = '{profileName}';
 const CLASSIFICATION_DEMO_FOLIO_PATTERN = 'ECO-ML-%';
 const SYNTHETIC_CATALOG_CODE_PATTERN = /^ECN-CAT-/i;
+const STUDY_CLUSTERING_ARTIFACT_RELATIVE_PATH =
+  'ml/clustering/artifacts/clustering_estudios_model.json';
 
 @Injectable()
 export class StudyClusteringService {
@@ -421,7 +425,8 @@ export class StudyClusteringService {
     const profileByCluster = new Map(
       profiles.map((profile) => [profile.clusterNumber, profile]),
     );
-    const artifactCandidate = run.dataQuality?.modelArtifact;
+    const artifactCandidate =
+      this.loadClusteringArtifactFromFile(run) ?? run.dataQuality?.modelArtifact;
     const artifact =
       typeof this.clusteringModel.isCompatibleArtifact === 'function' &&
       this.clusteringModel.isCompatibleArtifact(artifactCandidate)
@@ -871,4 +876,54 @@ export class StudyClusteringService {
       candidate.driverError?.code === '23505' || candidate.code === '23505'
     );
   }
+
+  private loadClusteringArtifactFromFile(run: StudyClusteringRun) {
+    const artifactPath = this.resolveClusteringArtifactPath();
+    if (!existsSync(artifactPath)) return null;
+
+    try {
+      const artifactCandidate = JSON.parse(
+        readFileSync(artifactPath, 'utf8'),
+      ) as StoredStudyClusteringArtifact;
+      if (
+        typeof this.clusteringModel.isCompatibleArtifact === 'function' &&
+        !this.clusteringModel.isCompatibleArtifact(artifactCandidate)
+      ) {
+        return null;
+      }
+      const expectedFingerprint =
+        run.dataQuality?.datasetFingerprintSha256 ?? null;
+      if (
+        expectedFingerprint &&
+        artifactCandidate.datasetFingerprintSha256 !== expectedFingerprint
+      ) {
+        return null;
+      }
+      return artifactCandidate;
+    } catch {
+      return null;
+    }
+  }
+
+  private resolveClusteringArtifactPath() {
+    const configuredPath = process.env.STUDY_CLUSTERING_MODEL_PATH?.trim();
+    if (configuredPath) {
+      return isAbsolute(configuredPath)
+        ? configuredPath
+        : resolve(process.cwd(), configuredPath);
+    }
+
+    const candidates = [
+      resolve(process.cwd(), STUDY_CLUSTERING_ARTIFACT_RELATIVE_PATH),
+      resolve(
+        __dirname,
+        '../../',
+        STUDY_CLUSTERING_ARTIFACT_RELATIVE_PATH,
+      ),
+    ];
+    return (
+      candidates.find((candidate) => existsSync(candidate)) ?? candidates[0]
+    );
+  }
 }
+
