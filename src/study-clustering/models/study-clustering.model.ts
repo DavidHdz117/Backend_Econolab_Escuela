@@ -8,6 +8,8 @@ export type StudyClusteringRow = {
   deliveryHours: number | null;
   parameterCount: number | null;
   requestCount: number | null;
+  /** Auditoria de demanda procedente de ordenes ECO-ML; nunca entra a X. */
+  syntheticRequestCount?: number | null;
   sampleType: string | null;
   analysisMethod: string | null;
   requiresSpecialProcessing: boolean | null;
@@ -17,6 +19,42 @@ export type StudyClusteringRow = {
 export type StudyClusteringOptions = {
   requestedK?: number;
   maxK?: number;
+};
+
+export type StudyClusteringArtifact = {
+  artifactType: 'econolab-study-clustering';
+  schemaVersion: '1.0';
+  algorithm: 'kmeans';
+  modelVersion: '2.1';
+  /**
+   * K-Means no usa azar en esta implementacion. La semilla queda registrada
+   * para que la libreta y cualquier comparacion externa usen el mismo valor.
+   */
+  randomSeed: number;
+  initialization: 'deterministic_farthest_point_3_starts';
+  selectedK: number;
+  featureNames: string[];
+  displayOnlyFields: ['studyId', 'code', 'name'];
+  preprocessing: {
+    numeric: Record<
+      NumericKey,
+      {
+        median: number;
+        lowerBound: number;
+        upperBound: number;
+        mean: number;
+        standardDeviation: number;
+      }
+    >;
+    sampleTypeCategories: string[];
+    analysisMethodCategories: string[];
+    requiresSpecialProcessingMode: boolean;
+  };
+  clusters: Array<{
+    cluster: number;
+    centroid: number[];
+    outlierThreshold: number | null;
+  }>;
 };
 
 type CleanRow = {
@@ -65,6 +103,7 @@ const NUMERIC_FEATURES: NumericKey[] = [
 const MAX_CATEGORIES = 20;
 const MAX_ITERATIONS = 100;
 const EPSILON = 1e-6;
+export const STUDY_CLUSTERING_RANDOM_SEED = 20260721;
 const UNKNOWN_CATEGORIES = new Set([
   'unknown',
   'sin_especificar',
@@ -74,7 +113,14 @@ const UNKNOWN_CATEGORIES = new Set([
 
 @Injectable()
 export class StudyClusteringModel {
+  /**
+   * ESTE ES EL MODELO DE CLUSTERING.
+   * Recibe el dataset creado por StudyClusteringService y devuelve el cluster
+   * asignado a cada estudio. Los identificadores se conservan solo para poder
+   * mostrar el resultado; no se agregan al vector que aprende K-Means.
+   */
   analyze(rows: StudyClusteringRow[], options: StudyClusteringOptions = {}) {
+    // PASO 2: quitar duplicados y corregir valores faltantes o incorrectos.
     const prepared = this.prepareRows(rows);
     const cleanRows = prepared.rows;
 
@@ -84,6 +130,7 @@ export class StudyClusteringModel {
       );
     }
 
+    // PASO 3: one-hot para categorias y estandarizacion para numeros.
     const encoded = this.encodeAndScale(cleanRows);
     const uniqueVectorCount = new Set(
       encoded.vectors.map((vector) =>
@@ -109,6 +156,7 @@ export class StudyClusteringModel {
       k: number;
       inertia: number;
       silhouette: number;
+      daviesBouldin: number;
       iterations: number;
       minimumClusterSize: number;
       stableForAutomaticSelection: boolean;
@@ -118,6 +166,7 @@ export class StudyClusteringModel {
       Math.ceil(cleanRows.length * 0.02),
     );
 
+    // PASO 4: entrenar un K-Means por cada k candidato y medir su calidad.
     for (let k = 2; k <= maxK; k += 1) {
       const fitted = this.fitBest(encoded.vectors, k);
       fittedByK.set(k, fitted);
@@ -133,6 +182,7 @@ export class StudyClusteringModel {
           pairwiseDistances,
           cleanRows.length,
         ),
+        daviesBouldin: this.daviesBouldinScore(encoded.vectors, fitted),
         iterations: fitted.iterations,
         minimumClusterSize,
         stableForAutomaticSelection:
@@ -140,6 +190,8 @@ export class StudyClusteringModel {
       });
     }
 
+    // El codo se informa como apoyo visual. La seleccion automatica usa la
+    // mejor silueta entre soluciones que no formen grupos demasiado pequenos.
     const elbowK = this.findElbow(rawEvaluations);
     const stableEvaluations = rawEvaluations.filter(
       (evaluation) => evaluation.stableForAutomaticSelection,
@@ -147,7 +199,10 @@ export class StudyClusteringModel {
     const automaticK = [
       ...(stableEvaluations.length > 0 ? stableEvaluations : rawEvaluations),
     ].sort(
-      (left, right) => right.silhouette - left.silhouette || left.k - right.k,
+      (left, right) =>
+        right.silhouette - left.silhouette ||
+        left.daviesBouldin - right.daviesBouldin ||
+        left.k - right.k,
     )[0].k;
     const selectedK = options.requestedK ?? automaticK;
 
@@ -163,11 +218,40 @@ export class StudyClusteringModel {
       selected,
       new Set(encoded.featureNames),
     );
+    const artifact: StudyClusteringArtifact = {
+      artifactType: 'econolab-study-clustering',
+      schemaVersion: '1.0',
+      algorithm: 'kmeans',
+      modelVersion: '2.1',
+      randomSeed: STUDY_CLUSTERING_RANDOM_SEED,
+      initialization: 'deterministic_farthest_point_3_starts',
+      selectedK,
+      featureNames: encoded.featureNames,
+      displayOnlyFields: ['studyId', 'code', 'name'],
+      preprocessing: {
+        numeric: Object.fromEntries(
+          NUMERIC_FEATURES.map((key) => [
+            key,
+            {
+              median: prepared.medians[key],
+              lowerBound: encoded.lowerBounds.get(key)!,
+              upperBound: encoded.upperBounds.get(key)!,
+              mean: encoded.means.get(key)!,
+              standardDeviation: encoded.deviations.get(key)!,
+            },
+          ]),
+        ) as StudyClusteringArtifact['preprocessing']['numeric'],
+        sampleTypeCategories: encoded.sampleTypeCategories,
+        analysisMethodCategories: encoded.analysisMethodCategories,
+        requiresSpecialProcessingMode: prepared.requiresSpecialProcessingMode,
+      },
+      clusters: result.clusterArtifacts,
+    };
 
     return {
       model: {
         algorithm: 'kmeans' as const,
-        version: '2.0',
+        version: '2.1',
         selectedK,
         elbowK,
         selectionMethod: options.requestedK
@@ -175,6 +259,10 @@ export class StudyClusteringModel {
           : ('highest_silhouette' as const),
         silhouetteScore: this.round(
           rawEvaluations.find((item) => item.k === selectedK)!.silhouette,
+          4,
+        ),
+        daviesBouldinScore: this.round(
+          rawEvaluations.find((item) => item.k === selectedK)!.daviesBouldin,
           4,
         ),
         inertia: this.round(selected.inertia, 2),
@@ -186,6 +274,7 @@ export class StudyClusteringModel {
         k: evaluation.k,
         inertia: this.round(evaluation.inertia, 2),
         silhouette: this.round(evaluation.silhouette, 4),
+        daviesBouldin: this.round(evaluation.daviesBouldin, 4),
         iterations: evaluation.iterations,
         minimumClusterSize: evaluation.minimumClusterSize,
         stableForAutomaticSelection: evaluation.stableForAutomaticSelection,
@@ -195,6 +284,7 @@ export class StudyClusteringModel {
       profiles: result.profiles,
       studies: result.studies,
       findings: result.findings,
+      artifact,
       interpretationThresholds: result.interpretationThresholds,
       dataQuality: {
         receivedRows: rows.length,
@@ -205,6 +295,21 @@ export class StudyClusteringModel {
         winsorizedValues: encoded.winsorizedValues,
         winsorizationPercentiles: encoded.winsorizationPercentiles,
         ignoredConstantFeatures: encoded.ignoredConstantFeatures,
+        realRows: cleanRows.filter((row) => !row.isSynthetic).length,
+        syntheticRows: cleanRows.filter((row) => row.isSynthetic).length,
+        syntheticPercentage: this.round(
+          (cleanRows.filter((row) => row.isSynthetic).length /
+            cleanRows.length) *
+            100,
+          2,
+        ),
+        syntheticDemandRows: rows.filter(
+          (row) => Number(row.syntheticRequestCount ?? 0) > 0,
+        ).length,
+        syntheticRequestCount: rows.reduce(
+          (sum, row) => sum + Number(row.syntheticRequestCount ?? 0),
+          0,
+        ),
       },
       warnings: [
         ...prepared.warnings,
@@ -225,11 +330,135 @@ export class StudyClusteringModel {
               `Se excluyeron variables constantes o con cobertura insuficiente: ${encoded.ignoredConstantFeatures.join(', ')}.`,
             ]
           : []),
+        ...(rows.some((row) => Number(row.syntheticRequestCount ?? 0) > 0)
+          ? [
+              'request_count incluye demanda demostrativa ECO-ML; synthetic_request_count se conserva solo para auditoria y no entra como variable adicional.',
+            ]
+          : []),
       ],
     };
   }
 
+  /** Valida el JSON antes de usarlo; evita tratar un objeto cualquiera como modelo. */
+  isCompatibleArtifact(value: unknown): value is StudyClusteringArtifact {
+    if (!value || typeof value !== 'object') return false;
+    const artifact = value as Partial<StudyClusteringArtifact>;
+    return (
+      artifact.artifactType === 'econolab-study-clustering' &&
+      artifact.schemaVersion === '1.0' &&
+      artifact.algorithm === 'kmeans' &&
+      Number.isInteger(artifact.selectedK) &&
+      Array.isArray(artifact.featureNames) &&
+      artifact.featureNames.length > 0 &&
+      Array.isArray(artifact.clusters) &&
+      artifact.clusters.length === artifact.selectedK &&
+      artifact.clusters.every(
+        (cluster) =>
+          Number.isInteger(cluster.cluster) &&
+          Array.isArray(cluster.centroid) &&
+          cluster.centroid.length === artifact.featureNames!.length &&
+          cluster.centroid.every(Number.isFinite),
+      ) &&
+      !!artifact.preprocessing?.numeric &&
+      Array.isArray(artifact.preprocessing.sampleTypeCategories) &&
+      Array.isArray(artifact.preprocessing.analysisMethodCategories)
+    );
+  }
+
+  /**
+   * USO REAL DEL ARTEFACTO.
+   * Aplica la mediana, one-hot y escalado guardados durante el entrenamiento;
+   * luego asigna el estudio al centroide mas cercano. No vuelve a entrenar.
+   */
+  assignFromArtifact(
+    row: StudyClusteringRow,
+    artifact: StudyClusteringArtifact,
+  ) {
+    if (!this.isCompatibleArtifact(artifact)) {
+      throw new BadRequestException(
+        'El artefacto de clustering no tiene un formato compatible.',
+      );
+    }
+
+    const featureValues = new Map<string, number>();
+    const featureNameByNumericKey: Record<NumericKey, string> = {
+      price: 'price',
+      deliveryHours: 'delivery_hours',
+      parameterCount: 'parameter_count',
+      requestCount: 'request_count',
+    };
+    for (const key of NUMERIC_FEATURES) {
+      const config = artifact.preprocessing.numeric[key];
+      const rawValue = row[key];
+      const isValid =
+        key === 'price' || key === 'deliveryHours'
+          ? this.isPositiveNumber(rawValue)
+          : this.isNonNegativeNumber(rawValue);
+      const value = isValid ? Number(rawValue) : config.median;
+      const clipped = Math.min(
+        config.upperBound,
+        Math.max(config.lowerBound, value),
+      );
+      featureValues.set(
+        featureNameByNumericKey[key],
+        (clipped - config.mean) / (config.standardDeviation || 1),
+      );
+    }
+
+    const setOneHotValues = (
+      prefix: string,
+      rawValue: string | null,
+      categories: string[],
+    ) => {
+      const normalized = this.normalizeCategory(rawValue);
+      const mapped = this.isUnknownCategory(normalized)
+        ? null
+        : categories.includes(normalized)
+          ? normalized
+          : categories.includes('otros')
+            ? 'otros'
+            : null;
+      categories.forEach((category) =>
+        featureValues.set(`${prefix}=${category}`, mapped === category ? 1 : 0),
+      );
+    };
+    setOneHotValues(
+      'sample_type',
+      row.sampleType,
+      artifact.preprocessing.sampleTypeCategories,
+    );
+    setOneHotValues(
+      'analysis_method',
+      row.analysisMethod,
+      artifact.preprocessing.analysisMethodCategories,
+    );
+    const specialProcessing =
+      typeof row.requiresSpecialProcessing === 'boolean'
+        ? row.requiresSpecialProcessing
+        : artifact.preprocessing.requiresSpecialProcessingMode;
+    featureValues.set('requires_special_processing', specialProcessing ? 1 : 0);
+
+    const vector = artifact.featureNames.map(
+      (featureName) => featureValues.get(featureName) ?? 0,
+    );
+    const selected = [...artifact.clusters].sort(
+      (left, right) =>
+        this.squaredDistance(vector, left.centroid) -
+          this.squaredDistance(vector, right.centroid) ||
+        left.cluster - right.cluster,
+    )[0];
+    const distance = Math.sqrt(this.squaredDistance(vector, selected.centroid));
+    return {
+      cluster: selected.cluster,
+      distanceToCentroid: this.round(distance, 4),
+      isOutlier:
+        selected.outlierThreshold != null &&
+        distance > selected.outlierThreshold,
+    };
+  }
+
   private prepareRows(rows: StudyClusteringRow[]) {
+    // Limpieza 1: studyId funciona como llave para eliminar filas duplicadas.
     const unique = new Map<number, StudyClusteringRow>();
     let duplicateRows = 0;
 
@@ -243,6 +472,7 @@ export class StudyClusteringModel {
     }
 
     const uniqueRows = [...unique.values()];
+    // Limpieza 2: calculamos medianas para rellenar numeros nulos o invalidos.
     const medians: Record<NumericKey, number> = {
       price: this.median(
         uniqueRows
@@ -328,7 +558,7 @@ export class StudyClusteringModel {
     }
     if (cleanRows.some((row) => row.isSynthetic)) {
       warnings.push(
-        'El analisis incluye registros sinteticos MLTRAIN identificados como datos de entrenamiento.',
+        'El analisis incluye estudios sinteticos ECN-CAT identificados para auditoria; isSynthetic no se usa como variable de K-Means.',
       );
     }
 
@@ -337,6 +567,8 @@ export class StudyClusteringModel {
       uniqueRows: uniqueRows.length,
       duplicateRows,
       imputedValues,
+      medians,
+      requiresSpecialProcessingMode: specialProcessingMode,
       warnings,
     };
   }
@@ -365,6 +597,8 @@ export class StudyClusteringModel {
         Math.max(lowerBounds.get(key)!, row[key]),
       );
 
+    // Variables numericas: limitar extremos y aplicar z-score
+    // (valor - promedio) / desviacion estandar.
     for (const key of NUMERIC_FEATURES) {
       const sortedValues = rows
         .map((row) => row[key])
@@ -387,6 +621,8 @@ export class StudyClusteringModel {
       deviations.set(key, deviation || 1);
     }
 
+    // Variables categoricas: sampleType y analysisMethod se convierten a
+    // columnas binarias (one-hot encoding).
     const sampleConfig = this.categoryConfig(rows.map((row) => row.sampleType));
     const methodConfig = this.categoryConfig(
       rows.map((row) => row.analysisMethod),
@@ -447,6 +683,12 @@ export class StudyClusteringModel {
       ignoredConstantFeatures,
       winsorizedValues,
       winsorizationPercentiles,
+      means,
+      deviations,
+      lowerBounds,
+      upperBounds,
+      sampleTypeCategories: sampleConfig.categories,
+      analysisMethodCategories: methodConfig.categories,
     };
   }
 
@@ -501,6 +743,8 @@ export class StudyClusteringModel {
   }
 
   private fit(points: number[][], k: number, start: number): FittedKMeans {
+    // K-MEANS: alterna entre asignar cada fila al centroide mas cercano y
+    // recalcular centroides, hasta converger o llegar a 100 iteraciones.
     let centroids = this.initializeCentroids(points, k, start);
     let labels = Array<number>(points.length).fill(-1);
     let iterations = 0;
@@ -663,6 +907,7 @@ export class StudyClusteringModel {
     distances: Float64Array,
     size: number,
   ) {
+    // SILUETA: compara cercania dentro del propio cluster contra otros grupos.
     const clusters = Array.from({ length: k }, (): number[] => []);
     labels.forEach((label, index) => clusters[label].push(index));
     let total = 0;
@@ -694,7 +939,48 @@ export class StudyClusteringModel {
     return total / size;
   }
 
+  /**
+   * DAVIES-BOULDIN: para cada cluster compara su dispersion interna con la
+   * separacion respecto de los otros centroides. Un valor menor es mejor.
+   */
+  private daviesBouldinScore(points: number[][], fitted: FittedKMeans) {
+    const k = fitted.centroids.length;
+    const clusters = Array.from({ length: k }, (): number[] => []);
+    fitted.labels.forEach((label, index) => clusters[label].push(index));
+    const dispersions = clusters.map(
+      (indices, cluster) =>
+        indices.reduce(
+          (sum, index) =>
+            sum +
+            Math.sqrt(
+              this.squaredDistance(points[index], fitted.centroids[cluster]),
+            ),
+          0,
+        ) / Math.max(indices.length, 1),
+    );
+
+    const worstRatios = fitted.centroids.map((centroid, cluster) => {
+      let worst = 0;
+      for (let other = 0; other < k; other += 1) {
+        if (other === cluster) continue;
+        const separation = Math.sqrt(
+          this.squaredDistance(centroid, fitted.centroids[other]),
+        );
+        const ratio =
+          separation <= EPSILON
+            ? Number.MAX_SAFE_INTEGER
+            : (dispersions[cluster] + dispersions[other]) / separation;
+        worst = Math.max(worst, ratio);
+      }
+      return worst;
+    });
+
+    return worstRatios.reduce((sum, value) => sum + value, 0) / k;
+  }
+
   private findElbow(evaluations: Array<{ k: number; inertia: number }>) {
+    // CODO: busca el punto con mayor separacion respecto de la linea que une
+    // la primera y ultima inercia evaluadas.
     if (evaluations.length <= 2) return evaluations[0].k;
     const first = evaluations[0];
     const last = evaluations[evaluations.length - 1];
@@ -723,6 +1009,8 @@ export class StudyClusteringModel {
     fitted: FittedKMeans,
     featureNames: Set<string>,
   ) {
+    // RESULTADO DEL MODELO: relaciona nuevamente cada etiqueta numerica con
+    // studyId/code/name para que la aplicacion pueda mostrar los estudios.
     const rawClusters = Array.from(
       { length: fitted.centroids.length },
       (_, cluster) =>
@@ -847,6 +1135,7 @@ export class StudyClusteringModel {
         suggestedName: interpretation.suggestedName,
         shortDescription: interpretation.shortDescription,
         keyCharacteristics: interpretation.keyCharacteristics,
+        suggestedAction: interpretation.suggestedAction,
         nameQualifiers: interpretation.nameQualifiers,
         studyCount: clusterRows.length,
         percentage: this.round((clusterRows.length / rows.length) * 100, 1),
@@ -876,6 +1165,15 @@ export class StudyClusteringModel {
       profiles,
       studies,
       findings,
+      clusterArtifacts: orderedClusters.map((cluster, index) => ({
+        cluster: index + 1,
+        centroid: fitted.centroids[cluster.rawCluster].map((value) =>
+          this.round(value, 10),
+        ),
+        outlierThreshold: Number.isFinite(thresholds.get(cluster.rawCluster)!)
+          ? this.round(thresholds.get(cluster.rawCluster)!, 10)
+          : null,
+      })),
       interpretationThresholds: this.roundDistributions(
         interpretationThresholds,
       ),
@@ -1054,14 +1352,37 @@ export class StudyClusteringModel {
         : fallbackQualifier
     }`;
     const shortDescription = `${input.studyCount} estudios con precio promedio de ${this.formatCurrency(averages.price)}, entrega de ${this.round(averages.deliveryHours, 1)} horas, ${this.round(averages.parameterCount, 1)} parámetros y ${this.round(averages.requestCount, 1)} solicitudes en el periodo.`;
+    const suggestedAction = this.suggestBusinessAction(traits);
 
     return {
       suggestedName,
       shortDescription,
       keyCharacteristics: keyCharacteristics.slice(0, 6),
+      suggestedAction,
       nameQualifiers,
       traits,
     };
+  }
+
+  /** Cada perfil recibe una accion administrativa, nunca una indicacion clinica. */
+  private suggestBusinessAction(traits: string[]) {
+    const has = (trait: string) => traits.includes(trait);
+    if (has('demanda alta') && has('entrega rápida')) {
+      return 'Vigilar capacidad, reactivos y continuidad para sostener la demanda sin aumentar el tiempo de entrega.';
+    }
+    if (has('entrega prolongada') || has('procesamiento especial frecuente')) {
+      return 'Revisar disponibilidad de equipo, reactivos y tiempos comprometidos para prevenir retrasos operativos.';
+    }
+    if (has('precio alto') && has('demanda baja')) {
+      return 'Revisar costos, disponibilidad y vigencia dentro del catalogo antes de mantener capacidad dedicada.';
+    }
+    if (has('multiparámetro')) {
+      return 'Planear capacidad de captura y procesamiento por tratarse de estudios con varios resultados.';
+    }
+    if (has('precio bajo') || has('demanda alta')) {
+      return 'Mantener existencias minimas y monitorear el volumen para conservar una operacion eficiente.';
+    }
+    return 'Revisar periodicamente precio, demanda y tiempo de entrega para detectar cambios en el comportamiento del segmento.';
   }
 
   private resolveSuggestedNameCollisions<

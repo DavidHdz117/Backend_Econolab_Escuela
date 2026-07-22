@@ -22,6 +22,7 @@ import { ServiceOutcomePredictionModel } from './models/service-outcome-predicti
     ]),
   ],
   controllers: [ServicesController],
+  // Aquí NestJS registra el modelo para que ServicesService pueda utilizarlo.
   providers: [ServicesService, ServiceOutcomePredictionModel],
   exports: [ServicesService],
 })

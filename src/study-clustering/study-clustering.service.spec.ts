@@ -133,7 +133,11 @@ describe('StudyClusteringService', () => {
       save: jest.fn(),
     };
     const assignmentRepo = { find: jest.fn() };
-    const model = { analyze: jest.fn() };
+    const model = {
+      analyze: jest.fn(),
+      isCompatibleArtifact: jest.fn().mockReturnValue(false),
+      assignFromArtifact: jest.fn(),
+    };
     const service = new StudyClusteringService(
       studyRepo as any,
       detailRepo as any,
@@ -196,6 +200,40 @@ describe('StudyClusteringService', () => {
         selectedK: 3,
         elbowK: 3,
         featureNames: ['price', 'delivery_hours'],
+      }),
+    );
+  });
+
+  it('carga el artefacto JSONB y lo usa para reasignar sin reentrenar', async () => {
+    const { service, runRepo, profileRepo, assignmentRepo, model } =
+      buildService();
+    const run = completedRun();
+    run.dataQuality = {
+      usableRows: 48,
+      datasetFingerprintSha256: 'huella-prueba',
+      modelArtifact: { artifactType: 'econolab-study-clustering' },
+    };
+    runRepo.findOne.mockResolvedValue(run);
+    profileRepo.find.mockResolvedValue([storedProfile()]);
+    assignmentRepo.find.mockResolvedValue([storedAssignment()]);
+    model.isCompatibleArtifact.mockReturnValue(true);
+    model.assignFromArtifact.mockReturnValue({
+      cluster: 1,
+      distanceToCentroid: 0.8,
+      isOutlier: true,
+    });
+
+    const result = await service.getLatestAnalysis();
+
+    expect(model.analyze).not.toHaveBeenCalled();
+    expect(model.assignFromArtifact).toHaveBeenCalledTimes(1);
+    expect(result.studies[0].assignmentSource).toBe('stored_model_artifact');
+    expect(result.technicalDetails.artifact).toEqual(
+      expect.objectContaining({
+        loaded: true,
+        reassignedStudies: 1,
+        mismatchesWithStoredAssignments: 0,
+        datasetFingerprintSha256: 'huella-prueba',
       }),
     );
   });
@@ -317,7 +355,7 @@ describe('StudyClusteringService', () => {
     ]);
   });
 
-  it('excluye explicitamente estudios sinteticos aunque esten activos', async () => {
+  it('excluye MLTRAIN, marca ECN-CAT y audita demanda ECO-ML', async () => {
     const { service, studyRepo, detailRepo, serviceOrderItemRepo } =
       buildService();
     studyRepo.find.mockResolvedValue([
@@ -348,6 +386,17 @@ describe('StudyClusteringService', () => {
         normalPrice: 100,
         durationMinutes: 60,
       },
+      {
+        id: 4,
+        code: 'ECN-CAT-QC-001',
+        name: 'Catalogo sintetico trazable',
+        indicator: 'Quimica clinica',
+        normalPrice: 180,
+        durationMinutes: 90,
+        sampleType: 'serum',
+        method: 'colorimetria',
+        requiresSpecialProcessing: false,
+      },
     ]);
     detailRepo.find.mockResolvedValue([]);
     const queryBuilder = {
@@ -356,8 +405,15 @@ describe('StudyClusteringService', () => {
       addSelect: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
+      setParameter: jest.fn().mockReturnThis(),
       groupBy: jest.fn().mockReturnThis(),
-      getRawMany: jest.fn().mockResolvedValue([]),
+      getRawMany: jest.fn().mockResolvedValue([
+        {
+          studyId: '4',
+          requestCount: '3',
+          syntheticRequestCount: '2',
+        },
+      ]),
     };
     serviceOrderItemRepo.createQueryBuilder.mockReturnValue(queryBuilder);
 
@@ -366,7 +422,20 @@ describe('StudyClusteringService', () => {
       new Date('2026-07-01T00:00:00.000Z'),
     );
 
-    expect(dataset.map((row: { studyId: number }) => row.studyId)).toEqual([1]);
+    expect(dataset.map((row: { studyId: number }) => row.studyId)).toEqual([
+      1, 4,
+    ]);
+    expect(dataset[1]).toEqual(
+      expect.objectContaining({
+        isSynthetic: true,
+        requestCount: 3,
+        syntheticRequestCount: 2,
+      }),
+    );
+    expect(queryBuilder.setParameter).toHaveBeenCalledWith(
+      'demoFolioPattern',
+      'ECO-ML-%',
+    );
   });
 
   it('rechaza nombres genericos y duplicados normalizados', async () => {

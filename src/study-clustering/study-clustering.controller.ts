@@ -24,11 +24,13 @@ export class StudyClusteringController {
     private readonly studyClusteringService: StudyClusteringService,
   ) {}
 
+  // La pantalla administrativa usa este endpoint para mostrar los clusters.
   @Get('analysis')
   getLatestAnalysis() {
     return this.studyClusteringService.getLatestAnalysis();
   }
 
+  // Este endpoint ejecuta todo el flujo: BD -> dataset -> K-Means -> resultados.
   @Post('recalculate')
   recalculate(@Body() dto: RecalculateStudyClusteringDto) {
     return this.studyClusteringService.recalculate(dto);

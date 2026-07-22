@@ -34,6 +34,7 @@ export class ServicesController {
     };
   }
 
+  // FORMULARIO: recibe una orden todavía no guardada y devuelve su pronóstico.
   @Post('outcome-prediction')
   async predictOutcome(@Body() dto: PredictServiceOutcomeDto) {
     return {
@@ -42,6 +43,7 @@ export class ServicesController {
     };
   }
 
+  // LISTADO: recibe varios IDs y devuelve un pronóstico para cada orden activa.
   @Post('outcome-predictions/batch')
   async predictOutcomesBatch(@Body() dto: BatchPredictServiceOutcomeDto) {
     return {

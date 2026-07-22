@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Like, QueryFailedError, Repository } from 'typeorm';
+import { In, QueryFailedError, Repository } from 'typeorm';
 import {
   ImportPreviewResult,
   ImportPreviewRow,
@@ -230,46 +230,13 @@ export class StudiesService {
     return { code: await this.getNextAutoStudyCode(type) };
   }
 
-  /** Construye el dataset real y manda llamar al modelo de regresion. */
-  async estimate(dto: EstimateStudyDto) {
-    const studies = await this.studyRepo.find({
-      where: [
-        { isActive: true, status: StudyStatus.ACTIVE },
-        {
-          code: Like('MLTRAIN-%'),
-          indicator: 'DATOS SINTETICOS',
-        },
-      ],
-    });
-    const studyIds = studies.map((study) => study.id);
-    const parameterCounts = new Map<number, number>();
-
-    if (studyIds.length > 0) {
-      const details = await this.detailRepo.find({
-        where: {
-          studyId: In(studyIds),
-          dataType: StudyDetailType.PARAMETER,
-          isActive: true,
-        },
-      });
-
-      for (const detail of details) {
-        parameterCounts.set(
-          detail.studyId,
-          (parameterCounts.get(detail.studyId) ?? 0) + 1,
-        );
-      }
-    }
-
-    const dataset = studies.map((study) => ({
-      type: study.type,
-      parameterCount: parameterCounts.get(study.id) ?? 0,
-      method: study.method,
-      normalPrice: Number(study.normalPrice),
-    }));
-
-    // Aqui se manda llamar y se utiliza el modelo.
-    return this.studyEstimationModel.predict(dto, dataset);
+  /**
+   * PASO 7: punto donde el sistema manda llamar y utiliza el modelo guardado.
+   * La extraccion y el entrenamiento son procesos offline; una peticion solo
+   * transforma el formulario y aplica los coeficientes del artefacto JSON.
+   */
+  estimate(dto: EstimateStudyDto) {
+    return this.studyEstimationModel.predict(dto);
   }
 
   private async validatePackageStudyIds(

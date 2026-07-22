@@ -1,5 +1,6 @@
 import {
   SERVICE_OUTCOME_CLASSES,
+  SERVICE_OUTCOME_MODEL_VERSION,
   ServiceOutcomeClass,
   ServiceOutcomeFeatures,
   ServiceOutcomeModelUnavailableError,
@@ -18,6 +19,9 @@ const buildRows = (samplesPerClass = 10): ServiceOutcomeTrainingRow[] => {
     for (let index = 0; index < samplesPerClass; index += 1) {
       rows.push({
         orderId,
+        sourceCreatedAt: new Date(
+          Date.UTC(2026, 0, 1 + index, 12, 0, 0),
+        ).toISOString(),
         outcome,
         ...featureFactory(index),
       });
@@ -130,22 +134,29 @@ describe('ServiceOutcomePredictionModel', () => {
     }
 
     expect(result.model.algorithm).toBe('multinomial_logistic_regression');
-    expect(result.model.version).toBe('1.0');
-    expect(result.model.trainingSamples).toBe(30);
+    expect(result.model.version).toBe(SERVICE_OUTCOME_MODEL_VERSION);
+    expect(result.model.trainingSamples).toBe(24);
     expect(result.model.classDistribution).toEqual({
       completed_on_time: 10,
       delayed: 10,
       cancelled: 10,
     });
+    expect(result.model.validationStrategy).toBe('temporal_holdout');
+    expect(result.model.baselineAccuracy).toBeGreaterThanOrEqual(0);
   });
 
-  it('reporta matriz de confusion y metricas por clase sobre un split estratificado', () => {
+  it('reporta matriz de confusion y metricas por clase sobre un holdout temporal', () => {
     const model = new ServiceOutcomePredictionModel();
     const result = model.predictMany([], buildRows(10));
 
     expect(result.model.evaluationTrainingSamples).toBe(24);
     expect(result.model.evaluationTestSamples).toBe(6);
     expect(result.model.accuracy).toBeGreaterThanOrEqual(0.8);
+    expect(result.model.macroAverage.f1Score).toBeGreaterThanOrEqual(0);
+    expect(result.model.weightedAverage.f1Score).toBeGreaterThanOrEqual(0);
+    expect(Date.parse(result.model.trainingPeriod.end)).toBeLessThanOrEqual(
+      Date.parse(result.model.testPeriod.start),
+    );
 
     for (const outcome of SERVICE_OUTCOME_CLASSES) {
       const matrixSupport = SERVICE_OUTCOME_CLASSES.reduce(
@@ -164,6 +175,94 @@ describe('ServiceOutcomePredictionModel', () => {
       expect(metrics.f1Score).toBeGreaterThanOrEqual(0);
       expect(metrics.f1Score).toBeLessThanOrEqual(1);
     }
+  });
+
+  it('genera exactamente el mismo artefacto con los mismos datos y fechas', () => {
+    const model = new ServiceOutcomePredictionModel();
+    const provenance = {
+      datasetSha256: 'sha256-repetible',
+      sourceWatermark: '2026-07-21T00:00:00.000Z',
+    };
+
+    const first = model.trainArtifact(buildRows(8), provenance);
+    const second = model.trainArtifact(buildRows(8), provenance);
+    const split = model.createEvaluationSplit(buildRows(8));
+    const repeatedSplit = model.createEvaluationSplit(buildRows(8));
+
+    expect(second).toEqual(first);
+    expect(repeatedSplit).toEqual(split);
+    expect(split.trainingOrderIds).toHaveLength(19);
+    expect(split.testOrderIds).toHaveLength(5);
+    expect(
+      split.trainingOrderIds.filter((id) => split.testOrderIds.includes(id)),
+    ).toHaveLength(0);
+    expect(first.model.classBalanceStrategy).toBe(
+      'inverse_frequency_class_weights',
+    );
+    expect(first.evaluation.baseline.strategy).toBe('majority_class');
+    expect(first.dataset.targetY).toBe('outcome');
+    expect(first.dataset.predictorsX).not.toContain('orderId');
+    expect(first.dataset.predictorsX).not.toContain('sourceCreatedAt');
+    expect(first.model.validationStrategy).toBe('temporal_holdout');
+  });
+
+  it('ajusta preprocesamiento y pesos solo con el periodo de train', () => {
+    const model = new ServiceOutcomePredictionModel();
+    const rows = buildRows(10).map((row) =>
+      Date.parse(row.sourceCreatedAt) >= Date.parse('2026-01-09T00:00:00.000Z')
+        ? {
+            ...row,
+            subtotalAmount: 999_999,
+            totalAmount: 999_999,
+            branchName: 'Sucursal futura solo test',
+          }
+        : row,
+    );
+
+    const artifact = model.trainArtifact(rows, {
+      datasetSha256: 'solo-train',
+      sourceWatermark: '2026-01-10T12:00:00.000Z',
+    });
+    const subtotal = artifact.preprocessing.numeric.find(
+      (feature) => feature.key === 'subtotalAmount',
+    );
+    const branches = artifact.preprocessing.categorical.find(
+      (feature) => feature.key === 'branchName',
+    );
+
+    expect(subtotal?.mean).toBeLessThan(1_000);
+    expect(branches?.categories).not.toContain('sucursal futura solo test');
+    expect(artifact.dataset.trainingSamples).toBe(24);
+    expect(artifact.dataset.evaluationTestSamples).toBe(6);
+  });
+
+  it('carga el artefacto JSON usado por el backend y lo conserva en memoria', () => {
+    const model = new ServiceOutcomePredictionModel();
+    const trainingSpy = jest.spyOn(model, 'trainArtifact');
+
+    const first = model.predictUsingArtifact([
+      {
+        promisedLeadHours: 24,
+        registrationHour: 9,
+        registrationWeekday: 2,
+        itemCount: 2,
+        totalQuantity: 2,
+        distinctStudyCount: 2,
+        subtotalAmount: 300,
+        totalAmount: 300,
+        branchName: 'Matriz',
+        dominantPriceType: 'normal',
+      },
+    ]);
+    const loadedPath = model.getLoadedArtifactPath();
+    const second = model.predictUsingArtifact([{}]);
+
+    expect(first.predictions).toHaveLength(1);
+    expect(second.predictions).toHaveLength(1);
+    expect(loadedPath).toContain('classification_service_outcome_model.json');
+    expect(model.getLoadedArtifactPath()).toBe(loadedPath);
+    expect(first.model.artifactDatasetSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(trainingSpy).not.toHaveBeenCalled();
   });
 
   it('marca el modelo como no disponible cuando falta una clase', () => {
@@ -227,7 +326,7 @@ describe('ServiceOutcomePredictionModel', () => {
     expect(result.model.featuresUsed).not.toContain('totalParameterCount');
     expect(result.model.featuresUsed).not.toContain('dominantSampleType');
     expect(result.warnings).toContain(
-      'Las variables vacias o sin variacion fueron omitidas del modelo.',
+      'Las variables vacias, constantes o con al menos 99 % del mismo valor fueron omitidas del modelo.',
     );
   });
 });

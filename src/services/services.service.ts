@@ -19,7 +19,11 @@ import { UpdateServiceStatusDto } from './dto/update-service-status.dto';
 import { PredictServiceOutcomeDto } from './dto/predict-service-outcome.dto';
 import { Patient } from '../patients/entities/patient.entity';
 import { Doctor } from '../doctors/entities/doctor.entity';
-import { Study, StudyStatus, StudyType } from '../studies/entities/study.entity';
+import {
+  Study,
+  StudyStatus,
+  StudyType,
+} from '../studies/entities/study.entity';
 import PDFDocument = require('pdfkit');
 import * as fs from 'fs';
 import * as bwipjs from 'bwip-js';
@@ -41,7 +45,6 @@ import {
   type ServiceOutcomeClass,
   type ServiceOutcomeFeatures,
   type ServiceOutcomePredictionResult as ServiceOutcomeModelResult,
-  type ServiceOutcomeTrainingRow,
 } from './models/service-outcome-prediction.model';
 
 const AUTO_SERVICE_FOLIO_PREFIX = 'ECO';
@@ -201,13 +204,11 @@ export class ServicesService {
   }
 
   private buildPersonName(
-    person?:
-      | {
-          firstName?: string | null;
-          lastName?: string | null;
-          middleName?: string | null;
-        }
-      | null,
+    person?: {
+      firstName?: string | null;
+      lastName?: string | null;
+      middleName?: string | null;
+    } | null,
   ) {
     if (!person) return 'N/D';
 
@@ -232,7 +233,9 @@ export class ServicesService {
       case 'other':
         return 'Otro';
       default:
-        return gender ? `${gender.charAt(0).toUpperCase()}${gender.slice(1)}` : 'N/D';
+        return gender
+          ? `${gender.charAt(0).toUpperCase()}${gender.slice(1)}`
+          : 'N/D';
     }
   }
 
@@ -295,7 +298,10 @@ export class ServicesService {
     return `${AUTO_SERVICE_FOLIO_PREFIX}${y}${m}${d}${String(sequence).padStart(AUTO_SEQUENCE_PAD, '0')}`;
   }
 
-  private extractAutoSequenceValue(value: string | null | undefined, date = new Date()) {
+  private extractAutoSequenceValue(
+    value: string | null | undefined,
+    date = new Date(),
+  ) {
     if (!value) return 0;
 
     const y = date.getFullYear();
@@ -345,7 +351,11 @@ export class ServicesService {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
-  /** Convierte una orden en las mismas variables que usa el clasificador. */
+  /**
+   * PASO 2 - CREAR X (variables de entrada).
+   * Convierte una orden de la BD o del formulario en las mismas variables
+   * numéricas y categóricas que entiende el modelo de clasificación.
+   */
   private buildOutcomeFeatures(
     source: ServiceOutcomeFeatureSource,
   ): ServiceOutcomeFeatures | null {
@@ -409,92 +419,37 @@ export class ServicesService {
     };
   }
 
-  private getHistoricalOutcome(
-    order: ServiceOrder,
-  ): ServiceOutcomeClass | null {
-    if (order.status === ServiceStatus.CANCELLED) return 'cancelled';
-    if (order.status === ServiceStatus.DELAYED) return 'delayed';
-    if (order.status !== ServiceStatus.COMPLETED) return null;
-
-    const deliveryAt = this.toValidDate(order.deliveryAt);
-    const completedAt = this.toValidDate(order.completedAt);
-    if (!deliveryAt || !completedAt) return null;
-
-    return completedAt.getTime() <= deliveryAt.getTime()
-      ? 'completed_on_time'
-      : 'delayed';
-  }
-
-  /** Dataset supervisado: el estado final solo se utiliza para construir Y. */
-  private async buildOutcomeTrainingDataset() {
-    const historicalOrders = await this.serviceRepo.find({
-      where: {
-        isActive: true,
-        status: In([
-          ServiceStatus.COMPLETED,
-          ServiceStatus.DELAYED,
-          ServiceStatus.CANCELLED,
-        ]),
-      },
-      order: { id: 'ASC' },
-    });
-    const dataset: ServiceOutcomeTrainingRow[] = [];
-
-    for (const order of historicalOrders) {
-      const outcome = this.getHistoricalOutcome(order);
-      const features = this.buildOutcomeFeatures({
-        branchName: order.branchName,
-        sampleAt: order.sampleAt,
-        deliveryAt: order.deliveryAt,
-        createdAt: order.createdAt,
-        subtotalAmount: Number(order.subtotalAmount),
-        courtesyPercent: Number(order.courtesyPercent),
-        discountAmount: Number(order.discountAmount),
-        totalAmount: Number(order.totalAmount),
-        items: order.items ?? [],
-      });
-
-      if (!outcome || !features) continue;
-      dataset.push({ orderId: order.id, outcome, ...features });
-    }
-
-    return dataset;
-  }
-
   private buildUnavailableOutcomePrediction(
-    dataset: ServiceOutcomeTrainingRow[],
-    message = `Aún no hay al menos ${SERVICE_OUTCOME_MINIMUM_SAMPLES_PER_CLASS} órdenes históricas válidas de cada resultado para calcular el pronóstico.`,
+    message = 'El artefacto de clasificación no está disponible. Ejecuta npm run classification:train.',
   ): PublicServiceOutcomePrediction {
-    const classDistribution: Record<ServiceOutcomeClass, number> = {
-      completed_on_time: 0,
-      delayed: 0,
-      cancelled: 0,
-    };
-    for (const row of dataset) classDistribution[row.outcome] += 1;
+    const metadata = this.serviceOutcomePredictionModel.getArtifactMetadata();
 
     return {
       available: false,
       message,
       model: {
-        version: SERVICE_OUTCOME_MODEL_VERSION,
-        trainingSamples: dataset.length,
+        version: metadata?.version ?? SERVICE_OUTCOME_MODEL_VERSION,
+        trainingSamples: metadata?.trainingSamples ?? 0,
         minimumSamplesPerClass:
+          metadata?.minimumSamplesPerClass ??
           SERVICE_OUTCOME_MINIMUM_SAMPLES_PER_CLASS,
-        classDistribution,
+        classDistribution: metadata?.classDistribution ?? {
+          completed_on_time: 0,
+          delayed: 0,
+          cancelled: 0,
+        },
       },
     };
   }
 
   private runOutcomeModel(
     inputs: ServiceOutcomeFeatures[],
-    dataset: ServiceOutcomeTrainingRow[],
   ): PublicServiceOutcomePrediction[] {
     try {
-      // Aquí se manda llamar y se utiliza el modelo de clasificación.
-      const result = this.serviceOutcomePredictionModel.predictMany(
-        inputs,
-        dataset,
-      );
+      // AQUÍ SE USA EL MODELO YA ENTRENADO.
+      // El JSON se lee una vez y NO se reentrena al atender la solicitud.
+      const result =
+        this.serviceOutcomePredictionModel.predictUsingArtifact(inputs);
 
       return result.predictions.map((prediction) => ({
         available: true,
@@ -512,7 +467,9 @@ export class ServicesService {
       }));
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : 'Error desconocido del modelo.';
+        error instanceof Error
+          ? error.message
+          : 'Error desconocido del modelo.';
 
       if (error instanceof ServiceOutcomeModelUnavailableError) {
         this.logger.warn(`Pronóstico de orden no disponible: ${errorMessage}`);
@@ -523,7 +480,9 @@ export class ServicesService {
         );
       }
 
-      return inputs.map(() => this.buildUnavailableOutcomePrediction(dataset));
+      return inputs.map(() =>
+        this.buildUnavailableOutcomePrediction(errorMessage),
+      );
     }
   }
 
@@ -532,9 +491,11 @@ export class ServicesService {
       return false;
     }
 
-    const driverError = (error as QueryFailedError & {
-      driverError?: { code?: string; errno?: number };
-    }).driverError;
+    const driverError = (
+      error as QueryFailedError & {
+        driverError?: { code?: string; errno?: number };
+      }
+    ).driverError;
 
     return driverError?.code === '23505' || driverError?.errno === 19;
   }
@@ -575,8 +536,7 @@ export class ServicesService {
 
   private async buildReceiptPdfBuffer(service: ServiceOrder): Promise<Buffer> {
     const labName = process.env.LAB_NAME ?? DEFAULT_LAB_NAME;
-    const labSubtitle =
-      process.env.LAB_SUBTITLE ?? DEFAULT_LAB_SUBTITLE;
+    const labSubtitle = process.env.LAB_SUBTITLE ?? DEFAULT_LAB_SUBTITLE;
     const labHeaderTitle =
       process.env.LAB_HEADER_TITLE ?? `${labName} ${labSubtitle}`.trim();
     const labAddress = process.env.LAB_ADDRESS ?? DEFAULT_LAB_ADDRESS;
@@ -709,13 +669,22 @@ export class ServicesService {
       doc
         .font('Helvetica')
         .fontSize(6.8)
-        .text(`${patientName} - ${this.calcAge(patient?.birthDate)}`, right - 160, top + 84, {
-          width: 150,
-          align: 'center',
-        });
+        .text(
+          `${patientName} - ${this.calcAge(patient?.birthDate)}`,
+          right - 160,
+          top + 84,
+          {
+            width: 150,
+            align: 'center',
+          },
+        );
 
       const headerBottom = top + 104;
-      doc.moveTo(left, headerBottom).lineTo(right, headerBottom).strokeColor(dividerColor).stroke();
+      doc
+        .moveTo(left, headerBottom)
+        .lineTo(right, headerBottom)
+        .strokeColor(dividerColor)
+        .stroke();
 
       const infoTop = headerBottom + 16;
       const leftLines = [
@@ -752,10 +721,20 @@ export class ServicesService {
       });
 
       const infoBottom = infoTop + 80;
-      doc.moveTo(left, infoBottom).lineTo(right, infoBottom).strokeColor(dividerColor).stroke();
+      doc
+        .moveTo(left, infoBottom)
+        .lineTo(right, infoBottom)
+        .strokeColor(dividerColor)
+        .stroke();
 
       let cursorY = infoBottom + 16;
-      const colX = { name: left, type: 255, price: 332, discount: 420, total: 505 };
+      const colX = {
+        name: left,
+        type: 255,
+        price: 332,
+        discount: 420,
+        total: 505,
+      };
 
       doc
         .font('Helvetica-Bold')
@@ -767,27 +746,42 @@ export class ServicesService {
         .text('DESC.', colX.discount, cursorY, { width: 50, align: 'right' })
         .text('TOTAL', colX.total, cursorY, { width: 50, align: 'right' });
       cursorY += 18;
-      doc.moveTo(left, cursorY).lineTo(right, cursorY).strokeColor(dividerColor).stroke();
+      doc
+        .moveTo(left, cursorY)
+        .lineTo(right, cursorY)
+        .strokeColor(dividerColor)
+        .stroke();
       cursorY += 10;
 
       for (const item of service.items ?? []) {
         const rowTop = cursorY;
         const lineTotal = Number(item.subtotalAmount ?? 0);
-        const description = item.sourcePackageNameSnapshot ?? item.studyNameSnapshot ?? '';
+        const description =
+          item.sourcePackageNameSnapshot ?? item.studyNameSnapshot ?? '';
 
         doc
           .font('Helvetica-Bold')
           .fontSize(9)
-          .text(this.truncate(item.studyNameSnapshot ?? '', 34), colX.name, rowTop, {
-            width: 190,
-          });
+          .text(
+            this.truncate(item.studyNameSnapshot ?? '', 34),
+            colX.name,
+            rowTop,
+            {
+              width: 190,
+            },
+          );
         doc
           .font('Helvetica')
           .fontSize(6.8)
           .fillColor(blueAccent)
-          .text(`DESCRIPCION: ${this.truncate(description, 34)}`, colX.name, rowTop + 11, {
-            width: 190,
-          })
+          .text(
+            `DESCRIPCION: ${this.truncate(description, 34)}`,
+            colX.name,
+            rowTop + 11,
+            {
+              width: 190,
+            },
+          )
           .fillColor('black');
         doc
           .font('Helvetica')
@@ -796,21 +790,35 @@ export class ServicesService {
             width: 44,
             align: 'center',
           });
-        doc.text(this.formatMoney(Number(item.unitPrice ?? 0)), colX.price, rowTop + 1, {
-          width: 60,
-          align: 'right',
-        });
-        doc.text(`${Number(item.discountPercent ?? 0)} %`, colX.discount, rowTop + 1, {
-          width: 50,
-          align: 'right',
-        });
+        doc.text(
+          this.formatMoney(Number(item.unitPrice ?? 0)),
+          colX.price,
+          rowTop + 1,
+          {
+            width: 60,
+            align: 'right',
+          },
+        );
+        doc.text(
+          `${Number(item.discountPercent ?? 0)} %`,
+          colX.discount,
+          rowTop + 1,
+          {
+            width: 50,
+            align: 'right',
+          },
+        );
         doc.text(this.formatMoney(lineTotal), colX.total, rowTop + 1, {
           width: 50,
           align: 'right',
         });
 
         cursorY += 28;
-        doc.moveTo(left, cursorY).lineTo(right, cursorY).strokeColor(lightDividerColor).stroke();
+        doc
+          .moveTo(left, cursorY)
+          .lineTo(right, cursorY)
+          .strokeColor(lightDividerColor)
+          .stroke();
         cursorY += 6;
       }
 
@@ -820,14 +828,30 @@ export class ServicesService {
       const total = Number(service.totalAmount ?? 0);
       const totalsTop = Math.max(cursorY + 16, doc.page.height - 150);
 
-      doc.moveTo(355, totalsTop - 10).lineTo(right, totalsTop - 10).strokeColor(dividerColor).stroke();
+      doc
+        .moveTo(355, totalsTop - 10)
+        .lineTo(right, totalsTop - 10)
+        .strokeColor(dividerColor)
+        .stroke();
       doc.font('Helvetica').fontSize(9);
       doc.text('SUBTOTAL:', 388, totalsTop, { width: 80, align: 'right' });
-      doc.text(this.formatMoney(subtotal), 470, totalsTop, { width: 65, align: 'right' });
+      doc.text(this.formatMoney(subtotal), 470, totalsTop, {
+        width: 65,
+        align: 'right',
+      });
       doc.text('CORTESIA:', 388, totalsTop + 18, { width: 80, align: 'right' });
-      doc.text(`${courtesy} %`, 470, totalsTop + 18, { width: 65, align: 'right' });
-      doc.text('DESC. TOTAL:', 388, totalsTop + 36, { width: 80, align: 'right' });
-      doc.text(this.formatMoney(discount), 470, totalsTop + 36, { width: 65, align: 'right' });
+      doc.text(`${courtesy} %`, 470, totalsTop + 18, {
+        width: 65,
+        align: 'right',
+      });
+      doc.text('DESC. TOTAL:', 388, totalsTop + 36, {
+        width: 80,
+        align: 'right',
+      });
+      doc.text(this.formatMoney(discount), 470, totalsTop + 36, {
+        width: 65,
+        align: 'right',
+      });
       doc
         .font('Helvetica-Bold')
         .text('TOTAL:', 388, totalsTop + 58, { width: 80, align: 'right' })
@@ -853,8 +877,7 @@ export class ServicesService {
 
   private async buildTicketPdfBuffer(service: ServiceOrder): Promise<Buffer> {
     const labName = process.env.LAB_NAME ?? DEFAULT_LAB_NAME;
-    const labSubtitle =
-      process.env.LAB_SUBTITLE ?? DEFAULT_LAB_SUBTITLE;
+    const labSubtitle = process.env.LAB_SUBTITLE ?? DEFAULT_LAB_SUBTITLE;
     const labHeaderTitle =
       process.env.LAB_HEADER_TITLE ?? `${labName} ${labSubtitle}`.trim();
     const labAddress = process.env.LAB_ADDRESS ?? DEFAULT_LAB_ADDRESS;
@@ -917,10 +940,13 @@ export class ServicesService {
         });
       cursorY += 11;
       if (labAddress) {
-        doc.font('Helvetica').fontSize(5.3).text(labAddress, left, cursorY, {
-          width: right - left,
-          align: 'center',
-        });
+        doc
+          .font('Helvetica')
+          .fontSize(5.3)
+          .text(labAddress, left, cursorY, {
+            width: right - left,
+            align: 'center',
+          });
         cursorY += 8;
       }
       if (labAddress2) {
@@ -973,21 +999,36 @@ export class ServicesService {
       });
       cursorY += 12;
       doc
-        .text(`EDAD: ${this.calcAge(service.patient?.birthDate)}`, left, cursorY, {
-          width: 96,
-        })
-        .text(`SEXO: ${this.formatGenderLabel(service.patient?.gender)}`, 116, cursorY, {
-          width: 92,
-          align: 'right',
-        });
+        .text(
+          `EDAD: ${this.calcAge(service.patient?.birthDate)}`,
+          left,
+          cursorY,
+          {
+            width: 96,
+          },
+        )
+        .text(
+          `SEXO: ${this.formatGenderLabel(service.patient?.gender)}`,
+          116,
+          cursorY,
+          {
+            width: 92,
+            align: 'right',
+          },
+        );
       cursorY += 12;
       doc.text(`TEL: ${service.patient?.phone ?? 'N/D'}`, left, cursorY, {
         width: right - left,
       });
       cursorY += 12;
-      doc.text(`DIRECCION: ${service.patient?.addressLine ?? 'N/D'}`, left, cursorY, {
-        width: right - left,
-      });
+      doc.text(
+        `DIRECCION: ${service.patient?.addressLine ?? 'N/D'}`,
+        left,
+        cursorY,
+        {
+          width: right - left,
+        },
+      );
       cursorY += 12;
       doc.text(
         `ENTRE CALLES: ${service.patient?.addressBetween ?? 'N/D'}`,
@@ -996,15 +1037,30 @@ export class ServicesService {
         { width: right - left },
       );
       cursorY += 12;
-      doc.text(`FECHA DE ENTREGA: ${this.formatDate(service.deliveryAt)}`, left, cursorY, {
-        width: right - left,
-      });
+      doc.text(
+        `FECHA DE ENTREGA: ${this.formatDate(service.deliveryAt)}`,
+        left,
+        cursorY,
+        {
+          width: right - left,
+        },
+      );
       cursorY += 12;
 
-      doc.moveTo(left, cursorY).lineTo(right, cursorY).strokeColor(dividerColor).stroke();
+      doc
+        .moveTo(left, cursorY)
+        .lineTo(right, cursorY)
+        .strokeColor(dividerColor)
+        .stroke();
       cursorY += 8;
 
-      const colX = { name: left, type: 108, price: 138, discount: 167, total: 208 };
+      const colX = {
+        name: left,
+        type: 108,
+        price: 138,
+        discount: 167,
+        total: 208,
+      };
       doc
         .font('Helvetica-Bold')
         .fontSize(7.2)
@@ -1014,26 +1070,41 @@ export class ServicesService {
         .text('DESC.', colX.discount, cursorY, { width: 24, align: 'right' })
         .text('TOTAL', colX.total - 28, cursorY, { width: 28, align: 'right' });
       cursorY += 14;
-      doc.moveTo(left, cursorY).lineTo(right, cursorY).strokeColor(dividerColor).stroke();
+      doc
+        .moveTo(left, cursorY)
+        .lineTo(right, cursorY)
+        .strokeColor(dividerColor)
+        .stroke();
       cursorY += 8;
 
       for (const item of items) {
         const rowTop = cursorY;
-        const description = item.sourcePackageNameSnapshot ?? item.studyNameSnapshot ?? '';
+        const description =
+          item.sourcePackageNameSnapshot ?? item.studyNameSnapshot ?? '';
 
         doc
           .font('Helvetica-Bold')
           .fontSize(7.2)
-          .text(this.truncate(item.studyNameSnapshot ?? '', 20), colX.name, rowTop, {
-            width: 82,
-          });
+          .text(
+            this.truncate(item.studyNameSnapshot ?? '', 20),
+            colX.name,
+            rowTop,
+            {
+              width: 82,
+            },
+          );
         doc
           .font('Helvetica')
           .fontSize(5.6)
           .fillColor(blueAccent)
-          .text(`DESCRIPCION: ${this.truncate(description, 20)}`, colX.name, rowTop + 9, {
-            width: 82,
-          })
+          .text(
+            `DESCRIPCION: ${this.truncate(description, 20)}`,
+            colX.name,
+            rowTop + 9,
+            {
+              width: 82,
+            },
+          )
           .fillColor('black');
         doc
           .font('Helvetica')
@@ -1042,61 +1113,89 @@ export class ServicesService {
             width: 20,
             align: 'center',
           });
-        doc.text(this.formatMoney(Number(item.unitPrice ?? 0)), colX.price, rowTop + 2, {
-          width: 28,
-          align: 'right',
-        });
-        doc.text(`${Number(item.discountPercent ?? 0)} %`, colX.discount, rowTop + 2, {
-          width: 24,
-          align: 'right',
-        });
-        doc.text(this.formatMoney(Number(item.subtotalAmount ?? 0)), colX.total - 28, rowTop + 2, {
-          width: 28,
-          align: 'right',
-        });
+        doc.text(
+          this.formatMoney(Number(item.unitPrice ?? 0)),
+          colX.price,
+          rowTop + 2,
+          {
+            width: 28,
+            align: 'right',
+          },
+        );
+        doc.text(
+          `${Number(item.discountPercent ?? 0)} %`,
+          colX.discount,
+          rowTop + 2,
+          {
+            width: 24,
+            align: 'right',
+          },
+        );
+        doc.text(
+          this.formatMoney(Number(item.subtotalAmount ?? 0)),
+          colX.total - 28,
+          rowTop + 2,
+          {
+            width: 28,
+            align: 'right',
+          },
+        );
         cursorY += 28;
       }
 
       cursorY += 8;
-      doc.moveTo(120, cursorY).lineTo(right, cursorY).strokeColor(dividerColor).stroke();
+      doc
+        .moveTo(120, cursorY)
+        .lineTo(right, cursorY)
+        .strokeColor(dividerColor)
+        .stroke();
       cursorY += 10;
 
       doc
         .font('Helvetica')
         .fontSize(7.5)
         .text('SUBTOTAL:', 118, cursorY, { width: 52, align: 'right' })
-        .text(this.formatMoney(Number(service.subtotalAmount ?? 0)), 170, cursorY, {
+        .text(
+          this.formatMoney(Number(service.subtotalAmount ?? 0)),
+          170,
+          cursorY,
+          {
+            width: 38,
+            align: 'right',
+          },
+        );
+      cursorY += 12;
+      doc
+        .text('CORTESIA:', 118, cursorY, { width: 52, align: 'right' })
+        .text(`${Number(service.courtesyPercent ?? 0)} %`, 170, cursorY, {
           width: 38,
           align: 'right',
         });
       cursorY += 12;
-      doc.text('CORTESIA:', 118, cursorY, { width: 52, align: 'right' }).text(
-        `${Number(service.courtesyPercent ?? 0)} %`,
-        170,
-        cursorY,
-        {
-          width: 38,
-          align: 'right',
-        },
-      );
-      cursorY += 12;
-      doc.text('DESC. TOTAL:', 118, cursorY, { width: 52, align: 'right' }).text(
-        this.formatMoney(Number(service.discountAmount ?? 0)),
-        170,
-        cursorY,
-        {
-          width: 38,
-          align: 'right',
-        },
-      );
+      doc
+        .text('DESC. TOTAL:', 118, cursorY, { width: 52, align: 'right' })
+        .text(
+          this.formatMoney(Number(service.discountAmount ?? 0)),
+          170,
+          cursorY,
+          {
+            width: 38,
+            align: 'right',
+          },
+        );
       cursorY += 14;
       doc
         .font('Helvetica-Bold')
         .text('TOTAL:', 118, cursorY, { width: 52, align: 'right' })
-        .text(this.formatMoney(Number(service.totalAmount ?? 0)), 170, cursorY, {
-          width: 38,
-          align: 'right',
-        });
+        .text(
+          this.formatMoney(Number(service.totalAmount ?? 0)),
+          170,
+          cursorY,
+          {
+            width: 38,
+            align: 'right',
+          },
+        );
 
       doc.end();
     });
@@ -1108,14 +1207,20 @@ export class ServicesService {
     const patient = service.patient;
     const sampleAt = service.sampleAt ?? service.createdAt;
 
-    const studyIds = [...new Set((service.items ?? []).map((item) => item.studyId))];
+    const studyIds = [
+      ...new Set((service.items ?? []).map((item) => item.studyId)),
+    ];
     const studies = studyIds.length
       ? await this.studyRepo.findBy({ id: In(studyIds) })
       : [];
     const studyMap = new Map<number, Study>();
     studies.forEach((s) => studyMap.set(s.id, s));
 
-    const labels: Array<{ item: ServiceOrderItem; barcode: string; studyCode: string }> = [];
+    const labels: Array<{
+      item: ServiceOrderItem;
+      barcode: string;
+      studyCode: string;
+    }> = [];
     for (const item of service.items ?? []) {
       const study = studyMap.get(item.studyId);
       const studyCode = study?.code ?? String(item.studyId);
@@ -1183,16 +1288,26 @@ export class ServicesService {
         doc
           .font('Helvetica')
           .fontSize(7)
-          .text(`Sexo: ${patient?.gender ?? 'N/D'}  Edad: ${this.calcAge(patient?.birthDate)}`, x + 4, y + 24, {
-            width: labelWidth - 8,
-          });
+          .text(
+            `Sexo: ${patient?.gender ?? 'N/D'}  Edad: ${this.calcAge(patient?.birthDate)}`,
+            x + 4,
+            y + 24,
+            {
+              width: labelWidth - 8,
+            },
+          );
 
         doc
           .font('Helvetica')
           .fontSize(7)
-          .text(`Estudio: ${this.truncate(item.studyNameSnapshot ?? studyCode, 26)}`, x + 4, y + 34, {
-            width: labelWidth - 8,
-          });
+          .text(
+            `Estudio: ${this.truncate(item.studyNameSnapshot ?? studyCode, 26)}`,
+            x + 4,
+            y + 34,
+            {
+              width: labelWidth - 8,
+            },
+          );
 
         doc
           .font('Helvetica')
@@ -1287,7 +1402,9 @@ export class ServicesService {
           );
         }
 
-        const componentStudies = await this.studyRepo.findBy({ id: In(componentIds) });
+        const componentStudies = await this.studyRepo.findBy({
+          id: In(componentIds),
+        });
         if (componentStudies.length !== componentIds.length) {
           throw new NotFoundException(
             `Uno o mas estudios del paquete "${study.name}" no existen.`,
@@ -1423,15 +1540,15 @@ export class ServicesService {
     return { items, removedItemIds };
   }
 
-  /** Inferencia individual usada por el formulario antes de guardar. */
+  /**
+   * PASO 5 - USO INDIVIDUAL.
+   * El formulario llama este método antes de guardar un servicio nuevo.
+   */
   async predictOutcome(
     dto: PredictServiceOutcomeDto,
   ): Promise<PublicServiceOutcomePrediction> {
-    const dataset = await this.buildOutcomeTrainingDataset();
-
     if (!dto.deliveryAt || !dto.items?.length) {
       return this.buildUnavailableOutcomePrediction(
-        dataset,
         'Captura la fecha de entrega y al menos un estudio para consultar el pronóstico.',
       );
     }
@@ -1456,32 +1573,33 @@ export class ServicesService {
 
     if (!features) {
       return this.buildUnavailableOutcomePrediction(
-        dataset,
         'La fecha de entrega debe ser posterior al inicio de la orden para consultar el pronóstico.',
       );
     }
 
+    // Envía X al artefacto previamente entrenado.
     return (
-      this.runOutcomeModel([features], dataset)[0] ??
-      this.buildUnavailableOutcomePrediction(dataset)
+      this.runOutcomeModel([features])[0] ??
+      this.buildUnavailableOutcomePrediction()
     );
   }
 
-  /** Una sola carga y un solo entrenamiento para todas las órdenes visibles. */
+  /**
+   * PASO 5 - USO POR LOTE.
+   * La lista de servicios llama este método para pronosticar todas las órdenes
+   * pendientes o en curso usando el mismo artefacto cargado en memoria.
+   */
   async predictOutcomesBatch(serviceIds: number[]) {
     const uniqueIds = [...new Set(serviceIds)];
     if (uniqueIds.length === 0) return { predictions: [] };
 
-    const [orders, dataset] = await Promise.all([
-      this.serviceRepo.find({
-        where: {
-          id: In(uniqueIds),
-          isActive: true,
-          status: In([ServiceStatus.PENDING, ServiceStatus.IN_PROGRESS]),
-        },
-      }),
-      this.buildOutcomeTrainingDataset(),
-    ]);
+    const orders = await this.serviceRepo.find({
+      where: {
+        id: In(uniqueIds),
+        isActive: true,
+        status: In([ServiceStatus.PENDING, ServiceStatus.IN_PROGRESS]),
+      },
+    });
     const orderById = new Map(orders.map((order) => [order.id, order]));
     const featuresByServiceId = new Map<number, ServiceOutcomeFeatures>();
 
@@ -1505,7 +1623,6 @@ export class ServicesService {
       modeledIds.length > 0
         ? this.runOutcomeModel(
             modeledIds.map((id) => featuresByServiceId.get(id)!),
-            dataset,
           )
         : [];
     const predictionByServiceId = new Map(
@@ -1519,12 +1636,10 @@ export class ServicesService {
 
         if (!order) {
           prediction = this.buildUnavailableOutcomePrediction(
-            dataset,
             'El pronóstico solo se muestra en órdenes pendientes o en curso.',
           );
         } else if (!prediction) {
           prediction = this.buildUnavailableOutcomePrediction(
-            dataset,
             'La orden no tiene suficientes datos para calcular el pronóstico.',
           );
         }
@@ -1769,43 +1884,45 @@ export class ServicesService {
     }
 
     const saveService = async (folio: string) => {
-      const savedId = await this.serviceRepo.manager.transaction(async (manager) => {
-        const transactionalServiceRepo = manager.getRepository(ServiceOrder);
-        const transactionalItemRepo = manager.getRepository(ServiceOrderItem);
+      const savedId = await this.serviceRepo.manager.transaction(
+        async (manager) => {
+          const transactionalServiceRepo = manager.getRepository(ServiceOrder);
+          const transactionalItemRepo = manager.getRepository(ServiceOrderItem);
 
-        const merged = transactionalServiceRepo.merge(service, {
-          folio,
-          patientId: dto.patientId ?? service.patientId,
-          doctorId:
-            dto.doctorId !== undefined ? dto.doctorId : service.doctorId,
-          branchName: dto.branchName ?? service.branchName,
-          sampleAt: dto.sampleAt ? new Date(dto.sampleAt) : service.sampleAt,
-          deliveryAt: dto.deliveryAt
-            ? new Date(dto.deliveryAt)
-            : service.deliveryAt,
-          status: dto.status ?? service.status,
-          completedAt:
-            dto.status === ServiceStatus.COMPLETED
-              ? service.completedAt ?? new Date()
-              : dto.status
-                ? undefined
-                : service.completedAt,
-          courtesyPercent: nextCourtesyPercent,
-          subtotalAmount: subtotal,
-          discountAmount,
-          totalAmount,
-          notes: dto.notes ?? service.notes,
-          items: nextItems,
-        });
+          const merged = transactionalServiceRepo.merge(service, {
+            folio,
+            patientId: dto.patientId ?? service.patientId,
+            doctorId:
+              dto.doctorId !== undefined ? dto.doctorId : service.doctorId,
+            branchName: dto.branchName ?? service.branchName,
+            sampleAt: dto.sampleAt ? new Date(dto.sampleAt) : service.sampleAt,
+            deliveryAt: dto.deliveryAt
+              ? new Date(dto.deliveryAt)
+              : service.deliveryAt,
+            status: dto.status ?? service.status,
+            completedAt:
+              dto.status === ServiceStatus.COMPLETED
+                ? (service.completedAt ?? new Date())
+                : dto.status
+                  ? undefined
+                  : service.completedAt,
+            courtesyPercent: nextCourtesyPercent,
+            subtotalAmount: subtotal,
+            discountAmount,
+            totalAmount,
+            notes: dto.notes ?? service.notes,
+            items: nextItems,
+          });
 
-        const saved = await transactionalServiceRepo.save(merged);
+          const saved = await transactionalServiceRepo.save(merged);
 
-        if (removedItemIds.length > 0) {
-          await transactionalItemRepo.delete({ id: In(removedItemIds) });
-        }
+          if (removedItemIds.length > 0) {
+            await transactionalItemRepo.delete({ id: In(removedItemIds) });
+          }
 
-        return saved.id;
-      });
+          return saved.id;
+        },
+      );
 
       return this.findOne(savedId);
     };
@@ -1815,7 +1932,9 @@ export class ServicesService {
         return await saveService(manualFolio ?? service.folio);
       } catch (error) {
         if (this.isUniqueConstraintError(error)) {
-          throw new ConflictException('Ya existe otro servicio con este folio.');
+          throw new ConflictException(
+            'Ya existe otro servicio con este folio.',
+          );
         }
         throw error;
       }
@@ -1843,7 +1962,7 @@ export class ServicesService {
     service.status = dto.status;
     service.completedAt =
       dto.status === ServiceStatus.COMPLETED
-        ? service.completedAt ?? new Date()
+        ? (service.completedAt ?? new Date())
         : undefined;
     return this.serviceRepo.save(service);
   }

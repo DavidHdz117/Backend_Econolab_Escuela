@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 1,
+  "modelName": "econolab_study_normal_price",
+  "modelVersion": "2.0.0",
+  "generatedAt": "2026-07-22T03:53:33.319322+00:00",
+  "algorithm": "ridge_regression",
+  "hyperparameters": {
+    "alpha": 0.1
+  },
+  "target": "normal_price",
+  "rowUnit": "one_study",
+  "randomSeed": 42,
+  "dataset": {
+    "relativePath": "05_Datasets/02_regresion_estudios_dataset.csv",
+    "sha256": "616c10723d6d29d3edbf0d6e7a1a246c4e726ac5ed083cf5ca8699d6c2f6fc5d",
+    "validRows": 1048,
+    "audit": {
+      "syntheticRows": 1000,
+      "realRows": 48,
+      "syntheticFraction": 0.954198,
+      "usedAsFeature": false
+    }
+  },
+  "split": {
+    "strategy": "holdout_80_20",
+    "testFraction": 0.2,
+    "trainingSamples": 838,
+    "testSamples": 210,
+    "audit": {
+      "trainSyntheticRows": 800,
+      "trainRealRows": 38,
+      "trainSyntheticFraction": 0.954654,
+      "testSyntheticRows": 200,
+      "testRealRows": 10,
+      "testSyntheticFraction": 0.952381
+    }
+  },
+  "features": {
+    "input": [
+      "parameter_count",
+      "method"
+    ],
+    "orderedEncoded": [
+      "parameter_count_scaled",
+      "method=aglutinacion",
+      "method=automatizado",
+      "method=citometria",
+      "method=citometria / hematologia automatizada",
+      "method=coagulometria",
+      "method=colorimetria",
+      "method=cultivo",
+      "method=cultivo microbiologico",
+      "method=elisa",
+      "method=enzimatico",
+      "method=enzimatico colorimetrico",
+      "method=espectrofotometria",
+      "method=hemaglutinacion",
+      "method=impedancia",
+      "method=inmunocromatografia",
+      "method=inmunoensayo",
+      "method=inmunoturbidimetria",
+      "method=microscopia",
+      "method=pcr",
+      "method=quimioluminiscencia",
+      "method=rt-pcr",
+      "method=sin_metodo",
+      "method=tira reactiva",
+      "method=tira reactiva y microscopia"
+    ],
+    "numeric": {
+      "parameter_count": {
+        "mean": 14.889021479713604,
+        "scale": 9.062543160796794,
+        "minimum": 0,
+        "maximum": 30
+      }
+    },
+    "categorical": {
+      "method": [
+        "aglutinacion",
+        "automatizado",
+        "citometria",
+        "citometria / hematologia automatizada",
+        "coagulometria",
+        "colorimetria",
+        "cultivo",
+        "cultivo microbiologico",
+        "elisa",
+        "enzimatico",
+        "enzimatico colorimetrico",
+        "espectrofotometria",
+        "hemaglutinacion",
+        "impedancia",
+        "inmunocromatografia",
+        "inmunoensayo",
+        "inmunoturbidimetria",
+        "microscopia",
+        "pcr",
+        "quimioluminiscencia",
+        "rt-pcr",
+        "sin_metodo",
+        "tira reactiva",
+        "tira reactiva y microscopia"
+      ]
+    }
+  },
+  "coefficients": {
+    "intercept": 562.1143598980238,
+    "values": [
+      197.2110600472259,
+      -45.82154736747803,
+      -52.829658850774806,
+      38.43407665346975,
+      -52.82965885077437,
+      -15.174960876924919,
+      -62.896489504386544,
+      43.92096412245783,
+      110.80670478558837,
+      39.83625307421173,
+      -115.02657746291256,
+      -136.2977378436686,
+      -59.84336694338831,
+      -98.28420430531943,
+      -55.840967404663104,
+      -10.360070202784561,
+      3.237928229440784,
+      106.55940501347409,
+      -53.38852997746464,
+      279.44656887989413,
+      76.7371817438684,
+      327.27412751250887,
+      -116.46602248713805,
+      -43.81830454099274,
+      -107.37511339622826
+    ]
+  },
+  "metrics": {
+    "train": {
+      "mae": 20.5498,
+      "rmse": 31.3735,
+      "r2": 0.9822
+    },
+    "test": {
+      "mae": 20.7193,
+      "rmse": 26.8872,
+      "r2": 0.9851
+    },
+    "testByOrigin": {
+      "real": {
+        "samples": 10,
+        "mae": 50.271,
+        "rmse": 60.5238,
+        "r2": 0.6747
+      },
+      "synthetic": {
+        "samples": 200,
+        "mae": 19.2418,
+        "rmse": 23.9982,
+        "r2": 0.9866
+      }
+    },
+    "baselineTest": {
+      "mae": 185.2857,
+      "rmse": 221.0742,
+      "r2": -0.0049
+    }
+  },
+  "usage": {
+    "suggestionOnly": true,
+    "population": "active_individual_studies",
+    "packagesSupported": false,
+    "currency": "MXN",
+    "priceMarginSource": "test_mae"
+  }
+}

@@ -53,6 +53,7 @@ export class StudiesController {
 
   @Post('estimate')
   async estimate(@Body() dto: EstimateStudyDto) {
+    // Recibe type, method y parameterCount enviados por el formulario.
     return {
       message: 'Estimacion generada correctamente.',
       data: await this.studiesService.estimate(dto),

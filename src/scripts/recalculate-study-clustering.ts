@@ -29,6 +29,9 @@ async function main() {
   try {
     const periodMonths = periodMonthsFromArgs();
     const clusteringService = application.get(StudyClusteringService);
+
+    // PUNTO DONDE SE USA EL MODELO: este comando llama al servicio que consulta
+    // la BD, crea el dataset, ejecuta K-Means y almacena los resultados.
     const result = await clusteringService.recalculate({ periodMonths });
     process.stdout.write(
       `${JSON.stringify(
@@ -38,6 +41,9 @@ async function main() {
           technicalDetails: {
             selectedK: result.technicalDetails.selectedK,
             silhouetteScore: result.technicalDetails.silhouetteScore,
+            daviesBouldinScore:
+              result.technicalDetails.daviesBouldinScore,
+            artifact: result.technicalDetails.artifact,
           },
         },
         null,

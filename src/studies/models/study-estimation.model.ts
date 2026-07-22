@@ -1,12 +1,11 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { readFileSync } from 'node:fs';
+import { isAbsolute, resolve } from 'node:path';
+import {
+  BadRequestException,
+  Injectable,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { StudyType } from '../entities/study.entity';
-
-export type StudyEstimationTrainingRow = {
-  type: StudyType;
-  parameterCount: number;
-  method?: string;
-  normalPrice: number;
-};
 
 export type StudyEstimationInput = {
   type: StudyType;
@@ -14,51 +13,93 @@ export type StudyEstimationInput = {
   method?: string;
 };
 
-type RegressionModel = {
-  coefficients: number[];
-  meanAbsoluteError: number;
+type RegressionMetrics = {
+  mae: number;
+  rmse: number;
+  r2: number;
 };
 
-const RIDGE_PENALTY = 0.1;
-const MIN_ROWS_WITH_PARAMETERS = 5;
-const MAX_METHOD_CATEGORIES = 8;
-
-type FeatureConfig = {
-  useParameterCount: boolean;
-  methodCategories: string[];
+type StudyPriceArtifact = {
+  schemaVersion: number;
+  modelName: string;
+  modelVersion: string;
+  generatedAt: string;
+  algorithm: 'ridge_regression';
+  target: 'normal_price';
+  randomSeed: number;
+  dataset?: {
+    audit?: {
+      syntheticFraction?: number;
+    };
+  };
+  split: {
+    trainingSamples: number;
+    testSamples: number;
+  };
+  features: {
+    input: string[];
+    orderedEncoded: string[];
+    numeric: {
+      parameter_count: {
+        mean: number;
+        scale: number;
+        minimum: number;
+        maximum: number;
+      };
+    };
+    categorical: {
+      method: string[];
+    };
+  };
+  coefficients: {
+    intercept: number;
+    values: number[];
+  };
+  metrics: {
+    train: RegressionMetrics;
+    test: RegressionMetrics;
+    testByOrigin?: {
+      real?: RegressionMetrics & { samples: number };
+      synthetic?: RegressionMetrics & { samples: number };
+    };
+    baselineTest: RegressionMetrics;
+  };
 };
 
 /**
- * Modelo de regresion lineal de ECONOLAB.
+ * PASO 5: modelo de regresion utilizado por la API.
  *
- * Se entrena una regresion con el catalogo real para sugerir el precio normal.
+ * Esta clase NO entrena durante una peticion. Al iniciar Nest carga el JSON
+ * generado previamente por 06_Notebooks/02_regresion_precio_estudios.ipynb.
  */
 @Injectable()
 export class StudyEstimationModel {
-  predict(input: StudyEstimationInput, rows: StudyEstimationTrainingRow[]) {
-    const trainingRows = rows.filter(
-      (row) => Number.isFinite(row.normalPrice) && row.normalPrice > 0,
-    );
+  private artifact?: StudyPriceArtifact;
+  private artifactProblem?: string;
 
-    if (trainingRows.length < 3) {
+  constructor() {
+    this.loadArtifact();
+  }
+
+  predict(input: StudyEstimationInput) {
+    if (input.type !== StudyType.STUDY) {
       throw new BadRequestException(
-        'Se necesitan al menos 3 estudios con precio para entrenar el modelo.',
+        'La estimacion de precio solo esta disponible para estudios individuales.',
       );
     }
 
-    const featureConfig = this.buildFeatureConfig(trainingRows);
-    const features = trainingRows.map((row) =>
-      this.toFeatures(row, featureConfig),
-    );
-    const priceModel = this.fit(
-      features,
-      trainingRows.map((row) => row.normalPrice),
-    );
-    const inputFeatures = this.toFeatures(input, featureConfig);
+    const artifact = this.getArtifactOrFail();
 
-    const rawPrice = this.dot(inputFeatures, priceModel.coefficients);
+    // PASO 6A: aplicar exactamente la misma transformacion aprendida en train.
+    const encodedInput = this.encodeInput(input, artifact);
+
+    // PASO 6B: aqui se USA el modelo: intercepto + X por coeficientes.
+    // No hay fit/reentrenamiento ni consulta a BD dentro de esta peticion.
+    const rawPrice =
+      artifact.coefficients.intercept +
+      this.dot(encodedInput, artifact.coefficients.values);
     const suggestedNormalPrice = this.roundToStep(Math.max(0, rawPrice), 10);
-    const priceMargin = Math.max(10, priceModel.meanAbsoluteError);
+    const priceMargin = Math.max(10, artifact.metrics.test.mae);
 
     return {
       suggestedNormalPrice,
@@ -70,180 +111,182 @@ export class StudyEstimationModel {
         max: this.roundToStep(suggestedNormalPrice + priceMargin, 10),
       },
       model: {
-        algorithm: 'linear_regression',
-        version: '1.0',
-        trainingSamples: trainingRows.length,
-        priceMeanAbsoluteError: this.round(priceModel.meanAbsoluteError),
-        featuresUsed: [
-          'tipo',
-          ...(featureConfig.methodCategories.length > 0 ? ['metodo'] : []),
-          ...(featureConfig.useParameterCount ? ['numero_parametros'] : []),
-        ],
+        algorithm: artifact.algorithm,
+        version: artifact.modelVersion,
+        artifactGeneratedAt: artifact.generatedAt,
+        randomSeed: artifact.randomSeed,
+        trainingSamples: artifact.split.trainingSamples,
+        testSamples: artifact.split.testSamples,
+        priceMeanAbsoluteError: artifact.metrics.test.mae,
+        priceRootMeanSquaredError: artifact.metrics.test.rmse,
+        priceR2: artifact.metrics.test.r2,
+        baselineMeanAbsoluteError: artifact.metrics.baselineTest.mae,
+        featuresUsed: ['metodo', 'numero_parametros'],
       },
-      warnings: this.buildWarnings(input, trainingRows, featureConfig),
+      warnings: this.buildWarnings(input, artifact),
     };
   }
 
-  private buildFeatureConfig(
-    rows: StudyEstimationTrainingRow[],
-  ): FeatureConfig {
-    const rowsWithParameters = rows.filter((row) => row.parameterCount > 0);
-    const differentParameterCounts = new Set(
-      rowsWithParameters.map((row) => row.parameterCount),
-    );
-    const methodFrequency = new Map<string, number>();
+  private loadArtifact() {
+    const artifactPath = this.resolveArtifactPath();
 
-    for (const row of rows) {
-      const method = this.normalizeMethod(row.method);
-      if (method) {
-        methodFrequency.set(method, (methodFrequency.get(method) ?? 0) + 1);
-      }
+    try {
+      const candidate: unknown = JSON.parse(readFileSync(artifactPath, 'utf8'));
+      this.assertValidArtifact(candidate);
+      this.artifact = candidate;
+    } catch (error) {
+      this.artifact = undefined;
+      this.artifactProblem =
+        error instanceof Error ? error.message : 'contenido no valido';
+    }
+  }
+
+  private resolveArtifactPath() {
+    const configuredPath = process.env.STUDY_PRICE_MODEL_PATH?.trim();
+    if (configuredPath) {
+      return isAbsolute(configuredPath)
+        ? configuredPath
+        : resolve(process.cwd(), configuredPath);
     }
 
-    const methodCategories = [...methodFrequency.entries()]
-      .filter(([, count]) => count >= 2)
-      .sort((left, right) => right[1] - left[1])
-      .slice(0, MAX_METHOD_CATEGORIES)
-      .map(([method]) => method);
-
-    return {
-      useParameterCount:
-        rowsWithParameters.length >= MIN_ROWS_WITH_PARAMETERS &&
-        differentParameterCounts.size >= 2,
-      methodCategories,
-    };
+    // Funciona con `npm run start:dev`, Jest y `node dist/main.js`.
+    return resolve(
+      __dirname,
+      '../../../ml-artifacts/regression_price_model.json',
+    );
   }
 
-  private toFeatures(
-    input: {
-      type: StudyType;
-      parameterCount: number;
-      method?: string;
-    },
-    config: FeatureConfig,
+  private getArtifactOrFail() {
+    if (!this.artifact) {
+      throw new ServiceUnavailableException(
+        'El modelo de precio no esta disponible porque falta o es invalido el ' +
+          `artefacto JSON (${this.artifactProblem ?? 'sin detalle'}). ` +
+          'Ejecute: npm run regression:export y npm run regression:train.',
+      );
+    }
+
+    return this.artifact;
+  }
+
+  private assertValidArtifact(
+    value: unknown,
+  ): asserts value is StudyPriceArtifact {
+    const artifact = value as Partial<StudyPriceArtifact> | null;
+    const numeric = artifact?.features?.numeric?.parameter_count;
+    const methodCategories = artifact?.features?.categorical?.method;
+    const coefficients = artifact?.coefficients?.values;
+    const expectedCoefficientCount = 1 + (methodCategories?.length ?? 0);
+
+    if (
+      !artifact ||
+      artifact.schemaVersion !== 1 ||
+      typeof artifact.modelName !== 'string' ||
+      typeof artifact.modelVersion !== 'string' ||
+      typeof artifact.generatedAt !== 'string' ||
+      artifact.algorithm !== 'ridge_regression' ||
+      artifact.target !== 'normal_price' ||
+      !Number.isInteger(artifact.randomSeed) ||
+      !numeric ||
+      !this.isFiniteNumber(numeric.mean) ||
+      !this.isFiniteNumber(numeric.scale) ||
+      numeric.scale <= 0 ||
+      !this.isFiniteNumber(numeric.minimum) ||
+      !this.isFiniteNumber(numeric.maximum) ||
+      numeric.minimum > numeric.maximum ||
+      !Array.isArray(methodCategories) ||
+      methodCategories.length === 0 ||
+      !this.isFiniteNumber(artifact.coefficients?.intercept) ||
+      !Array.isArray(coefficients) ||
+      coefficients.length !== expectedCoefficientCount ||
+      !coefficients.every((coefficient) => this.isFiniteNumber(coefficient)) ||
+      !this.isValidMetrics(artifact.metrics?.test) ||
+      !this.isValidMetrics(artifact.metrics?.baselineTest) ||
+      !Number.isInteger(artifact.split?.trainingSamples) ||
+      (artifact.split?.trainingSamples ?? 0) < 1 ||
+      !Number.isInteger(artifact.split?.testSamples) ||
+      (artifact.split?.testSamples ?? 0) < 1
+    ) {
+      throw new Error('la estructura o los coeficientes no son validos');
+    }
+  }
+
+  private encodeInput(
+    input: StudyEstimationInput,
+    artifact: StudyPriceArtifact,
   ) {
-    const method = this.normalizeMethod(input.method);
+    const numeric = artifact.features.numeric.parameter_count;
+    const normalizedMethod = this.normalizeCategory(input.method, 'sin_metodo');
 
     return [
-      1,
-      input.type === StudyType.PACKAGE ? 1 : 0,
-      input.type === StudyType.OTHER ? 1 : 0,
-      ...(config.useParameterCount ? [input.parameterCount] : []),
-      ...config.methodCategories.map((category) =>
-        method === category ? 1 : 0,
+      (input.parameterCount - numeric.mean) / numeric.scale,
+      ...artifact.features.categorical.method.map((category) =>
+        normalizedMethod === category ? 1 : 0,
       ),
     ];
   }
 
-  private fit(features: number[][], targets: number[]): RegressionModel {
-    const featureCount = features[0].length;
-    const matrix = Array.from({ length: featureCount }, () =>
-      Array(featureCount).fill(0),
-    );
-    const vector = Array(featureCount).fill(0);
+  private buildWarnings(
+    input: StudyEstimationInput,
+    artifact: StudyPriceArtifact,
+  ) {
+    const warnings: string[] = [];
+    const numeric = artifact.features.numeric.parameter_count;
+    const method = this.normalizeCategory(input.method, 'sin_metodo');
 
-    for (let row = 0; row < features.length; row += 1) {
-      for (let i = 0; i < featureCount; i += 1) {
-        vector[i] += features[row][i] * targets[row];
-        for (let j = 0; j < featureCount; j += 1) {
-          matrix[i][j] += features[row][i] * features[row][j];
-        }
-      }
+    const syntheticFraction = artifact.dataset?.audit?.syntheticFraction;
+    const realMetrics = artifact.metrics.testByOrigin?.real;
+    if (
+      typeof syntheticFraction === 'number' &&
+      syntheticFraction >= 0.8
+    ) {
+      const realEvaluation = realMetrics
+        ? ` En ${realMetrics.samples} estudios reales de prueba, el MAE fue $${realMetrics.mae.toFixed(2)} MXN.`
+        : '';
+      warnings.push(
+        `Prototipo académico: ${(syntheticFraction * 100).toFixed(2)} % del dataset es demostrativo.${realEvaluation} Confirma el precio antes de guardar.`,
+      );
     }
 
-    // Una penalizacion pequena evita errores cuando una columna tiene pocos datos.
-    for (let i = 1; i < featureCount; i += 1) {
-      matrix[i][i] += RIDGE_PENALTY;
+    if (!artifact.features.categorical.method.includes(method)) {
+      warnings.push(
+        'El metodo no aparecio en entrenamiento; se calculo con la referencia general.',
+      );
     }
 
-    const coefficients = this.solve(matrix, vector);
-    const meanAbsoluteError =
-      features.reduce(
-        (total, row, index) =>
-          total + Math.abs(targets[index] - this.dot(row, coefficients)),
-        0,
-      ) / features.length;
+    if (
+      input.parameterCount < numeric.minimum ||
+      input.parameterCount > numeric.maximum
+    ) {
+      warnings.push(
+        `El numero de parametros esta fuera del rango entrenado (${numeric.minimum}-${numeric.maximum}).`,
+      );
+    }
 
-    return { coefficients, meanAbsoluteError };
+    return warnings;
   }
 
-  /** Resuelve el sistema de ecuaciones del modelo con eliminacion de Gauss. */
-  private solve(matrix: number[][], vector: number[]) {
-    const featureCount = matrix.length;
-    const augmented = matrix.map((row, index) => [...row, vector[index]]);
-
-    for (let column = 0; column < featureCount; column += 1) {
-      let pivotRow = column;
-      for (let row = column + 1; row < featureCount; row += 1) {
-        if (
-          Math.abs(augmented[row][column]) >
-          Math.abs(augmented[pivotRow][column])
-        ) {
-          pivotRow = row;
-        }
-      }
-
-      [augmented[column], augmented[pivotRow]] = [
-        augmented[pivotRow],
-        augmented[column],
-      ];
-
-      const pivot = augmented[column][column] || Number.EPSILON;
-      for (let value = column; value <= featureCount; value += 1) {
-        augmented[column][value] /= pivot;
-      }
-
-      for (let row = 0; row < featureCount; row += 1) {
-        if (row === column) continue;
-        const factor = augmented[row][column];
-        for (let value = column; value <= featureCount; value += 1) {
-          augmented[row][value] -= factor * augmented[column][value];
-        }
-      }
-    }
-
-    return augmented.map((row) => row[featureCount]);
-  }
-
-  private normalizeMethod(value?: string) {
-    return (value ?? '')
+  private normalizeCategory(value: string | undefined, fallback: string) {
+    const normalized = (value ?? '')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .trim()
       .toLowerCase()
       .replace(/\s+/g, ' ');
+    return normalized || fallback;
   }
 
-  private buildWarnings(
-    input: StudyEstimationInput,
-    rows: StudyEstimationTrainingRow[],
-    config: FeatureConfig,
-  ) {
-    const warnings: string[] = [];
+  private isValidMetrics(value: unknown): value is RegressionMetrics {
+    const metrics = value as Partial<RegressionMetrics> | null;
+    return Boolean(
+      metrics &&
+        this.isFiniteNumber(metrics.mae) &&
+        this.isFiniteNumber(metrics.rmse) &&
+        this.isFiniteNumber(metrics.r2),
+    );
+  }
 
-    if (!config.useParameterCount) {
-      warnings.push(
-        'El numero de parametros se activara cuando existan al menos 5 estudios con parametros capturados.',
-      );
-    }
-
-    if (!rows.some((row) => row.type === input.type)) {
-      warnings.push(
-        'No existen ejemplos historicos de este tipo; la estimacion usa el promedio disponible.',
-      );
-    }
-
-    const normalizedInputMethod = this.normalizeMethod(input.method);
-    if (
-      normalizedInputMethod &&
-      !config.methodCategories.includes(normalizedInputMethod)
-    ) {
-      warnings.push(
-        'El metodo capturado tiene pocos ejemplos historicos; se uso la referencia general del catalogo.',
-      );
-    }
-
-    return warnings;
+  private isFiniteNumber(value: unknown): value is number {
+    return typeof value === 'number' && Number.isFinite(value);
   }
 
   private dot(left: number[], right: number[]) {
@@ -255,9 +298,5 @@ export class StudyEstimationModel {
 
   private roundToStep(value: number, step: number) {
     return Math.round(value / step) * step;
-  }
-
-  private round(value: number) {
-    return Math.round(value * 100) / 100;
   }
 }

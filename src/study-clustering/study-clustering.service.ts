@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { createHash } from 'crypto';
 import { In, Repository } from 'typeorm';
 import {
   ServiceOrderItem,
@@ -29,6 +30,7 @@ import {
   StudyClusteringRunStatus,
 } from './entities/study-clustering-run.entity';
 import {
+  StudyClusteringArtifact,
   StudyClusteringModel,
   StudyClusteringRow,
 } from './models/study-clustering.model';
@@ -37,10 +39,34 @@ import {
   StoredClusteringFinding,
 } from './study-clustering.contract';
 
-type RequestCountRow = { studyId: string; requestCount: string };
+type RequestCountRow = {
+  studyId: string;
+  requestCount: string;
+  syntheticRequestCount: string;
+};
+type StudyRequestCounts = {
+  requestCount: number;
+  syntheticRequestCount: number;
+};
+type StoredStudyClusteringArtifact = StudyClusteringArtifact & {
+  generatedAt: string;
+  trainingPeriod: { start: string; end: string; months: number };
+  datasetFingerprintSha256: string;
+  datasetComposition: {
+    totalRows: number;
+    realRows: number;
+    syntheticRows: number;
+    syntheticPercentage: number;
+    totalRequestCount: number;
+    syntheticRequestCount: number;
+    syntheticRequestPercentage: number;
+  };
+};
 
 const INTERNAL_MAX_K = 6;
 const PROFILE_NAME_PLACEHOLDER = '{profileName}';
+const CLASSIFICATION_DEMO_FOLIO_PATTERN = 'ECO-ML-%';
+const SYNTHETIC_CATALOG_CODE_PATTERN = /^ECN-CAT-/i;
 
 @Injectable()
 export class StudyClusteringService {
@@ -76,10 +102,74 @@ export class StudyClusteringService {
     return this.getStoredAnalysis(latestRun);
   }
 
-  /** Proceso interno: calcula K-Means con datos reales y persiste una fotografia. */
-  async recalculate(dto: RecalculateStudyClusteringDto) {
+  /**
+   * ETL REPRODUCIBLE PARA LA ENTREGA.
+   * El script clustering:export usa este mismo metodo que alimenta al backend;
+   * asi el CSV y el artefacto no dependen de transformaciones manuales.
+   */
+  async buildReproducibilityBundle(periodMonths = 6, periodEnd = new Date()) {
+    if (
+      !Number.isInteger(periodMonths) ||
+      periodMonths < 1 ||
+      periodMonths > 24
+    ) {
+      throw new BadRequestException(
+        'El periodo de clustering debe estar entre 1 y 24 meses.',
+      );
+    }
+    if (Number.isNaN(periodEnd.getTime())) {
+      throw new BadRequestException('La fecha de corte no es valida.');
+    }
+    const periodStart = this.getPeriodStart(periodEnd, periodMonths);
+    const dataset = await this.buildOperationalDataset(periodStart, periodEnd);
+    const result = this.clusteringModel.analyze(dataset, {
+      maxK: INTERNAL_MAX_K,
+    });
+    const artifact = this.enrichArtifact(
+      result.artifact,
+      dataset,
+      periodStart,
+      periodEnd,
+      periodMonths,
+    );
+    return {
+      metadata: {
+        generatedAt: periodEnd.toISOString(),
+        periodStart: periodStart.toISOString(),
+        periodEnd: periodEnd.toISOString(),
+        periodMonths,
+        unitOfAnalysis: 'Un estudio individual activo del catalogo ECONOLAB',
+        datasetFingerprintSha256: artifact.datasetFingerprintSha256,
+        composition: artifact.datasetComposition,
+        sources: this.dataSources(),
+        exclusions: [
+          'Paquetes, estudios inactivos o suspendidos',
+          'MLTRAIN y registros marcados como DATOS SINTETICOS',
+          'Ordenes canceladas para calcular request_count',
+        ],
+      },
+      dataset,
+      artifact,
+      evaluation: {
+        selectedK: result.model.selectedK,
+        elbowK: result.model.elbowK,
+        silhouetteScore: result.model.silhouetteScore,
+        daviesBouldinScore: result.model.daviesBouldinScore,
+        inertia: result.model.inertia,
+        alternatives: result.evaluations,
+      },
+      profiles: result.profiles,
+      dataQuality: result.dataQuality,
+      warnings: result.warnings,
+    };
+  }
+
+  /** Proceso interno: calcula K-Means y persiste una fotografia verificable. */
+  async recalculate(
+    dto: RecalculateStudyClusteringDto,
+    periodEnd = new Date(),
+  ) {
     const periodMonths = dto.periodMonths ?? 6;
-    const periodEnd = new Date();
     const periodStart = this.getPeriodStart(periodEnd, periodMonths);
     const run = await this.runRepo.save(
       this.runRepo.create({
@@ -100,7 +190,7 @@ export class StudyClusteringService {
         profileCount: 0,
         outlierCount: 0,
         algorithm: 'kmeans',
-        modelVersion: '2.0',
+        modelVersion: '2.1',
         evaluations: [],
         featureNames: [],
         excludedFeatures: [],
@@ -114,15 +204,29 @@ export class StudyClusteringService {
     );
 
     try {
+      // PASO 1: consultar la BD y construir el dataset (una fila por estudio).
       const dataset = await this.buildOperationalDataset(
         periodStart,
         periodEnd,
       );
+
+      // PASOS 2 A 4: limpiar, codificar, estandarizar y entrenar K-Means.
+      // El modelo esta en models/study-clustering.model.ts.
       const result = this.clusteringModel.analyze(dataset, {
         maxK: INTERNAL_MAX_K,
       });
+      // ARTEFACTO: conserva medianas, escalado, one-hot y centroides en JSONB.
+      // getStoredAnalysis lo carga y lo usa para volver a asignar cada estudio.
+      const modelArtifact = this.enrichArtifact(
+        result.artifact,
+        dataset,
+        periodStart,
+        periodEnd,
+        periodMonths,
+      );
       const originalRows = new Map(dataset.map((row) => [row.studyId, row]));
 
+      // PASO 5: guardar la ejecucion, los perfiles y el cluster de cada estudio.
       await this.runRepo.manager.transaction(async (manager) => {
         const runRepository = manager.getRepository(StudyClusteringRun);
         const profileRepository = manager.getRepository(StudyClusteringProfile);
@@ -132,6 +236,7 @@ export class StudyClusteringService {
 
         Object.assign(run, {
           status: StudyClusteringRunStatus.COMPLETED,
+          includeSynthetic: modelArtifact.datasetComposition.syntheticRows > 0,
           selectedK: result.model.selectedK,
           elbowK: result.model.elbowK,
           selectionMethod: result.model.selectionMethod,
@@ -142,11 +247,15 @@ export class StudyClusteringService {
           outlierCount: result.studies.filter((study) => study.isOutlier)
             .length,
           algorithm: result.model.algorithm,
-          modelVersion: '2.0',
+          modelVersion: '2.1',
           evaluations: result.evaluations,
           featureNames: result.model.featureNames,
           excludedFeatures: result.dataQuality.ignoredConstantFeatures,
-          dataQuality: result.dataQuality,
+          dataQuality: {
+            ...result.dataQuality,
+            modelArtifact,
+            datasetFingerprintSha256: modelArtifact.datasetFingerprintSha256,
+          },
           warnings: result.warnings,
           sources: this.dataSources(),
           interpretationThresholds: result.interpretationThresholds,
@@ -176,6 +285,7 @@ export class StudyClusteringService {
               sampleTypes: profile.sampleTypes,
               analysisMethods: profile.analysisMethods,
               clusterNumber: profile.cluster,
+              suggestedAction: profile.suggestedAction,
             },
           }),
         );
@@ -201,7 +311,7 @@ export class StudyClusteringService {
             distanceToCentroid: study.distanceToCentroid,
             outlierScore: study.outlierScore,
             isOutlier: study.isOutlier,
-            isSynthetic: false,
+            isSynthetic: study.isSynthetic,
             // La interfaz recibe los datos originales, no los imputados del vector.
             values: this.originalValues(original),
           });
@@ -293,6 +403,8 @@ export class StudyClusteringService {
       );
     }
 
+    // USO DEL MODELO: la pantalla no vuelve a entrenar. Lee la ultima
+    // fotografia almacenada de perfiles y asignaciones generada por K-Means.
     const [profiles, assignments] = await Promise.all([
       this.profileRepo.find({
         where: { runId: run.id },
@@ -306,6 +418,68 @@ export class StudyClusteringService {
     const profileMap = new Map(
       profiles.map((profile) => [profile.id, profile]),
     );
+    const profileByCluster = new Map(
+      profiles.map((profile) => [profile.clusterNumber, profile]),
+    );
+    const artifactCandidate = run.dataQuality?.modelArtifact;
+    const artifact =
+      typeof this.clusteringModel.isCompatibleArtifact === 'function' &&
+      this.clusteringModel.isCompatibleArtifact(artifactCandidate)
+        ? artifactCandidate
+        : null;
+    let artifactMismatches = 0;
+    const returnedStudies = assignments.map((assignment) => {
+      const storedProfile = profileMap.get(assignment.profileId);
+      if (!storedProfile) {
+        throw new Error(
+          `La asignacion ${assignment.id} no tiene un perfil almacenado.`,
+        );
+      }
+
+      // CARGA Y USO DEL ARTEFACTO: vuelve a preparar la fila con los parametros
+      // guardados y calcula el centroide mas cercano, sin reentrenar K-Means.
+      const reapplied = artifact
+        ? this.clusteringModel.assignFromArtifact(
+            this.assignmentAsModelRow(assignment),
+            artifact,
+          )
+        : null;
+      const profile = reapplied
+        ? profileByCluster.get(reapplied.cluster)
+        : storedProfile;
+      if (!profile) {
+        throw new Error(
+          `El artefacto asigno un cluster inexistente al estudio ${assignment.studyId}.`,
+        );
+      }
+      if (reapplied && profile.id !== storedProfile.id) {
+        artifactMismatches += 1;
+      }
+      return {
+        studyId: assignment.studyId,
+        code: assignment.studyCodeSnapshot,
+        name: assignment.studyNameSnapshot,
+        profileId: profile.id,
+        profileDisplayName: profile.displayName,
+        isOutlier: reapplied?.isOutlier ?? assignment.isOutlier,
+        isSynthetic: assignment.isSynthetic,
+        assignmentSource: reapplied
+          ? ('stored_model_artifact' as const)
+          : ('stored_assignment' as const),
+        values: assignment.values,
+      };
+    });
+    const selectedEvaluation = run.evaluations.find(
+      (evaluation) =>
+        evaluation.isSelected === true || evaluation.k === run.selectedK,
+    );
+    const daviesBouldinScore =
+      typeof selectedEvaluation?.daviesBouldin === 'number'
+        ? selectedEvaluation.daviesBouldin
+        : null;
+    const { modelArtifact: hiddenArtifact, ...publicDataQuality } =
+      run.dataQuality;
+    void hiddenArtifact;
 
     return {
       run: {
@@ -322,6 +496,10 @@ export class StudyClusteringService {
         displayName: profile.displayName,
         shortDescription: profile.shortDescription,
         keyCharacteristics: profile.keyCharacteristics,
+        suggestedAction:
+          typeof profile.technicalDetails?.suggestedAction === 'string'
+            ? profile.technicalDetails.suggestedAction
+            : 'Revisar periodicamente los indicadores administrativos de este segmento.',
         studyCount: profile.studyCount,
         percentage: profile.percentage,
         averages: profile.averages,
@@ -330,23 +508,7 @@ export class StudyClusteringService {
         specialProcessingPercentage: profile.specialProcessingPercentage,
         outlierCount: profile.outlierCount,
       })),
-      studies: assignments.map((assignment) => {
-        const profile = profileMap.get(assignment.profileId);
-        if (!profile) {
-          throw new Error(
-            `La asignacion ${assignment.id} no tiene un perfil almacenado.`,
-          );
-        }
-        return {
-          studyId: assignment.studyId,
-          code: assignment.studyCodeSnapshot,
-          name: assignment.studyNameSnapshot,
-          profileId: assignment.profileId,
-          profileDisplayName: profile.displayName,
-          isOutlier: assignment.isOutlier,
-          values: assignment.values,
-        };
-      }),
+      studies: returnedStudies,
       findings: this.renderFindings(run.findings, profileMap),
       technicalDetails: {
         algorithm: run.algorithm,
@@ -355,18 +517,38 @@ export class StudyClusteringService {
         elbowK: run.elbowK,
         selectionMethod: run.selectionMethod,
         silhouetteScore: run.silhouetteScore,
+        daviesBouldinScore,
         inertia: run.inertia,
         evaluations: run.evaluations,
         featureNames: run.featureNames,
         excludedFeatures: run.excludedFeatures,
         interpretationThresholds: run.interpretationThresholds,
-        dataQuality: run.dataQuality,
+        dataQuality: publicDataQuality,
+        artifact: {
+          storage: 'operativo.study_clustering_runs.data_quality.modelArtifact',
+          loaded: artifact != null,
+          schemaVersion: artifact?.schemaVersion ?? null,
+          datasetFingerprintSha256:
+            typeof run.dataQuality.datasetFingerprintSha256 === 'string'
+              ? run.dataQuality.datasetFingerprintSha256
+              : null,
+          reassignedStudies: artifact ? assignments.length : 0,
+          mismatchesWithStoredAssignments: artifactMismatches,
+        },
         warnings: run.warnings,
       },
     };
   }
 
+  /**
+   * PASO 1 - CONSULTA Y DATASET.
+   * TypeORM convierte estas consultas en SELECT sobre studies, study_details y
+   * service_order_items. El resultado final tiene una fila por cada estudio.
+   */
   private async buildOperationalDataset(periodStart: Date, periodEnd: Date) {
+    // CONSULTA 1: estudios individuales y activos del catalogo.
+    // ECN-CAT-* se conserva porque forma parte de la BD, pero se marca como
+    // sintetico para reportar su proporcion; esa bandera NO entra a K-Means.
     const studies = (
       await this.studyRepo.find({
         where: {
@@ -387,27 +569,39 @@ export class StudyClusteringService {
       this.loadActualRequestCounts(periodStart, periodEnd),
     ]);
 
-    return studies.map<StudyClusteringRow>((study) => ({
-      studyId: study.id,
-      code: study.code,
-      name: study.name,
-      price: Number(study.normalPrice),
-      deliveryHours: Number(study.durationMinutes) / 60,
-      parameterCount: parameterCounts.get(study.id) ?? null,
-      requestCount: requestCounts.get(study.id) ?? 0,
-      sampleType:
-        study.sampleType === StudySampleType.UNKNOWN
-          ? null
-          : (study.sampleType ?? null),
-      analysisMethod: study.method?.trim() || null,
-      requiresSpecialProcessing: study.requiresSpecialProcessing ?? null,
-      isSynthetic: false,
-    }));
+    // CREACION DEL DATASET: cada objeto es una fila y cada propiedad es una
+    // columna. studyId, code y name solo identifican el resultado; el modelo
+    // no los incluye entre sus variables de entrenamiento.
+    return studies.map<StudyClusteringRow>((study) => {
+      const demand = requestCounts.get(study.id);
+      return {
+        studyId: study.id,
+        code: study.code,
+        name: study.name,
+        price: Number(study.normalPrice),
+        deliveryHours: Number(study.durationMinutes) / 60,
+        parameterCount: parameterCounts.get(study.id) ?? null,
+        requestCount: demand?.requestCount ?? 0,
+        // Auditoria: permite medir cuanto de requestCount procede de ECO-ML.
+        // Esta columna no forma parte de las variables codificadas por el modelo.
+        syntheticRequestCount: demand?.syntheticRequestCount ?? 0,
+        sampleType:
+          study.sampleType === StudySampleType.UNKNOWN
+            ? null
+            : (study.sampleType ?? null),
+        analysisMethod: study.method?.trim() || null,
+        requiresSpecialProcessing: study.requiresSpecialProcessing ?? null,
+        isSynthetic: SYNTHETIC_CATALOG_CODE_PATTERN.test(
+          study.code?.trim() ?? '',
+        ),
+      };
+    });
   }
 
   private async loadParameterCounts(studyIds: number[]) {
     const counts = new Map<number, number>();
     if (studyIds.length === 0) return counts;
+    // CONSULTA 2: cuenta los parametros activos incluidos en cada estudio.
     const details = await this.detailRepo.find({
       where: {
         studyId: In(studyIds),
@@ -423,23 +617,132 @@ export class StudyClusteringService {
   }
 
   private async loadActualRequestCounts(periodStart: Date, periodEnd: Date) {
+    // CONSULTA 3: suma cuantas veces se solicito cada estudio en el periodo.
+    // Se excluyen ordenes canceladas porque no representan demanda atendida.
+    // ECO-ML se incluye para que el historial demostrativo tenga trazabilidad
+    // desde la BD. Su aporte se cuenta aparte y se informa como sintetico.
     const rows = await this.serviceOrderItemRepo
       .createQueryBuilder('item')
       .innerJoin('item.serviceOrder', 'serviceOrder')
       .select('item.studyId', 'studyId')
       .addSelect('COALESCE(SUM(item.quantity), 0)', 'requestCount')
+      .addSelect(
+        `COALESCE(SUM(CASE WHEN serviceOrder.folio LIKE :demoFolioPattern THEN item.quantity ELSE 0 END), 0)`,
+        'syntheticRequestCount',
+      )
       .where('serviceOrder.createdAt >= :periodStart', { periodStart })
       .andWhere('serviceOrder.createdAt <= :periodEnd', { periodEnd })
       .andWhere('serviceOrder.isActive = true')
       .andWhere('serviceOrder.status != :cancelled', {
         cancelled: ServiceStatus.CANCELLED,
       })
+      .setParameter('demoFolioPattern', CLASSIFICATION_DEMO_FOLIO_PATTERN)
       .groupBy('item.studyId')
       .getRawMany<RequestCountRow>();
 
-    return new Map(
-      rows.map((row) => [Number(row.studyId), Number(row.requestCount)]),
+    return new Map<number, StudyRequestCounts>(
+      rows.map((row) => [
+        Number(row.studyId),
+        {
+          requestCount: Number(row.requestCount),
+          syntheticRequestCount: Number(row.syntheticRequestCount),
+        },
+      ]),
     );
+  }
+
+  private enrichArtifact(
+    artifact: StudyClusteringArtifact,
+    dataset: StudyClusteringRow[],
+    periodStart: Date,
+    periodEnd: Date,
+    periodMonths: number,
+  ): StoredStudyClusteringArtifact {
+    const syntheticRows = dataset.filter((row) => row.isSynthetic).length;
+    const totalRequestCount = dataset.reduce(
+      (sum, row) => sum + Number(row.requestCount ?? 0),
+      0,
+    );
+    const syntheticRequestCount = dataset.reduce(
+      (sum, row) => sum + Number(row.syntheticRequestCount ?? 0),
+      0,
+    );
+    return {
+      ...artifact,
+      generatedAt: periodEnd.toISOString(),
+      trainingPeriod: {
+        start: periodStart.toISOString(),
+        end: periodEnd.toISOString(),
+        months: periodMonths,
+      },
+      datasetFingerprintSha256: this.datasetFingerprint(dataset),
+      datasetComposition: {
+        totalRows: dataset.length,
+        realRows: dataset.length - syntheticRows,
+        syntheticRows,
+        syntheticPercentage: Number(
+          ((syntheticRows / Math.max(dataset.length, 1)) * 100).toFixed(2),
+        ),
+        totalRequestCount,
+        syntheticRequestCount,
+        syntheticRequestPercentage: Number(
+          (
+            (syntheticRequestCount / Math.max(totalRequestCount, 1)) *
+            100
+          ).toFixed(2),
+        ),
+      },
+    };
+  }
+
+  /** Huella para demostrar que CSV, libreta y ejecucion web usan las mismas filas. */
+  private datasetFingerprint(dataset: StudyClusteringRow[]) {
+    const canonicalRows = [...dataset]
+      .sort((left, right) => left.studyId - right.studyId)
+      .map((row) => ({
+        studyId: row.studyId,
+        code: row.code,
+        name: row.name,
+        price: row.price,
+        deliveryHours: row.deliveryHours,
+        parameterCount: row.parameterCount,
+        requestCount: row.requestCount,
+        syntheticRequestCount: row.syntheticRequestCount ?? 0,
+        sampleType: row.sampleType,
+        analysisMethod: row.analysisMethod,
+        requiresSpecialProcessing: row.requiresSpecialProcessing,
+        isSynthetic: row.isSynthetic === true,
+      }));
+    return createHash('sha256')
+      .update(JSON.stringify(canonicalRows), 'utf8')
+      .digest('hex');
+  }
+
+  private assignmentAsModelRow(
+    assignment: StudyClusteringAssignment,
+  ): StudyClusteringRow {
+    const values = assignment.values;
+    const numberOrNull = (value: unknown) =>
+      typeof value === 'number' && Number.isFinite(value) ? value : null;
+    const stringOrNull = (value: unknown) =>
+      typeof value === 'string' ? value : null;
+    return {
+      studyId: assignment.studyId,
+      code: assignment.studyCodeSnapshot,
+      name: assignment.studyNameSnapshot,
+      price: numberOrNull(values.price),
+      deliveryHours: numberOrNull(values.deliveryHours),
+      parameterCount: numberOrNull(values.parameterCount),
+      requestCount: numberOrNull(values.requestCount),
+      syntheticRequestCount: numberOrNull(values.syntheticRequestCount),
+      sampleType: stringOrNull(values.sampleType),
+      analysisMethod: stringOrNull(values.analysisMethod),
+      requiresSpecialProcessing:
+        typeof values.requiresSpecialProcessing === 'boolean'
+          ? values.requiresSpecialProcessing
+          : null,
+      isSynthetic: assignment.isSynthetic,
+    };
   }
 
   private originalValues(row: StudyClusteringRow) {
@@ -448,6 +751,7 @@ export class StudyClusteringService {
       deliveryHours: row.deliveryHours,
       parameterCount: row.parameterCount,
       requestCount: row.requestCount,
+      syntheticRequestCount: row.syntheticRequestCount ?? 0,
       sampleType: row.sampleType,
       analysisMethod: row.analysisMethod,
       requiresSpecialProcessing: row.requiresSpecialProcessing,
@@ -511,9 +815,13 @@ export class StudyClusteringService {
       deliveryHours: 'operativo.studies.durationMinutes / 60',
       parameterCount: 'operativo.study_details',
       requestCount: 'operativo.service_order_items + operativo.service_orders',
+      syntheticRequestCount:
+        "misma fuente; SUM(quantity) cuando folio LIKE 'ECO-ML-%' (solo auditoria)",
       sampleType: 'operativo.studies.sampleType',
       analysisMethod: 'operativo.studies.method',
       requiresSpecialProcessing: 'operativo.studies.requiresSpecialProcessing',
+      isSynthetic:
+        "operativo.studies.code LIKE 'ECN-CAT-%' (solo auditoria; no entra al modelo)",
     };
   }
 

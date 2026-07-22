@@ -168,6 +168,8 @@ describe('StudyClusteringModel', () => {
       const evaluation = result.evaluations[index];
       expect(Number.isFinite(evaluation.inertia)).toBe(true);
       expect(Number.isFinite(evaluation.silhouette)).toBe(true);
+      expect(Number.isFinite(evaluation.daviesBouldin)).toBe(true);
+      expect(evaluation.daviesBouldin).toBeGreaterThanOrEqual(0);
       expect(evaluation.silhouette).toBeGreaterThanOrEqual(-1);
       expect(evaluation.silhouette).toBeLessThanOrEqual(1);
 
@@ -177,6 +179,42 @@ describe('StudyClusteringModel', () => {
         );
       }
     }
+    expect(Number.isFinite(result.model.daviesBouldinScore)).toBe(true);
+  });
+
+  it('guarda un artefacto determinista que reasigna las mismas filas', () => {
+    const model = new StudyClusteringModel();
+    const rows = buildThreeClearGroups();
+    const result = model.analyze(rows, { requestedK: 3 });
+    const expectedAssignments = assignmentMap(result);
+
+    expect(result.artifact.randomSeed).toBe(20260721);
+    expect(result.artifact.featureNames).toEqual(result.model.featureNames);
+    expect(result.artifact.clusters).toHaveLength(3);
+    expect(model.isCompatibleArtifact(result.artifact)).toBe(true);
+    expect(result.profiles.every((profile) => profile.suggestedAction)).toBe(
+      true,
+    );
+    for (const row of rows) {
+      expect(model.assignFromArtifact(row, result.artifact).cluster).toBe(
+        expectedAssignments.get(row.studyId),
+      );
+    }
+  });
+
+  it('reporta por separado las filas reales y sinteticas sin usar la bandera como variable', () => {
+    const model = new StudyClusteringModel();
+    const rows = buildThreeClearGroups().map((row, index) => ({
+      ...row,
+      isSynthetic: index < 10,
+    }));
+    const result = model.analyze(rows, { requestedK: 3 });
+
+    expect(result.dataQuality.realRows).toBe(5);
+    expect(result.dataQuality.syntheticRows).toBe(10);
+    expect(result.dataQuality.syntheticPercentage).toBe(66.67);
+    expect(result.model.featureNames).not.toContain('isSynthetic');
+    expect(result.warnings.join(' ')).toContain('ECN-CAT');
   });
 
   it('limpia duplicados, imputa nulos y soporta variables constantes sin NaN', () => {

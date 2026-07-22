@@ -15,6 +15,7 @@ import { StudyEstimationModel } from './models/study-estimation.model';
     PublicStudiesController,
     PublicBrandController,
   ],
+  // Aqui Nest registra la clase del modelo para poder usarla en StudiesService.
   providers: [StudiesService, StudyEstimationModel],
   exports: [StudiesService],
 })
