@@ -44,7 +44,7 @@ request_counts AS (
       SUM(
         CASE
           WHEN service.folio LIKE 'ECO-ML-%' THEN item.quantity
-          ELSE 0
+          ELSE 0 
         END
       ),
       0
