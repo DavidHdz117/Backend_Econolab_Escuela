@@ -1,0 +1,17 @@
+{
+  "validatedAt": "2026-07-21T21:33:00-06:00",
+  "method": "restauracion en esquema temporal aislado y eliminacion posterior",
+  "restored": true,
+  "analyticTables": 8,
+  "personalTables": 0,
+  "etlRows": {
+    "regression": 1048,
+    "classificationExtracted": 523,
+    "classificationAccepted": 512,
+    "clustering": 1048
+  },
+  "checks": {
+    "classificationRealFoliosPseudonymized": true,
+    "temporarySchemaRemoved": true
+  }
+}

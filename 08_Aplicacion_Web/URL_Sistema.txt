@@ -1,0 +1,3 @@
+Ejecución local: http://localhost:5173
+API local: http://localhost:3000/api
+Consultar README.md en la raíz para instalar y ejecutar.

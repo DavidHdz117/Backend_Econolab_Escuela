@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Reporte práctico de Machine Learning — ECONOLAB</title>
+  <style>
+    @page { size: A4; margin: 2cm 1.8cm 2cm 1.8cm; }
+    body { color: #202124; font-family: Aptos, Arial, sans-serif; font-size: 10.5pt; line-height: 1.38; }
+    h1 { color: #a80000; font-size: 21pt; margin: 22pt 0 9pt; page-break-after: avoid; }
+    h2 { color: #a80000; border-bottom: 2px solid #a80000; font-size: 16pt; margin: 18pt 0 8pt; page-break-after: avoid; }
+    h3 { color: #111; font-size: 13pt; margin: 14pt 0 6pt; page-break-after: avoid; }
+    h4 { color: #444; font-size: 11pt; margin: 11pt 0 5pt; page-break-after: avoid; }
+    p { margin: 4pt 0 8pt; text-align: justify; }
+    ul, ol { margin: 4pt 0 9pt 20pt; }
+    li { margin-bottom: 3pt; }
+    table { border-collapse: collapse; width: 100%; margin: 8pt 0 12pt; font-size: 8.7pt; page-break-inside: auto; }
+    th { background: #a80000; color: white; padding: 5pt; border: 1px solid #6e0000; text-align: left; }
+    td { border: 1px solid #b8b8b8; padding: 4.5pt; vertical-align: top; }
+    tr { page-break-inside: avoid; }
+    code { color: #8c0000; font-family: Consolas, monospace; font-size: 8.5pt; }
+    pre { background: #111; color: #fff; border-left: 5px solid #d00000; padding: 9pt; white-space: pre-wrap; font-size: 8.2pt; }
+    figure { margin: 10pt auto 14pt; text-align: center; page-break-inside: avoid; }
+    figure img { max-width: 92%; max-height: 15.5cm; height: auto; }
+    figcaption { color: #555; font-size: 8.5pt; margin-top: 4pt; }
+    .cover { min-height: 24cm; text-align: center; page-break-after: always; }
+    .cover img { width: 8.2cm; margin: 25pt auto 35pt; }
+    .cover h1 { font-size: 28pt; border: 0; margin-top: 12pt; }
+    .cover h2 { border: 0; color: #222; font-size: 18pt; }
+    .cover table { width: 82%; margin: 30pt auto 10pt; font-size: 10pt; }
+    .cover th { width: 34%; }
+    .page-break { page-break-before: always; }
+    .callout { background: #f6f6f6; border-left: 5px solid #a80000; padding: 9pt 11pt; margin: 10pt 0; page-break-inside: avoid; }
+    .warning { background: #fff4f4; border: 1px solid #d00000; padding: 9pt 11pt; margin: 10pt 0; }
+    .success { background: #f3f8f3; border-left: 5px solid #2d6a38; padding: 9pt 11pt; margin: 10pt 0; }
+    .flow td { text-align: center; vertical-align: middle; font-weight: 600; padding: 10pt 5pt; }
+    .flow .arrow { border: 0; color: #a80000; font-size: 18pt; width: 5%; }
+    .small { font-size: 8.3pt; color: #555; }
+    .center { text-align: center; }
+    .pending { border: 2px dashed #a80000; background: #fff7f7; color: #6b0000; min-height: 85pt; padding: 18pt 10pt; margin: 8pt; text-align: center; page-break-inside: avoid; }
+    .figure-grid { width: 100%; page-break-inside: avoid; }
+    .figure-grid figure, .figure-grid .pending { display: inline-block; width: 43%; vertical-align: top; }
+    .metric { font-size: 15pt; font-weight: 700; color: #a80000; }
+    .toc a { color: #222; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <img src="../frontend/public/econolab-brand.png" alt="ECONOLAB">
+    <h1>Proyecto final de extracción de conocimiento en bases de datos</h1>
+    <h2>Integración práctica de tres modelos de Machine Learning en ECONOLAB</h2>
+    <p class="center"><strong>Empresa:</strong> ECONOLAB · Laboratorio de análisis clínicos</p>
+    <table>
+      <tr><th>Grupo</th><td>{{GRUPO}}</td></tr>
+      <tr><th>Equipo</th><td>{{EQUIPO}}</td></tr>
+      <tr><th>Integrante 1</th><td>{{INTEGRANTE_1}} — {{MATRICULA_1}}</td></tr>
+      <tr><th>Integrante 2</th><td>{{INTEGRANTE_2}} — {{MATRICULA_2}}</td></tr>
+      <tr><th>Asignatura</th><td>Extracción de conocimiento en bases de datos</td></tr>
+      <tr><th>Docente</th><td>Dr. Efrén Juárez Castillo</td></tr>
+      <tr><th>Fecha</th><td>{{FECHA}}</td></tr>
+    </table>
+    <p class="small center">Reporte de la parte práctica, organizado con CRISP-DM.</p>
+  </section>
+
+  <h1>Índice</h1>
+  <ol class="toc">
+    <li>Introducción, alcance y objetivos</li>
+    <li>Arquitectura, base de datos, volumen y privacidad</li>
+    <li>Solución 1: clustering operativo de estudios</li>
+    <li>Solución 2: regresión para sugerir precio</li>
+    <li>Solución 3: clasificación del resultado de una orden</li>
+    <li>Arquitectura de integración web</li>
+    <li>Reproducibilidad y orden de ejecución</li>
+    <li>Evidencias funcionales</li>
+    <li>Resultados globales, limitaciones y mejoras</li>
+    <li>Conclusiones y bibliografía</li>
+    <li>Anexos técnicos y trazabilidad</li>
+  </ol>
+
+  <div class="callout">
+    <strong>Lectura honesta de los resultados.</strong> Las tres funciones son
+    reales y reproducibles, pero la mayoría de las observaciones actuales son
+    sintéticas y están identificadas. Las métricas demuestran el ciclo técnico;
+    no constituyen validación clínica ni garantía de desempeño productivo.
+  </div>
+
+  <h1>1. Introducción, alcance y objetivos</h1>
+
+  <p>ECONOLAB administra un catálogo de estudios y órdenes de servicio en una
+  aplicación web. La base permite registrar características del estudio,
+  parámetros, precios, tiempos, solicitudes, importes y estados de las órdenes.
+  Este proyecto convierte esos datos en tres apoyos administrativos diferentes:
+  segmentación del catálogo, sugerencia de precio y pronóstico del resultado de
+  una orden. Ninguna salida crea diagnósticos, categorías médicas o decisiones
+  clínicas.</p>
+
+  <h2>1.1 Objetivo general</h2>
+
+  <p>Integrar en ECONOLAB soluciones analíticas reproducibles que partan de su
+  propia base PostgreSQL, documenten el recorrido de cada dato, generen y
+  evalúen artefactos versionados y ejecuten inferencia real desde el backend y
+  las pantallas del sistema.</p>
+
+  <h2>1.2 Objetivos específicos</h2>
+
+  <ol>
+    <li>Agrupar estudios semejantes por variables económicas y operativas para
+    comparar perfiles y localizar valores atípicos.</li>
+    <li>Estimar un precio normal orientativo al registrar un estudio individual
+    con base en método y cantidad de parámetros.</li>
+    <li>Pronosticar, antes de guardar una orden, si probablemente concluirá a
+    tiempo, se retrasará o será cancelada.</li>
+    <li>Conservar la separación entre ETL, entrenamiento, evaluación, artefacto
+    e inferencia para que cada resultado sea verificable.</li>
+  </ol>
+
+  <h2>1.3 Alcance práctico</h2>
+
+  <p>La rúbrica requiere al menos dos tipos de análisis; se entregan tres:
+  clustering, regresión y clasificación. El diseño general de inventarios,
+  pacientes, resultados clínicos u otros módulos no se evalúa ni se describe
+  salvo cuando participa directamente en una entrada analítica.</p>
+
+  <h1 class="page-break">2. Arquitectura, base de datos, volumen y privacidad</h1>
+
+  <h2>2.1 Recorrido general de los datos</h2>
+
+  <table class="flow">
+    <tr>
+      <td>PostgreSQL<br><span class="small">tablas `operativo`</span></td>
+      <td class="arrow">→</td>
+      <td>SQL + exportadores<br><span class="small">04_ETL</span></td>
+      <td class="arrow">→</td>
+      <td>CSV auditables<br><span class="small">05_Datasets</span></td>
+      <td class="arrow">→</td>
+      <td>Notebook CRISP-DM<br><span class="small">06_Notebooks</span></td>
+    </tr>
+    <tr>
+      <td>Interfaz Next.js</td>
+      <td class="arrow">←</td>
+      <td>API NestJS</td>
+      <td class="arrow">←</td>
+      <td>Artefacto versionado<br><span class="small">07_Modelos</span></td>
+      <td class="arrow">←</td>
+      <td>Entrenamiento y evaluación</td>
+    </tr>
+  </table>
+
+  <p>Las flechas inferiores representan inferencia: el backend carga el
+  artefacto y aplica sus parámetros. Una petición web no vuelve a entrenar ni
+  devuelve una respuesta escrita directamente en el código.</p>
+
+  <h2>2.2 Esquema relacional utilizado</h2>
+
+  <table class="flow">
+    <tr>
+      <td><strong>studies</strong><br>PK id<br>catálogo, precio, duración, muestra y método</td>
+      <td class="arrow">1 → N</td>
+      <td><strong>study_details</strong><br>FK study_id<br>parámetros del estudio</td>
+    </tr>
+    <tr>
+      <td><strong>service_orders</strong><br>PK id<br>fechas, estado, sucursal e importes</td>
+      <td class="arrow">1 → N</td>
+      <td><strong>service_order_items</strong><br>FK service_order_id y study_id<br>estudios, cantidades y tarifas</td>
+    </tr>
+  </table>
+
+  <p>El respaldo analítico contiene únicamente esas cuatro tablas. Se omiten
+  pacientes, médicos, usuarios, notas y datos de contacto. Los folios reales se
+  sustituyen de forma determinista por <code>ECO-REAL-&lt;id&gt;</code>, por lo que
+  el proceso se puede reconstruir sin identificar personas.</p>
+
+  <h2>2.3 Volumen comprobado</h2>
+
+  <table>
+    <tr><th>Fuente</th><th>Filas en el respaldo</th><th>Uso</th></tr>
+    <tr><td><code>studies</code></td><td>{{SOURCE_STUDIES}}</td><td>Regresión y clustering; catálogo, no se usa para inflar el requisito transaccional.</td></tr>
+    <tr><td><code>study_details</code></td><td>{{SOURCE_DETAILS}}</td><td>Conteo de parámetros por estudio.</td></tr>
+    <tr><td><code>service_orders</code></td><td>{{SOURCE_ORDERS}}</td><td>Órdenes históricas y resultados.</td></tr>
+    <tr><td><code>service_order_items</code></td><td>{{SOURCE_ITEMS}}</td><td>Movimientos de estudios dentro de órdenes.</td></tr>
+    <tr><th>Total de filas fuente</th><th>{{SOURCE_TOTAL}}</th><th>Respaldo analítico.</th></tr>
+    <tr><th>Registros operativos útiles</th><th>{{OPERATIONAL_ROWS}}</th><th>Órdenes + ítems; supera el mínimo de 2,000.</th></tr>
+  </table>
+
+  <h2>2.4 Datos sintéticos reproducibles</h2>
+
+  <p>La operación real todavía es insuficiente. Por ello se incluyeron dos
+  scripts idempotentes con fecha y reglas deterministas: 1,000 estudios
+  <code>ECN-CAT-*</code> y 500 órdenes <code>ECO-ML-*</code> relacionadas con
+  registros existentes. Los precios, métodos, parámetros, estados y tiempos
+  presentan traslape y ruido determinista; la clase no se obtiene mediante una
+  regla perfecta. La marca <code>is_synthetic</code> se conserva solo para
+  auditoría y jamás entra como X.</p>
+
+  <div class="warning">
+    Regresión y clustering contienen 1,000 de 1,048 estudios sintéticos
+    (95.42%). Clasificación contiene 500 de 512 órdenes sintéticas (97.66%).
+    Antes de uso productivo se debe acumular historia real, volver a entrenar y
+    evaluar por origen y periodo.
+  </div>
+
+  <h1 class="page-break">3. Solución 1 — Clustering operativo de estudios</h1>
+
+  <h2>3.1 CRISP-DM: comprensión del negocio</h2>
+
+  <table>
+    <tr><th>Elemento</th><th>Definición</th></tr>
+    <tr><td>Nombre</td><td>Segmentación operativa del catálogo de estudios.</td></tr>
+    <tr><td>Tipo</td><td>Clustering no supervisado con K-Means.</td></tr>
+    <tr><td>Necesidad</td><td>Comparar conjuntamente precio, entrega, complejidad y demanda; las categorías médicas no resuelven esa necesidad administrativa.</td></tr>
+    <tr><td>Pregunta</td><td>¿Qué segmentos operativos aparecen entre los estudios individuales activos y cuáles se alejan de su propio segmento?</td></tr>
+    <tr><td>Unidad</td><td>Un estudio individual activo en la fecha de corte.</td></tr>
+    <tr><td>Salida</td><td>Cluster, perfil promedio, nombre, acción administrativa e indicador de atípico.</td></tr>
+    <tr><td>Datos de origen</td><td><code>operativo.studies</code>, <code>study_details</code>, <code>service_orders</code> y <code>service_order_items</code>.</td></tr>
+    <tr><td>Usuario y pantalla</td><td>Administrador del catálogo en <code>/admin/clustering</code>.</td></tr>
+    <tr><td>Decisión</td><td>Priorizar revisiones de precio, capacidad y entrega; no modificar automáticamente el catálogo.</td></tr>
+    <tr><td>Beneficio esperado</td><td>Convertir una revisión fila por fila en perfiles comparables y una cola priorizada de estudios atípicos.</td></tr>
+    <tr><td>Criterio de utilidad</td><td>Reducir tiempo de revisión, documentar decisiones sobre atípicos y conservar perfiles interpretables al recalcular con datos reales.</td></tr>
+    <tr><td>Riesgo</td><td>Un grupo débil puede priorizar comparaciones poco útiles. La pantalla declara la calidad y exige revisión humana.</td></tr>
+  </table>
+
+  <h2>3.2 CRISP-DM: comprensión de los datos</h2>
+
+  <p>El dataset contiene <strong>{{CLUSTER_ROWS}} estudios</strong> y representa
+  solicitudes entre {{CLUSTER_PERIOD_START}} y {{CLUSTER_PERIOD_END}}. El EDA
+  revisa estadísticos, cardinalidad, nulos, duplicados, cobertura de categorías
+  y atípicos. La demanda suma 962 unidades; 930 proceden del lote demostrativo,
+  dato que se muestra por separado.</p>
+
+  {{FIG_CLUSTER_NUMERIC}}
+
+  <p><strong>Interpretación:</strong> precio, tiempo y parámetros tienen escalas
+  distintas, por lo que usar distancia euclidiana sin estandarizar haría que una
+  variable dominara. La demanda es muy asimétrica y mayoritariamente sintética;
+  se conserva por su sentido operativo, pero se advierte en el módulo.</p>
+
+  <h3>Verificación fuente → dataset</h3>
+
+  <table>
+    <tr><th>Control</th><th>Antes</th><th>Después / decisión</th></tr>
+    <tr><td>Filas</td><td>1,057 estudios en respaldo.</td><td>1,048 elegibles tras filtrar estudios individuales activos; 1,048 utilizables y 0 descartados dentro del modelo.</td></tr>
+    <tr><td>Dimensión final</td><td>Cuatro tablas relacionales.</td><td>1,048 × 12; una fila por estudio.</td></tr>
+    <tr><td>Duplicados</td><td>Se valida <code>study_id</code>.</td><td>0 duplicados.</td></tr>
+    <tr><td>Nulos</td><td>47 en parámetros (4.48%), 42 en muestra/proceso (4.01%) y 1 en método (0.10%).</td><td>Mediana/moda o categoría desconocida dentro del pipeline; se conservan los conteos.</td></tr>
+    <tr><td>Valores extremos</td><td>Rangos originales visibles en CSV/notebook.</td><td>21 precios, 14 tiempos y 5 demandas se winsorizan solo en X; el valor visible no se altera.</td></tr>
+    <tr><td>Tipos/validaciones</td><td>Numéricos, texto y booleano de PostgreSQL.</td><td>Double/entero, one-hot y 0/1; se rechazan precios/tiempos imposibles. La muestra antes/después está en el notebook.</td></tr>
+  </table>
+
+  <h3>Cinco renglones explicados</h3>
+
+  <table>
+    <tr><th>Estudio</th><th>Lectura de negocio del renglón</th></tr>
+    <tr><td>GLU-001</td><td>$110, 1 hora y 5 solicitudes; una es demostrativa. Los faltantes categóricos se imputan únicamente en el preprocesamiento.</td></tr>
+    <tr><td>BH01</td><td>$180, 0.5 horas, 3 solicitudes y método automatizado; combina entrega rápida con demanda observada.</td></tr>
+    <tr><td>QS06</td><td>$220, 0.75 horas y cero solicitudes en el periodo; cero es un conteo válido, no un nulo.</td></tr>
+    <tr><td>QS12</td><td>$350, 1 hora y 4 solicitudes, dos demostrativas, con espectrofotometría.</td></tr>
+    <tr><td>GLU01</td><td>$80, 0.25 horas y 5 solicitudes, una demostrativa, con método enzimático.</td></tr>
+  </table>
+
+  <h2>3.3 CRISP-DM: preparación de los datos</h2>
+
+  <p>El SQL filtra estudios individuales activos, cuenta parámetros por
+  <code>study_id</code> y agrega ítems de órdenes activas no canceladas dentro
+  del corte. Se elimina un duplicado si comparte ID, se validan rangos y se
+  imputan nulos numéricos con mediana. Los extremos se limitan a percentiles 1
+  y 99 solo dentro del vector, las variables numéricas se estandarizan con
+  z-score y las categorías se codifican one-hot. Código, nombre, ID, origen
+  sintético y demanda sintética no entran a K-Means.</p>
+
+  <h2>3.4 CRISP-DM: modelado y fundamento</h2>
+
+  <p>K-Means asigna cada observación al centroide más cercano y actualiza los
+  centroides para minimizar la suma de cuadrados dentro de los grupos [2]. Es
+  adecuado para una primera segmentación operativa porque produce asignaciones
+  simples, centroides reutilizables y perfiles comparables. Sus limitaciones son
+  la sensibilidad a escala, inicialización, valores extremos y formas no
+  esféricas. Por eso se fijó la semilla 20260721, se usan múltiples
+  inicializaciones, escalado y una comparación de <em>k</em>=2…6.</p>
+
+  <table>
+    <tr><th>k</th><th>Inercia</th><th>Silueta</th><th>Davies–Bouldin</th><th>Grupo mínimo</th><th>Seleccionado</th></tr>
+    {{CLUSTER_ALTERNATIVE_ROWS}}
+  </table>
+
+  {{FIG_CLUSTER_K}}
+
+  <p>La gráfica de referencia en scikit-learn y la implementación del backend
+  seleccionan el mismo <em>k</em>. Las cifras oficiales son las del artefacto
+  JSONB utilizado por el sistema, mostradas en la tabla anterior.</p>
+
+  <h2>3.5 CRISP-DM: evaluación</h2>
+
+  <p>Se seleccionó <strong>k={{CLUSTER_K}}</strong>. La silueta es
+  <span class="metric">{{CLUSTER_SILHOUETTE}}</span> (mayor es mejor) y
+  Davies–Bouldin es <span class="metric">{{CLUSTER_DB}}</span> (menor es
+  mejor) [3][4]. La silueta modesta indica solapamiento y obliga a interpretar
+  el resultado como prototipo, no como separación natural definitiva.</p>
+
+  <table>
+    <tr><th>Cluster</th><th>Nombre interpretable</th><th>Estudios</th><th>Precio promedio</th><th>Horas</th><th>Parámetros</th><th>Solicitudes</th><th>Atípicos</th></tr>
+    {{CLUSTER_PROFILE_ROWS}}
+  </table>
+
+  <p>El grupo accesible sugiere monitorear volumen y existencias mínimas. El
+  grupo de mayor costo y entrega prolongada requiere revisar equipo, reactivos
+  y compromisos de entrega. Se detectaron {{CLUSTER_OUTLIERS}} atípicos; son una
+  cola de revisión, no errores automáticos.</p>
+
+  <h2>3.6 CRISP-DM: despliegue</h2>
+
+  <p>El artefacto contiene medianas, límites, categorías, escalas, centroides y
+  umbrales de atípicos. Se persiste en
+  <code>study_clustering_runs.data_quality.modelArtifact</code>. El endpoint
+  <code>GET /study-clustering/analysis</code> carga la ejecución completada y
+  reasigna las 1,048 filas con el artefacto: cero discrepancias con la
+  fotografía almacenada. La pantalla permite comparar perfiles, buscar estudios
+  y filtrar atípicos. El recálculo es una acción administrativa separada.</p>
+
+  <h1 class="page-break">4. Solución 2 — Regresión para sugerir precio</h1>
+
+  <h2>4.1 CRISP-DM: comprensión del negocio</h2>
+
+  <table>
+    <tr><th>Elemento</th><th>Definición</th></tr>
+    <tr><td>Nombre</td><td>Estimación administrativa del precio de un estudio.</td></tr>
+    <tr><td>Tipo</td><td>Regresión supervisada Ridge.</td></tr>
+    <tr><td>Necesidad</td><td>Dar al administrador una referencia consistente al crear un estudio, sin reemplazar costos ni políticas comerciales.</td></tr>
+    <tr><td>Pregunta</td><td>¿Qué precio normal en MXN conviene sugerir para un estudio individual según su método y número de parámetros?</td></tr>
+    <tr><td>Unidad y Y</td><td>Un estudio individual activo; precio normal histórico continuo en MXN.</td></tr>
+    <tr><td>Datos de origen</td><td><code>operativo.studies</code> y <code>operativo.study_details</code>.</td></tr>
+    <tr><td>Usuario y pantalla</td><td>Administrador, dentro del formulario Agregar estudio.</td></tr>
+    <tr><td>Decisión</td><td>Aceptar la sugerencia o capturar otro precio tras revisar costos.</td></tr>
+    <tr><td>Beneficio esperado</td><td>Reducir tiempo e inconsistencia al capturar precios mediante una referencia inmediata, trazable y editable.</td></tr>
+    <tr><td>Criterio de utilidad</td><td>Superar el baseline promedio en un holdout real y reducir al menos 20% su MAE, sujeto al umbral comercial que apruebe ECONOLAB.</td></tr>
+    <tr><td>Riesgo</td><td>Sobreestimar reduce demanda; subestimar reduce margen. Nunca se guarda automáticamente.</td></tr>
+  </table>
+
+  <h2>4.2 CRISP-DM: comprensión de los datos</h2>
+
+  <p>Se exportó un snapshot de {{REG_ROWS}} estudios el {{REG_SNAPSHOT}}. No es
+  una serie temporal porque no existe una fecha de observación por estudio.
+  Contiene 48 filas reales y 1,000 demostrativas. Después de normalizar el
+  método existen 24 categorías. <code>parameter_count</code> cubre valores 0–30,
+  sin atípicos según 1.5×IQR ni variables cuasi constantes en el conjunto total.</p>
+
+  {{FIG_REG_EDA}}
+
+  <div class="warning">
+    El EDA encontró que 47 de los 48 estudios reales tienen cero parámetros
+    activos en <code>study_details</code>, mientras los sintéticos cubren 1–30.
+    No se inventaron parámetros ni se ocultó el problema. Antes de producción
+    debe completarse esa captura y reentrenarse con mayor cobertura real.
+  </div>
+
+  <h3>Verificación fuente → dataset</h3>
+
+  <table>
+    <tr><th>Control</th><th>Antes</th><th>Después / decisión</th></tr>
+    <tr><td>Filas</td><td>1,057 estudios en respaldo.</td><td>1,048 estudios individuales activos con precio positivo; 0 descartes adicionales.</td></tr>
+    <tr><td>Dimensión final</td><td><code>studies</code> + detalle uno-a-muchos.</td><td>1,048 × 8; train {{REG_TRAIN}} y test {{REG_TEST}}.</td></tr>
+    <tr><td>Duplicados/nulos</td><td>Se agrupa detalle por ID y se normaliza método.</td><td>0 IDs duplicados y 0 nulos en el CSV final.</td></tr>
+    <tr><td>Atípicos/baja variabilidad</td><td>Parámetros 0–30; Q1=7, Q3=23.</td><td>0 atípicos por 1.5×IQR y ninguna X cuasi constante; 47/48 reales con cero se conserva como limitación.</td></tr>
+    <tr><td>Tipos/validaciones</td><td>Precio numeric, método text y detalles relacionales.</td><td>Y decimal en MXN, conteo entero y categoría; se excluyen paquetes/precios no positivos. El notebook muestra antes/después.</td></tr>
+  </table>
+
+  <h3>Cinco renglones explicados</h3>
+
+  <table>
+    <tr><th>Estudio</th><th>Lectura de negocio del renglón</th></tr>
+    <tr><td>GLU-001</td><td>Estudio real de glucosa, método faltante normalizado a <code>SIN_METODO</code>, cero parámetros activos y precio histórico de $110.</td></tr>
+    <tr><td>BH01</td><td>Biometría hemática real, método automatizado, cero parámetros capturados y Y=$180.</td></tr>
+    <tr><td>QS06</td><td>Espectrofotometría, cero parámetros activos y Y=$220; el nombre “6 elementos” no entra como atajo.</td></tr>
+    <tr><td>QS12</td><td>Mismo método que QS06 pero Y=$350, evidencia de que el método por sí solo no determina el precio.</td></tr>
+    <tr><td>GLU01</td><td>Glucosa enzimática a $80; código y nombre solo permiten auditar la predicción.</td></tr>
+  </table>
+
+  <h2>4.3 CRISP-DM: preparación de los datos</h2>
+
+  <p>El SQL une <code>studies.id</code> con el conteo de parámetros activos de
+  <code>study_details.study_id</code>, filtra <code>type='study'</code>, estado
+  activo y precio positivo, y normaliza el método faltante. X contiene solo
+  <code>parameter_count</code> y <code>method</code>; Y es
+  <code>normal_price</code>. ID, código, nombre, tipo y procedencia sintética
+  quedan para auditoría. La división fija es {{REG_TRAIN}} train y {{REG_TEST}}
+  test, sin intersección. Imputación, media/escala y one-hot se ajustan solo con
+  train.</p>
+
+  <h2>4.4 CRISP-DM: modelado y fundamento</h2>
+
+  <p>Ridge es regresión lineal con penalización L2: minimiza el error cuadrático
+  más α por la suma de coeficientes al cuadrado [5]. La penalización estabiliza
+  coeficientes cuando hay varias categorías one-hot y evita depender en exceso
+  de una categoría pequeña. Se usa α=0.10 y semilla 42. El baseline aprende
+  únicamente el precio promedio de train.</p>
+
+  <h2>4.5 CRISP-DM: evaluación</h2>
+
+  <table>
+    <tr><th>Evaluación</th><th>MAE (MXN)</th><th>RMSE (MXN)</th><th>R²</th></tr>
+    <tr><td>Ridge — test global</td><td>{{REG_MAE}}</td><td>{{REG_RMSE}}</td><td>{{REG_R2}}</td></tr>
+    <tr><td>Ridge — test real</td><td>{{REG_REAL_MAE}}</td><td>{{REG_REAL_RMSE}}</td><td>{{REG_REAL_R2}}</td></tr>
+    <tr><td>Baseline — test</td><td>{{REG_BASE_MAE}}</td><td>{{REG_BASE_RMSE}}</td><td>{{REG_BASE_R2}}</td></tr>
+  </table>
+
+  <p>MAE se interpreta directamente en pesos; RMSE castiga más los errores
+  grandes; R² expresa variación explicada [5]. El modelo supera ampliamente el
+  baseline en el conjunto actual, pero el MAE real es mayor que el global. El
+  residuo medio global es −3.06 MXN, el percentil 90 del error absoluto es
+  42.56 MXN y el peor caso es 121.35 MXN. Por ello la UI muestra advertencia,
+  rango y edición manual.</p>
+
+  {{FIG_REG_ACTUAL}}
+  {{FIG_REG_RESIDUALS}}
+
+  <h2>4.6 CRISP-DM: despliegue</h2>
+
+  <p>El notebook guarda categorías, media, escala, coeficientes, intercepto,
+  métricas, semilla y hash en <code>regression_price_model.json</code>. NestJS
+  lo carga al iniciar <code>StudyEstimationModel</code>. El formulario envía
+  <code>{type, method, parameterCount}</code> a
+  <code>POST /studies/estimate</code>; la respuesta incluye precio, rango,
+  métricas y advertencias. Un paquete genera 400 y un artefacto inválido 503.
+  La salida se copia al formulario solo cuando el usuario pulsa “Usar precio
+  sugerido”.</p>
+
+  <h1 class="page-break">5. Solución 3 — Clasificación del resultado de una orden</h1>
+
+  <h2>5.1 CRISP-DM: comprensión del negocio</h2>
+
+  <table>
+    <tr><th>Elemento</th><th>Definición</th></tr>
+    <tr><td>Nombre</td><td>Pronóstico administrativo del resultado de una orden.</td></tr>
+    <tr><td>Tipo</td><td>Clasificación multiclase con regresión logística multinomial.</td></tr>
+    <tr><td>Necesidad</td><td>Identificar riesgo operativo antes de guardar la orden, cuando todavía se puede revisar plazo y capacidad.</td></tr>
+    <tr><td>Pregunta</td><td>¿La orden probablemente concluirá a tiempo, se retrasará o será cancelada con la información disponible al registrarla?</td></tr>
+    <tr><td>Unidad y Y</td><td>Una orden histórica con resultado final; clases <code>completed_on_time</code>, <code>delayed</code> y <code>cancelled</code>.</td></tr>
+    <tr><td>Datos de origen</td><td><code>operativo.service_orders</code> y <code>operativo.service_order_items</code>.</td></tr>
+    <tr><td>Usuario y pantalla</td><td>Personal que registra servicios y responsable operativo, en el formulario y el listado de órdenes activas.</td></tr>
+    <tr><td>Decisión</td><td>Revisar plazo/capacidad o comunicar preventivamente; no cambiar estado ni rechazar la orden.</td></tr>
+    <tr><td>Beneficio esperado</td><td>Añadir una alerta preventiva donde antes solo existía seguimiento posterior y medir anticipaciones útiles.</td></tr>
+    <tr><td>Criterio de utilidad</td><td>Superar la clase mayoritaria en macro-F1 sobre un periodo posterior y lograr recall de riesgo útil sin saturar con falsas alertas.</td></tr>
+    <tr><td>Riesgo</td><td>Un falso “a tiempo” omite una intervención; una falsa alerta consume tiempo. Se muestran probabilidades y revisión humana.</td></tr>
+  </table>
+
+  <h2>5.2 CRISP-DM: comprensión de los datos</h2>
+
+  <p>El ETL extrajo {{CLASS_EXTRACTED}} órdenes elegibles entre {{CLASS_PERIOD_START}} y
+  {{CLASS_PERIOD_END}}. De las filas extraídas se aceptaron {{CLASS_ROWS}} y se
+  rechazaron {{CLASS_REJECTED}} por no tener un resultado histórico válido u
+  otra regla de calidad. El balance completo es {{CLASS_COMPLETED}} a tiempo,
+  {{CLASS_DELAYED}} retrasadas y {{CLASS_CANCELLED}} canceladas. No hay IDs
+  duplicados.</p>
+
+  <h3>Verificación fuente → dataset</h3>
+
+  <table>
+    <tr><th>Control</th><th>Antes</th><th>Después / decisión</th></tr>
+    <tr><td>Filas</td><td>528 órdenes en respaldo; {{CLASS_EXTRACTED}} llegan al SQL analítico.</td><td>{{CLASS_ROWS}} aceptadas y {{CLASS_REJECTED}} rechazadas por no tener Y determinable.</td></tr>
+    <tr><td>Dimensión final</td><td>Órdenes + 1,784 ítems.</td><td>{{CLASS_ROWS}} × 19; train {{CLASS_TRAIN}} y test {{CLASS_TEST}}.</td></tr>
+    <tr><td>Duplicados</td><td>Se agrega por <code>service_order_id</code>.</td><td>0 IDs duplicados y traslape train/test 0.</td></tr>
+    <tr><td>Nulos</td><td>En extracción, 11 outcomes y 1 grupo de agregados no válidos.</td><td>Las 11 filas sin clase se rechazan; el CSV limpio no tiene nulos en las X usadas.</td></tr>
+    <tr><td>Atípicos/baja variabilidad</td><td>El reporte calcula IQR y proporción dominante de cada candidata.</td><td>Extremos válidos se conservan; <code>package_component_count</code> se excluye por 99.61% de ceros.</td></tr>
+    <tr><td>Tipos/validaciones</td><td>Timestamps, numeric, texto e ítems relacionales.</td><td>ISO para auditoría, double/entero, one-hot y clase; se rechazan plazo no positivo, ítems faltantes o valores inválidos. El notebook muestra antes/después.</td></tr>
+  </table>
+
+  {{FIG_CLASS_EDA}}
+  {{FIG_CLASS_PERIODS}}
+
+  <p><strong>Interpretación:</strong> el EDA compara distribución, cardinalidad,
+  baja variabilidad y límites IQR de todas las X. Las variables monetarias están
+  relacionadas pero representan descuentos y magnitud disponibles antes del
+  alta. La procedencia sintética se audita y no se ofrece al clasificador. Los
+  extremos plausibles no se eliminan automáticamente; se documentan porque
+  pueden representar órdenes de alto volumen.</p>
+
+  <h3>Cinco renglones explicados</h3>
+
+  <table>
+    <tr><th>Orden seudonimizada</th><th>Lectura de negocio del renglón</th></tr>
+    <tr><td>ECO-REAL-000003</td><td>24 horas prometidas, un estudio, $180 y sucursal Centro; Y retrasada se deriva después, de estado/fechas.</td></tr>
+    <tr><td>ECO-REAL-000005</td><td>Misma holgura y volumen, $90 y sucursal Norte; termina retrasada.</td></tr>
+    <tr><td>ECO-REAL-000007</td><td>Un estudio por $120 en Sur; sucursal y monto sí estaban disponibles al registrar.</td></tr>
+    <tr><td>ECO-REAL-000010</td><td>Un estudio por $90 en Centro; el folio original nunca aparece en el CSV.</td></tr>
+    <tr><td>ECO-REAL-000012</td><td>Un estudio por $150 en Sur; Y entrena/evalúa, pero nunca se solicita al pronosticar.</td></tr>
+  </table>
+
+  <h2>5.3 CRISP-DM: preparación de los datos</h2>
+
+  <p>El SQL agrupa ítems por <code>service_order_id</code>, calcula plazo
+  prometido, hora/día de registro, cantidades, estudios distintos, componentes
+  de paquete, importes y tarifa dominante. La clase se deriva de
+  <code>status</code>, <code>completedAt</code> y <code>deliveryAt</code> solo
+  después del evento. Esos campos, así como IDs, folios y
+  <code>updatedAt</code>, nunca entran a X. La validación usa
+  <strong>{{CLASS_SPLIT}}</strong>: {{CLASS_TRAIN}} órdenes anteriores para train
+  y las {{CLASS_TEST}} más recientes para test, sin intersección. Imputación,
+  escalado, categorías y pesos se aprenden exclusivamente de train.</p>
+
+  <p><code>package_component_count</code> permanece en el CSV para trazabilidad,
+  pero se elimina del vector porque 99.61% de train tiene el mismo valor. Esta
+  regla evita conservar una variable sin variabilidad suficiente.</p>
+
+  <h2>5.4 CRISP-DM: modelado y fundamento</h2>
+
+  <p>La regresión logística multinomial calcula un puntaje lineal por clase y
+  transforma los puntajes con softmax para obtener probabilidades que suman uno
+  [5][6]. Se optimiza la entropía cruzada y se aplican pesos inversos por clase
+  para que cancelaciones y retrasos no desaparezcan frente a la clase
+  mayoritaria. La semilla es 20260721. El baseline siempre predice la clase más
+  frecuente aprendida en train.</p>
+
+  <h2>5.5 CRISP-DM: evaluación</h2>
+
+  <table>
+    <tr><th>Métrica</th><th>Clasificador</th><th>Baseline mayoritario</th></tr>
+    <tr><td>Accuracy</td><td>{{CLASS_ACCURACY}}</td><td>{{CLASS_BASE_ACCURACY}}</td></tr>
+    <tr><td>Macro F1</td><td>{{CLASS_MACRO_F1}}</td><td>{{CLASS_BASE_MACRO_F1}}</td></tr>
+  </table>
+
+  <table>
+    <tr><th>Clase</th><th>Precision</th><th>Recall</th><th>F1</th><th>Soporte test</th></tr>
+    {{CLASS_METRIC_ROWS}}
+  </table>
+
+  {{FIG_CLASS_MATRIX}}
+
+  <p>Accuracy permite comparar aciertos generales, pero macro-F1 da el mismo
+  peso a las tres clases y es más informativa con desbalance. Precision mide
+  cuántas alertas de una clase fueron correctas; recall, cuántos casos reales se
+  detectaron. La matriz de confusión permite localizar específicamente falsos
+  “a tiempo”, el error de mayor costo operativo. La validación temporal es más
+  exigente y realista que mezclar órdenes futuras con pasadas.</p>
+
+  <h2>5.6 CRISP-DM: despliegue</h2>
+
+  <p>El artefacto JSON guarda transformaciones, categorías, pesos, coeficientes,
+  métricas, periodo y hash. <code>ServiceOutcomePredictionModel</code> lo carga
+  una vez. El formulario envía únicamente campos conocidos antes del alta a
+  <code>POST /services/outcome-prediction</code>; el listado usa el endpoint por
+  lote. La respuesta indica disponibilidad, clase, etiqueta, confianza y las
+  tres probabilidades. Datos insuficientes o artefacto ausente producen
+  <code>available:false</code> con mensaje; el registro sigue funcionando.</p>
+
+  <h1 class="page-break">6. Arquitectura de integración web</h1>
+
+  <table>
+    <tr><th>Solución</th><th>Carga/uso del artefacto</th><th>API</th><th>Pantalla</th></tr>
+    <tr><td>Clustering</td><td><code>StudyClusteringService.getStoredAnalysis</code> y <code>StudyClusteringModel.assignFromArtifact</code></td><td><code>GET /study-clustering/analysis</code></td><td><code>/admin/clustering</code></td></tr>
+    <tr><td>Regresión</td><td><code>StudyEstimationModel</code></td><td><code>POST /studies/estimate</code></td><td><code>StudyEstimationPanel</code> en Agregar estudio</td></tr>
+    <tr><td>Clasificación</td><td><code>ServiceOutcomePredictionModel</code> y <code>ServicesService.runOutcomeModel</code></td><td><code>POST /services/outcome-prediction</code></td><td><code>AgregarServicioModal</code> y listado</td></tr>
+  </table>
+
+  <p>Backend: Node.js, NestJS 11, TypeScript, TypeORM y PostgreSQL. Frontend:
+  Next.js 16.1.5 y React 19.1. Analítica: Python, pandas, NumPy,
+  scikit-learn y Matplotlib; clustering productivo conserva una implementación
+  TypeScript del preprocesamiento/K-Means y persiste el JSONB. Versiones y
+  contratos completos están en <code>08_Aplicacion_Web/README.md</code>.</p>
+
+  <h2>6.1 Formato de respuesta y manejo de fallos</h2>
+
+  <table>
+    <tr><th>Solución</th><th>Respuesta comprensible</th><th>Manejo seguro</th></tr>
+    <tr><td>Regresión</td><td>Precio sugerido, rango, métricas y advertencias.</td><td>400 para paquetes/entrada inválida; 503 si no puede cargarse el artefacto.</td></tr>
+    <tr><td>Clasificación</td><td>Clase, texto, confianza, probabilidades y versión.</td><td><code>available:false</code> para datos/modelo insuficiente; nunca bloquea el alta.</td></tr>
+    <tr><td>Clustering</td><td>Perfiles, estudios, promedios, acción, métricas y atípicos.</td><td>404 sin ejecución; 400 para corte inválido; JWT y rol administrador.</td></tr>
+  </table>
+
+  <h2>6.2 Actualización de modelos</h2>
+
+  <p>Regresión y clasificación se reentrenan mediante comandos controlados y se
+  recargan al reiniciar NestJS. Clustering se recalcula con una fecha de corte y
+  crea una nueva ejecución persistida. Antes de promover un artefacto se
+  comparan métricas, composición real/sintética, hashes y casos de error; se
+  conserva el artefacto anterior para reversión.</p>
+
+  <h1 class="page-break">7. Reproducibilidad y orden de ejecución</h1>
+
+  <pre>createdb econolab_ml_evaluacion
+psql --set ON_ERROR_STOP=on --dbname econolab_ml_evaluacion --file 02_Base_Datos/respaldo_analitico_anonimizado.sql
+psql --set ON_ERROR_STOP=on --dbname econolab_ml_evaluacion --file 02_Base_Datos/02_esquema_modulo_clustering.sql
+
+cd backend
+npm install
+npm run regression:export
+python -m jupyter nbconvert --to notebook --execute --inplace ../06_Notebooks/02_regresion_precio_estudios.ipynb --ExecutePreprocessor.timeout=300
+npm run classification:notebook
+python -m jupyter nbconvert --to notebook --execute --inplace ../06_Notebooks/01_clustering_estudios.ipynb --ExecutePreprocessor.timeout=300
+npm test -- --runInBand
+npm run build
+
+cd ../frontend
+npm install
+npm run build
+npm run dev</pre>
+
+  <p>La restauración solo debe ejecutarse en una base vacía de evaluación. Los
+  notebooks están ejecutados en orden, no contienen rutas privadas ni
+  credenciales y guardan el mismo artefacto que utiliza el backend. Los CSV y
+  JSON se relacionan mediante SHA-256.</p>
+
+  <h1 class="page-break">8. Evidencias funcionales</h1>
+
+  <p>Se definieron dos casos distintos por solución. Cada par debe mostrar
+  entrada, ejecución y resultado dentro del sistema. Si una captura no está
+  presente, el recuadro siguiente conserva el nombre exacto pendiente y evita
+  presentar una imagen inventada.</p>
+
+  <h2>8.1 Clustering</h2>
+  {{WEB_CASE_1}}
+  <p>Interpretación esperada: comparar dos perfiles con promedios y acciones
+  distintas, observando la silueta y Davies–Bouldin de la ejecución.</p>
+  {{WEB_CASE_2}}
+  <p>Interpretación esperada: el caso atípico se señala para revisión frente a
+  su cluster; no recibe una clasificación médica ni se edita automáticamente.</p>
+
+  <h2>8.2 Regresión</h2>
+  {{WEB_CASE_3}}
+  <p>Interpretación esperada: el cálculo se genera con método/parámetros y solo
+  se copia al campo de precio después de la acción explícita del usuario.</p>
+  {{WEB_CASE_4}}
+  <p>Interpretación esperada: cambiar X produce otra estimación y la interfaz
+  mantiene visibles rango, calidad y limitación sintética.</p>
+
+  <h2>8.3 Clasificación</h2>
+  {{WEB_CASE_5}}
+  <p>Interpretación esperada: antes de guardar se muestran clase, confianza y
+  probabilidades sin cambiar el estado de la orden.</p>
+  {{WEB_CASE_6}}
+  <p>Interpretación esperada: modificar estudios o plazo recalcula el pronóstico
+  con las mismas transformaciones del entrenamiento.</p>
+
+  <h1 class="page-break">9. Resultados globales, limitaciones y mejoras</h1>
+
+  <h2>9.1 Resultados</h2>
+
+  <ul>
+    <li>El respaldo anónimo reconstruye los tres datasets y supera 2,000
+    movimientos operativos útiles.</li>
+    <li>Los tres notebooks realizan comprensión, preparación, modelado,
+    evaluación y despliegue; los artefactos están versionados.</li>
+    <li>Regresión supera su baseline en el dataset actual y presenta MAE/RMSE/R²,
+    predicho-real, residuos y evaluación real separada.</li>
+    <li>Clasificación se compara con clase mayoritaria mediante un holdout
+    temporal y muestra matriz, precision, recall, F1 y accuracy.</li>
+    <li>Clustering compara k=2…6, perfila segmentos y asigna nuevos casos con el
+    artefacto persistido.</li>
+    <li>Las tres funciones están conectadas a pantallas y manejan entradas no
+    disponibles o inválidas.</li>
+  </ul>
+
+  <h2>9.2 Limitaciones y sesgos</h2>
+
+  <ul>
+    <li>La proporción sintética es muy alta; las reglas pueden hacer que las
+    métricas sean más favorables que en producción.</li>
+    <li>Regresión tiene cobertura real deficiente de parámetros. El nombre del
+    estudio se excluye para evitar memorizar un sustituto del objetivo.</li>
+    <li>Clasificación solo cuenta con 12 órdenes reales válidas; además,
+    <code>deliveryAt</code> puede editarse y no existe snapshot histórico de la
+    promesa original.</li>
+    <li>La demanda de clustering es 96.67% demostrativa y la silueta es modesta;
+    los perfiles pueden cambiar con operación real.</li>
+    <li>Un artefacto puede degradarse por cambios en precios, catálogo,
+    sucursales o carga. No hay automatización de decisiones.</li>
+  </ul>
+
+  <h2>9.3 Mejoras priorizadas</h2>
+
+  <ol>
+    <li>Completar parámetros reales y capturar snapshots de promesa, catálogo y
+    características de cada orden.</li>
+    <li>Acumular historia real y evaluar ventanas temporales consecutivas por
+    sucursal y procedencia.</li>
+    <li>Registrar sugerencia, decisión final y acción operativa para medir valor
+    agregado, falsos avisos y aceptación.</li>
+    <li>Definir umbrales de negocio con ECONOLAB y monitorear deriva antes de
+    reemplazar artefactos.</li>
+    <li>Recalcular clustering mensualmente, comparar estabilidad y documentar
+    por qué cada atípico terminó o no en una corrección.</li>
+  </ol>
+
+  <h1 class="page-break">10. Conclusiones</h1>
+
+  <p>ECONOLAB cuenta ahora con tres aplicaciones analíticas distintas y
+  verificables. El valor principal no es una métrica aislada, sino el recorrido
+  completo y demostrable desde PostgreSQL hasta una acción administrativa en la
+  interfaz. Los IDs y datos posteriores se excluyen, las transformaciones se
+  ajustan con entrenamiento, los artefactos se cargan realmente y los errores se
+  comunican sin fabricar respuestas.</p>
+
+  <p>El trabajo también identifica sus límites: todavía no debe considerarse
+  una validación productiva. La alta proporción sintética, la captura incompleta
+  de parámetros y la poca historia real definen el siguiente paso: mejorar la
+  calidad de captura y evaluar por periodos reales. Esta conclusión evita
+  confundir una integración técnica exitosa con evidencia suficiente para
+  decisiones automáticas.</p>
+
+  <h1>Bibliografía</h1>
+
+  <ol>
+    <li>Chapman, P., Clinton, J., Kerber, R., Khabaza, T., Reinartz, T.,
+    Shearer, C., & Wirth, R. (2000). <em>CRISP-DM 1.0: Step-by-step data mining
+    guide</em>. SPSS.</li>
+    <li>MacQueen, J. (1967). Some methods for classification and analysis of
+    multivariate observations. <em>Proceedings of the Fifth Berkeley Symposium
+    on Mathematical Statistics and Probability</em>, 1, 281–297.</li>
+    <li>Rousseeuw, P. J. (1987). Silhouettes: A graphical aid to the
+    interpretation and validation of cluster analysis. <em>Journal of
+    Computational and Applied Mathematics, 20</em>, 53–65.
+    https://doi.org/10.1016/0377-0427(87)90125-7</li>
+    <li>Davies, D. L., & Bouldin, D. W. (1979). A cluster separation measure.
+    <em>IEEE Transactions on Pattern Analysis and Machine Intelligence,
+    PAMI-1</em>(2), 224–227. https://doi.org/10.1109/TPAMI.1979.4766909</li>
+    <li>James, G., Witten, D., Hastie, T., & Tibshirani, R. (2021). <em>An
+    introduction to statistical learning</em> (2nd ed.). Springer.
+    https://doi.org/10.1007/978-1-0716-1418-1</li>
+    <li>Hastie, T., Tibshirani, R., & Friedman, J. (2009). <em>The elements of
+    statistical learning</em> (2nd ed.). Springer.
+    https://doi.org/10.1007/978-0-387-84858-7</li>
+    <li>Pedregosa, F., Varoquaux, G., Gramfort, A., et al. (2011).
+    Scikit-learn: Machine learning in Python. <em>Journal of Machine Learning
+    Research, 12</em>, 2825–2830.</li>
+  </ol>
+
+  <h1 class="page-break">11. Anexos técnicos y trazabilidad</h1>
+
+  <h2>11.1 Trazabilidad — clustering</h2>
+
+  <table>
+    <tr><th>Columna</th><th>Origen y transformación</th><th>Función/justificación</th></tr>
+    <tr><td>study_id, code, name</td><td><code>studies</code>, sin transformación sustantiva.</td><td>Auditoría/presentación; excluidos para no memorizar identidad.</td></tr>
+    <tr><td>price</td><td><code>studies.normalPrice</code>; valida, imputa, winsoriza y estandariza.</td><td>X económica conocida en catálogo.</td></tr>
+    <tr><td>delivery_hours</td><td><code>durationMinutes / 60</code>; valida, imputa, winsoriza y estandariza.</td><td>X de tiempo operativo.</td></tr>
+    <tr><td>parameter_count</td><td>COUNT de parámetros activos en <code>study_details</code>.</td><td>X de complejidad.</td></tr>
+    <tr><td>request_count</td><td>SUM(quantity) por estudio en órdenes válidas antes del corte.</td><td>X de demanda histórica disponible al ejecutar.</td></tr>
+    <tr><td>sample_type</td><td><code>studies.sampleType</code>; normalización y one-hot.</td><td>X de operación de muestra.</td></tr>
+    <tr><td>analysis_method</td><td><code>studies.method</code>; normalización y one-hot.</td><td>X de tecnología/equipo.</td></tr>
+    <tr><td>requires_special_processing</td><td><code>studies.requiresSpecialProcessing</code>; moda y 0/1.</td><td>X binaria de complejidad.</td></tr>
+    <tr><td>synthetic_request_count, is_synthetic</td><td>Patrones ECO-ML/ECN-CAT.</td><td>Auditoría de procedencia; nunca X.</td></tr>
+  </table>
+
+  <h2>11.2 Trazabilidad — regresión</h2>
+
+  <table>
+    <tr><th>Columna</th><th>Origen y transformación</th><th>Función/justificación</th></tr>
+    <tr><td>study_id, study_code, study_name</td><td><code>studies</code>, sin cambio.</td><td>Auditoría; nunca X.</td></tr>
+    <tr><td>is_synthetic</td><td>Patrón reservado del código.</td><td>Auditoría y evaluación por origen; nunca X.</td></tr>
+    <tr><td>type</td><td><code>studies.type</code>; filtro <code>study</code>.</td><td>Demuestra población; constante y no X.</td></tr>
+    <tr><td>method</td><td><code>studies.method</code>; vacío a SIN_METODO y one-hot.</td><td>X conocida al registrar; aproxima tecnología/costo.</td></tr>
+    <tr><td>parameter_count</td><td>COUNT de parámetros activos por study_id; estandarización.</td><td>X de complejidad conocida.</td></tr>
+    <tr><td>normal_price</td><td><code>studies.normalPrice</code>; precio positivo.</td><td>Y continua en MXN; nunca X.</td></tr>
+  </table>
+
+  <h2>11.3 Trazabilidad — clasificación</h2>
+
+  <table>
+    <tr><th>Columna</th><th>Origen y transformación</th><th>Función/justificación</th></tr>
+    <tr><td>order_id, source_folio</td><td><code>service_orders</code>; folio real seudonimizado.</td><td>Deduplicación/auditoría; nunca X.</td></tr>
+    <tr><td>source_created_at, source_updated_at</td><td>Fechas fuente en ISO.</td><td>Orden del split/marca de agua; nunca X.</td></tr>
+    <tr><td>is_synthetic</td><td>Patrón ECO-ML.</td><td>Auditoría; nunca X.</td></tr>
+    <tr><td>promised_lead_hours</td><td><code>deliveryAt - COALESCE(sampleAt, createdAt)</code>.</td><td>X de holgura conocida antes del alta.</td></tr>
+    <tr><td>registration_hour, registration_weekday</td><td>Hora decimal y día derivados de <code>createdAt</code>.</td><td>X de turno/carga.</td></tr>
+    <tr><td>item_count, total_quantity, distinct_study_count</td><td>COUNT/SUM/COUNT DISTINCT de ítems.</td><td>X de volumen y diversidad.</td></tr>
+    <tr><td>package_component_count</td><td>COUNT de <code>source_package_id</code> no nulo.</td><td>Candidata conservada en CSV; excluida del artefacto porque 99.61% de train vale cero.</td></tr>
+    <tr><td>subtotal_amount, courtesy_percent, discount_amount, total_amount</td><td>Importes de <code>service_orders</code>, validados.</td><td>X económicas disponibles antes de guardar.</td></tr>
+    <tr><td>branch_name</td><td>Sucursal normalizada y one-hot.</td><td>X de contexto/capacidad.</td></tr>
+    <tr><td>dominant_price_type</td><td>Tarifa con mayor cantidad; desempate determinista.</td><td>X categórica de mezcla tarifaria.</td></tr>
+    <tr><td>outcome</td><td>CASE con estado y fechas finales.</td><td>Y histórica; sus fuentes no entran a X.</td></tr>
+  </table>
+
+  <h2>11.4 Mapa del código que se puede mostrar en la exposición</h2>
+
+  <table>
+    <tr><th>Qué demostrar</th><th>Archivo principal</th></tr>
+    <tr><td>SQL que extrae y crea cada dataset</td><td><code>04_ETL/clustering_etl.sql</code>, <code>02_regresion_extraer_dataset.sql</code> y <code>03_clasificacion_extraer_dataset.sql</code>.</td></tr>
+    <tr><td>Entrenamiento/evaluación</td><td>Los tres notebooks en <code>06_Notebooks</code> y los entrenadores referidos por sus celdas.</td></tr>
+    <tr><td>Artefactos exactos</td><td><code>07_Modelos/*.json</code> y copia/ruta desplegada documentada.</td></tr>
+    <tr><td>Carga y ejecución real</td><td><code>study-clustering.service.ts</code>, <code>study-estimation.model.ts</code> y <code>service-outcome-prediction.model.ts</code>.</td></tr>
+    <tr><td>Llamada desde el sistema</td><td>Controladores NestJS y componentes React listados en <code>GUIA_CODIGO_TRES_PROPUESTAS_ML.md</code>.</td></tr>
+  </table>
+
+  <p class="small">La trazabilidad completa por campo, con tipo final,
+  disponibilidad y aporte individual, se encuentra en
+  <code>04_ETL/TRAZABILIDAD_DATASETS.md</code>. Este anexo resume la misma
+  evidencia sin sustituir el archivo ejecutable.</p>
+</body>
+</html>
