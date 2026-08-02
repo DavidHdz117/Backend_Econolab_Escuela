@@ -1,401 +1,401 @@
-study_id,study_code,study_name,is_synthetic,method,parameter_count,duration_minutes,sample_type,requires_special_processing,normal_price,predicted_price,residual
-8,TRI01,TRIGLICERIDOS,False,enzimatico,0,20,unknown,sin_especificar,90.0,138.0814,-48.0814
-11,UROC01,UROCULTIVO,False,cultivo,0,48,unknown,sin_especificar,280.0,60.0207,219.9793
-15,HCG01,PRUEBA DE EMBARAZO,False,inmunoensayo,0,15,unknown,sin_especificar,120.0,259.4545,-139.4545
-19,PT01,PROTEINAS TOTALES,False,colorimetria,0,20,unknown,sin_especificar,90.0,166.8283,-76.8283
-21,BILI01,BILIRRUBINA TOTAL,False,colorimetria,0,20,unknown,sin_especificar,100.0,166.8283,-66.8283
-23,TGP01,TGP,False,enzimatico,0,20,unknown,sin_especificar,110.0,138.0814,-28.0814
-35,QS003,Química sanguínea de 3 elementos,False,espectrofotometria,3,60,serum,false,190.0,225.0851,-35.0851
-46,UROCUL,Urocultivo,False,cultivo microbiologico,0,2880,unknown,sin_especificar,380.0,414.94,-34.94
-50,PSA001,Antígeno prostático específico PSA,False,quimioluminiscencia,0,120,unknown,sin_especificar,360.0,349.5435,10.4565
-55,TPT001,Tiempo parcial de tromboplastina TPT,False,coagulometria,0,60,unknown,sin_especificar,180.0,253.7128,-73.7128
-60,ECN-CAT-HEM-001,Determinación de Biometría hemática,True,impedancia,15,105,blood,false,500.0,500.7218,-0.7218
-67,ECN-CAT-QC-002,Determinación de Urea,True,espectrofotometria,4,60,plasma,false,240.0,263.8042,-23.8042
-72,ECN-CAT-END-002,Determinación de Tiroxina libre,True,quimioluminiscencia,9,180,plasma,false,500.0,535.1763,-35.1763
-73,ECN-CAT-URO-002,Determinación de Microalbúmina en orina,True,microscopia,16,135,urine,false,590.0,570.1901,19.8099
-75,ECN-CAT-QC-003,Determinación de Creatinina,True,colorimetria,30,150,serum,true,780.0,785.7998,-5.7998
-76,ECN-CAT-HEM-003,Determinación de Hematocrito,True,microscopia,7,90,blood,false,290.0,317.8984,-27.8984
-85,ECN-CAT-INM-004,Determinación de Inmunoglobulina A,True,inmunoensayo,10,120,serum,false,450.0,460.8441,-10.8441
-93,ECN-CAT-INM-005,Determinación de Inmunoglobulina G,True,elisa,6,135,serum,false,380.0,416.4624,-36.4624
-96,ECN-CAT-END-005,Determinación de Triyodotironina total,True,quimioluminiscencia,27,240,serum,true,920.0,904.7193,15.2807
-99,ECN-CAT-QC-006,Determinación de Triglicéridos,True,colorimetria,18,105,plasma,false,540.0,542.2901,-2.2901
-112,ECN-CAT-END-007,Determinación de Cortisol,True,inmunoensayo,19,150,serum,false,660.0,652.2313,7.7687
-123,ECN-CAT-QC-009,Determinación de Alanina aminotransferasa,True,colorimetria,6,60,serum,false,250.0,267.0565,-17.0565
-150,ECN-CAT-MIC-012,Determinación de Tinción de Gram,True,microscopia,15,150,other,true,520.0,526.5316,-6.5316
-154,ECN-CAT-MOL-012,Determinación de Neisseria gonorrhoeae,True,pcr,13,420,swab,true,810.0,820.375,-10.375
-157,ECN-CAT-INM-013,Determinación de Procalcitonina,True,inmunoensayo,4,90,serum,false,330.0,330.1365,-0.1365
-162,ECN-CAT-MOL-013,Determinación de Mycobacterium tuberculosis,True,pcr,9,405,other,true,710.0,751.0893,-41.0893
-171,ECN-CAT-QC-015,Determinación de Calcio,True,colorimetria,12,90,serum,false,420.0,397.7642,22.2358
-181,ECN-CAT-INM-016,Determinación de Antígeno carcinoembrionario,True,inmunoensayo,22,150,serum,false,700.0,712.9108,-12.9108
-186,ECN-CAT-MOL-016,Determinación de Dengue por PCR,True,rt-pcr,27,420,blood,true,1160.0,1144.2551,15.7449
-193,ECN-CAT-URO-017,Determinación de Cetonas en orina,True,microscopia,16,135,urine,false,590.0,570.1901,19.8099
-202,ECN-CAT-MOL-018,Determinación de Chikungunya por PCR,True,rt-pcr,19,390,blood,true,960.0,973.0944,-13.0944
-205,ECN-CAT-INM-019,Determinación de CA 19-9,True,inmunoensayo,10,105,serum,false,450.0,456.1698,-6.1698
-209,ECN-CAT-URO-019,Determinación de Nitritos en orina,True,tira reactiva,8,60,urine,false,370.0,374.0209,-4.0209
-210,ECN-CAT-MOL-019,Determinación de Panel respiratorio molecular,True,rt-pcr,15,360,swab,true,870.0,889.4077,-19.4077
-211,ECN-CAT-QC-020,Determinación de Cloro,True,espectrofotometria,22,135,plasma,false,610.0,651.2528,-41.2528
-213,ECN-CAT-INM-020,Determinación de CA 15-3,True,elisa,6,135,serum,false,390.0,416.4624,-26.4624
-216,ECN-CAT-END-020,Determinación de Paratohormona,True,quimioluminiscencia,27,255,plasma,true,920.0,927.8862,-7.8862
-219,ECN-CAT-QC-021,Determinación de Hierro sérico,True,colorimetria,18,105,serum,false,540.0,523.7975,16.2025
-220,ECN-CAT-HEM-021,Determinación de Morfología eritrocitaria,True,microscopia,25,165,blood,true,710.0,710.6083,-0.6083
-239,ECN-CAT-COA-023,Determinación de Factor V,True,coagulometria,8,90,plasma,false,390.0,409.7705,-19.7705
-245,ECN-CAT-INM-024,Determinación de Serología para rubéola,True,quimioluminiscencia,20,225,serum,false,740.0,753.1981,-13.1981
-246,ECN-CAT-MIC-024,Determinación de Shigella,True,cultivo,27,840,stool,true,870.0,872.6613,-2.6613
-248,ECN-CAT-END-024,Determinación de Hormona antimülleriana,True,elisa,11,150,plasma,false,550.0,540.7617,9.2383
-249,ECN-CAT-URO-024,Determinación de Bilirrubina en orina,True,colorimetria,18,105,urine,false,600.0,612.5054,-12.5054
-256,ECN-CAT-END-025,Determinación de Somatomedina C,True,inmunoensayo,7,105,serum,false,420.0,395.4903,24.5097
-259,ECN-CAT-QC-026,Cuantificación de Glucosa,True,espectrofotometria,28,150,plasma,true,790.0,782.5475,7.4525
-260,ECN-CAT-HEM-026,Cuantificación de Biometría hemática,True,citometria,5,105,blood,false,390.0,390.1603,-0.1603
-261,ECN-CAT-INM-026,Cuantificación de Proteína C reactiva,True,elisa,12,150,serum,false,510.0,542.4957,-32.4957
-264,ECN-CAT-END-026,Cuantificación de Hormona estimulante de tiroides,True,quimioluminiscencia,3,150,plasma,false,390.0,404.4686,-14.4686
-265,ECN-CAT-URO-026,Cuantificación de Examen general de orina,True,microscopia,10,105,urine,false,420.0,439.4824,-19.4824
-266,ECN-CAT-MOL-026,Cuantificación de Detección molecular de SARS-CoV-2,True,rt-pcr,17,390,swab,true,940.0,939.2094,0.7906
-275,ECN-CAT-QC-028,Cuantificación de Creatinina,True,enzimatico,20,105,plasma,false,560.0,553.9962,6.0038
-278,ECN-CAT-MIC-028,Cuantificación de Exudado faríngeo,True,cultivo,11,780,swab,true,530.0,521.3307,8.6693
-284,ECN-CAT-HEM-029,Cuantificación de Eritrocitos,True,citometria,23,195,blood,false,800.0,782.2833,17.7167
-288,ECN-CAT-END-029,Cuantificación de Triyodotironina libre,True,quimioluminiscencia,21,210,serum,false,800.0,768.7503,31.2497
-289,ECN-CAT-URO-029,Cuantificación de Glucosa en orina,True,microscopia,28,180,urine,true,840.0,832.1924,7.8076
-300,ECN-CAT-HEM-031,Cuantificación de Plaquetas,True,impedancia,15,105,blood,false,510.0,500.7218,9.2782
-305,ECN-CAT-URO-031,Cuantificación de Calcio en orina,True,tira reactiva,20,120,urine,false,610.0,635.4361,-25.4361
-311,ECN-CAT-COA-032,Cuantificación de Actividad de factor VIII,True,coagulometria,2,75,plasma,false,270.0,283.7371,-13.7371
-312,ECN-CAT-END-032,Cuantificación de Cortisol,True,quimioluminiscencia,9,165,plasma,false,510.0,530.5019,-20.5019
-321,ECN-CAT-URO-033,Cuantificación de Sodio en orina,True,colorimetria,12,90,urine,false,480.0,486.4721,-6.4721
-328,ECN-CAT-END-034,Cuantificación de Hormona de crecimiento,True,inmunoensayo,1,75,plasma,false,300.0,283.2752,16.7248
-338,ECN-CAT-MOL-035,Cuantificación de Virus herpes simple 2,True,pcr,11,420,swab,true,740.0,779.922,-39.922
-342,ECN-CAT-MIC-036,Cuantificación de Antibiograma,True,cultivo,9,780,other,true,450.0,497.1723,-47.1723
-347,ECN-CAT-QC-037,Cuantificación de Gamma glutamil transferasa,True,enzimatico,14,90,serum,false,440.0,409.4703,30.5297
-352,ECN-CAT-END-037,Cuantificación de Hormona foliculoestimulante,True,inmunoensayo,19,135,serum,false,670.0,647.5569,22.4431
-354,ECN-CAT-MOL-037,Cuantificación de Neisseria gonorrhoeae,True,pcr,3,375,swab,true,600.0,604.087,-4.087
-360,ECN-CAT-END-038,Cuantificación de Estradiol,True,quimioluminiscencia,15,210,plasma,false,630.0,665.8839,-35.8839
-374,ECN-CAT-MIC-040,Cuantificación de Coprológico,True,microscopia,23,165,stool,true,670.0,685.7327,-15.7327
-376,ECN-CAT-END-040,Cuantificación de Testosterona total,True,inmunoensayo,7,105,plasma,false,430.0,413.9829,16.0171
-396,ECN-CAT-HEM-043,Cuantificación de Frotis de sangre periférica,True,impedancia,27,150,blood,true,750.0,762.7241,-12.7241
-404,ECN-CAT-HEM-044,Cuantificación de Conteo diferencial,True,citometria,23,180,blood,false,760.0,777.609,-17.609
-437,ECN-CAT-INM-048,Cuantificación de Serología para dengue,True,quimioluminiscencia,14,195,serum,false,620.0,622.4905,-2.4905
-438,ECN-CAT-MIC-048,Cuantificación de Salmonella,True,cultivo,21,810,stool,true,750.0,741.9537,8.0463
-443,ECN-CAT-QC-049,Cuantificación de Lactato deshidrogenasa,True,enzimatico,26,135,serum,true,690.0,671.4726,18.5274
-450,ECN-CAT-MOL-049,Cuantificación de HLA-B27,True,pcr,15,435,blood,true,840.0,858.9344,-18.9344
-451,ECN-CAT-QC-050,Cuantificación de Hemoglobina glucosilada,True,espectrofotometria,22,135,blood,false,620.0,665.2379,-45.2379
-456,ECN-CAT-END-050,Cuantificación de Somatomedina C,True,quimioluminiscencia,27,240,plasma,true,930.0,923.2119,6.7881
-459,ECN-CAT-QC-051,Evaluación de Glucosa,True,colorimetria,18,105,serum,false,550.0,523.7975,26.2025
-460,ECN-CAT-HEM-051,Evaluación de Biometría hemática,True,microscopia,25,180,blood,true,710.0,715.2827,-5.2827
-461,ECN-CAT-INM-051,Evaluación de Proteína C reactiva,True,quimioluminiscencia,2,150,serum,false,320.0,365.7495,-45.7495
-462,ECN-CAT-MIC-051,Evaluación de Urocultivo,True,cultivo,9,765,urine,false,460.0,520.6043,-60.6043
-465,ECN-CAT-URO-051,Evaluación de Examen general de orina,True,colorimetria,30,165,urine,true,850.0,879.182,-29.182
-477,ECN-CAT-INM-053,Evaluación de Antiestreptolisinas O,True,elisa,24,195,serum,false,810.0,799.2366,10.7634
-496,ECN-CAT-END-055,Evaluación de Triyodotironina total,True,inmunoensayo,7,90,serum,false,430.0,390.816,39.184
-500,ECN-CAT-HEM-056,Evaluación de Plaquetas,True,citometria,5,120,blood,false,390.0,394.8347,-4.8347
-511,ECN-CAT-COA-057,Evaluación de Actividad de factor VIII,True,coagulometria,22,150,plasma,false,710.0,711.6387,-1.6387
-514,ECN-CAT-MOL-057,Evaluación de Virus de Epstein-Barr,True,pcr,13,420,blood,true,820.0,813.8071,6.1929
-518,ECN-CAT-MIC-058,Evaluación de Cultivo de esputo,True,cultivo,11,780,other,false,530.0,532.364,-2.364
-522,ECN-CAT-MOL-058,Evaluación de Citomegalovirus,True,pcr,9,405,blood,true,720.0,728.2267,-8.2267
-528,ECN-CAT-END-059,Evaluación de Hormona de crecimiento,True,quimioluminiscencia,21,225,serum,false,810.0,773.4246,36.5754
-531,ECN-CAT-QC-060,Evaluación de Aspartato aminotransferasa,True,colorimetria,12,90,plasma,false,380.0,416.2568,-36.2568
-535,ECN-CAT-COA-060,Evaluación de Actividad de factor XII,True,coagulometria,10,90,plasma,false,420.0,450.2235,-30.2235
-543,ECN-CAT-COA-061,Evaluación de Antitrombina III,True,coagulometria,6,75,plasma,false,370.0,364.6431,5.3569
-547,ECN-CAT-QC-062,Evaluación de Gamma glutamil transferasa,True,espectrofotometria,4,60,plasma,false,250.0,263.8042,-13.8042
-548,ECN-CAT-HEM-062,Evaluación de Neutrófilos,True,citometria,11,135,blood,false,520.0,520.868,-0.868
-551,ECN-CAT-COA-062,Evaluación de Proteína C funcional,True,coagulometria,2,60,plasma,false,270.0,279.0628,-9.0628
-555,ECN-CAT-QC-063,Evaluación de Albúmina,True,colorimetria,30,165,serum,true,800.0,790.4741,9.5259
-561,ECN-CAT-URO-063,Evaluación de Urea en orina,True,colorimetria,12,75,urine,false,490.0,481.7978,8.2022
-567,ECN-CAT-COA-064,Evaluación de Anticoagulante lúpico,True,coagulometria,24,150,plasma,false,740.0,752.0917,-12.0917
-568,ECN-CAT-END-064,Evaluación de Progesterona,True,inmunoensayo,1,90,plasma,false,260.0,287.9496,-27.9496
-576,ECN-CAT-END-065,Evaluación de Testosterona total,True,quimioluminiscencia,27,240,serum,true,930.0,904.7193,25.2807
-579,ECN-CAT-QC-066,Evaluación de Fósforo,True,colorimetria,18,105,plasma,false,550.0,542.2901,7.7099
-583,ECN-CAT-COA-066,Evaluación de Agregación plaquetaria,True,coagulometria,16,120,plasma,false,590.0,580.9311,9.0689
-599,ECN-CAT-COA-068,Evaluación de Tiempo de coagulación,True,coagulometria,8,105,plasma,false,400.0,414.4448,-14.4448
-605,ECN-CAT-INM-069,Evaluación de CA 19-9,True,quimioluminiscencia,20,225,serum,false,740.0,753.1981,-13.1981
-609,ECN-CAT-URO-069,Evaluación de Nitritos en orina,True,colorimetria,18,105,urine,false,610.0,612.5054,-2.5054
-615,ECN-CAT-COA-070,Evaluación de Factor de von Willebrand,True,coagulometria,30,180,plasma,true,860.0,888.0607,-28.0607
-621,ECN-CAT-INM-071,Evaluación de Antígeno prostático total,True,elisa,12,150,serum,false,520.0,542.4957,-22.4957
-622,ECN-CAT-MIC-071,Evaluación de Clostridioides difficile,True,inmunocromatografia,19,120,stool,false,620.0,646.8642,-26.8642
-623,ECN-CAT-COA-071,Evaluación de Mezcla de TTPa,True,coagulometria,26,165,plasma,true,810.0,802.4804,7.5196
-624,ECN-CAT-END-071,Evaluación de Calcitonina,True,quimioluminiscencia,3,150,serum,false,400.0,385.976,14.024
-628,ECN-CAT-HEM-072,Evaluación de Morfología leucocitaria,True,microscopia,1,90,blood,false,180.0,196.5394,-16.5394
-636,ECN-CAT-HEM-073,Evaluación de Morfología plaquetaria,True,impedancia,27,165,blood,true,760.0,767.3984,-7.3984
-645,ECN-CAT-INM-074,Evaluación de Serología para rubéola,True,elisa,30,225,serum,true,940.0,935.2056,4.7944
-651,ECN-CAT-QC-075,Evaluación de Hemoglobina glucosilada,True,colorimetria,12,75,blood,false,380.0,425.5675,-45.5675
-659,ECN-CAT-QC-076,Control de Glucosa,True,enzimatico,8,60,plasma,false,270.0,297.2552,-27.2552
-665,ECN-CAT-URO-076,Control de Examen general de orina,True,tira reactiva,20,120,urine,false,620.0,635.4361,-15.4361
-667,ECN-CAT-QC-077,Control de Urea,True,espectrofotometria,4,45,serum,false,260.0,240.6373,19.3627
-671,ECN-CAT-COA-077,Control de Tiempo de tromboplastina parcial,True,coagulometria,2,75,plasma,false,280.0,283.7371,-3.7371
-682,ECN-CAT-MOL-078,Control de Virus de influenza B,True,rt-pcr,19,390,swab,true,980.0,979.6624,0.3376
-684,ECN-CAT-HEM-079,Control de Eritrocitos,True,impedancia,3,60,blood,false,220.0,243.9808,-23.9808
-686,ECN-CAT-MIC-079,Control de Exudado nasal,True,cultivo,17,810,swab,false,660.0,646.777,13.223
-691,ECN-CAT-QC-080,Control de Colesterol total,True,espectrofotometria,22,135,plasma,false,620.0,651.2528,-31.2528
-698,ECN-CAT-MOL-080,Control de Virus de hepatitis B,True,pcr,11,420,plasma,true,750.0,759.369,-9.369
-699,ECN-CAT-QC-081,Control de Triglicéridos,True,colorimetria,18,120,serum,false,510.0,528.4718,-18.4718
-700,ECN-CAT-HEM-081,Control de Plaquetas,True,microscopia,25,180,blood,true,720.0,715.2827,4.7173
-701,ECN-CAT-INM-081,Control de Inmunoglobulina M,True,quimioluminiscencia,2,135,serum,false,330.0,361.0752,-31.0752
-704,ECN-CAT-END-081,Control de Insulina,True,elisa,23,210,serum,false,810.0,783.6845,26.3155
-706,ECN-CAT-MOL-081,Control de Virus de hepatitis C,True,pcr,7,390,plasma,true,650.0,669.1143,-19.1143
-707,ECN-CAT-QC-082,Control de Bilirrubina total,True,enzimatico,14,90,plasma,false,450.0,427.9629,22.0371
-717,ECN-CAT-INM-083,Control de Complemento C3,True,elisa,24,210,serum,false,760.0,803.911,-43.911
-718,ECN-CAT-MIC-083,Control de Cultivo de esputo,True,cultivo,1,735,other,false,320.0,316.076,3.924
-722,ECN-CAT-MOL-083,Control de Citomegalovirus,True,pcr,29,480,blood,true,1170.0,1156.1283,13.8717
-740,ECN-CAT-HEM-086,Control de Ancho de distribución eritrocitaria,True,citometria,5,105,blood,false,400.0,390.1603,9.8397
-742,ECN-CAT-MIC-086,Control de Antibiograma,True,cultivo,19,810,other,false,680.0,703.5246,-23.5246
-744,ECN-CAT-END-086,Control de Hormona luteinizante,True,quimioluminiscencia,3,150,plasma,false,400.0,404.4686,-4.4686
-746,ECN-CAT-MOL-086,Control de Chlamydia trachomatis,True,pcr,17,450,swab,true,870.0,910.6296,-40.6296
-757,ECN-CAT-INM-088,Control de Procalcitonina,True,inmunoensayo,4,90,serum,false,300.0,330.1365,-30.1365
-758,ECN-CAT-MIC-088,Control de Baciloscopía,True,microscopia,11,120,other,true,440.0,436.277,3.723
-761,ECN-CAT-URO-088,Control de Urea en orina,True,tira reactiva,2,30,urine,false,210.0,243.3132,-33.3132
-768,ECN-CAT-END-089,Control de Progesterona,True,quimioluminiscencia,21,225,serum,false,760.0,773.4246,-13.4246
-778,ECN-CAT-MOL-090,Control de Parvovirus B19,True,pcr,1,390,blood,true,530.0,561.7404,-31.7404
-784,ECN-CAT-END-091,Control de Testosterona libre,True,inmunoensayo,13,120,serum,false,560.0,521.5236,38.4764
-788,ECN-CAT-HEM-092,Control de Velocidad de sedimentación,True,citometria,11,150,blood,false,520.0,525.5423,-5.5423
-801,ECN-CAT-URO-093,Control de Hemoglobina en orina,True,colorimetria,12,90,urine,false,450.0,486.4721,-36.4721
-807,ECN-CAT-COA-094,Control de Productos de degradación de fibrina,True,coagulometria,24,165,plasma,false,740.0,756.7661,-16.7661
-808,ECN-CAT-END-094,Control de Renina,True,inmunoensayo,1,75,plasma,false,270.0,283.2752,-13.2752
-810,ECN-CAT-MOL-094,Control de Panel respiratorio molecular,True,rt-pcr,15,375,swab,true,880.0,894.0821,-14.0821
-822,ECN-CAT-MIC-096,Control de Clostridioides difficile,True,inmunocromatografia,9,90,stool,true,410.0,440.5119,-30.5119
-825,ECN-CAT-URO-096,Control de Cristales en orina,True,colorimetria,30,165,urine,true,860.0,879.182,-19.182
-834,ECN-CAT-MOL-097,Control de Mutación JAK2,True,pcr,3,390,blood,true,610.0,602.1934,7.8066
-835,ECN-CAT-QC-098,Control de Lipasa,True,espectrofotometria,10,75,plasma,false,380.0,389.8375,-9.8375
-838,ECN-CAT-MIC-098,Control de Salmonella,True,cultivo,1,750,stool,false,320.0,313.4651,6.5349
-850,ECN-CAT-MOL-099,Control de HLA-B27,True,pcr,25,465,blood,true,1070.0,1070.548,-0.548
-853,ECN-CAT-INM-100,Control de Serología para toxoplasma,True,inmunoensayo,16,135,serum,false,590.0,586.8775,3.1225
-854,ECN-CAT-MIC-100,Control de Candida albicans,True,cultivo,23,840,swab,true,780.0,782.7459,-2.7459
-856,ECN-CAT-END-100,Control de Somatomedina C,True,inmunoensayo,7,90,plasma,false,440.0,409.3086,30.6914
-859,ECN-CAT-QC-101,Confirmación de Glucosa,True,espectrofotometria,28,165,serum,true,750.0,768.7292,-18.7292
-863,ECN-CAT-COA-101,Confirmación de Tiempo de protrombina,True,coagulometria,26,165,plasma,true,770.0,802.4804,-32.4804
-874,ECN-CAT-MOL-102,Confirmación de Virus de influenza A,True,rt-pcr,13,360,swab,true,810.0,848.9547,-38.9547
-880,ECN-CAT-END-103,Confirmación de Tiroxina total,True,inmunoensayo,25,180,serum,true,810.0,788.2003,21.7997
-894,ECN-CAT-MIC-105,Confirmación de Exudado vaginal,True,cultivo,3,750,swab,false,350.0,344.9087,5.0913
-912,ECN-CAT-END-107,Confirmación de Cortisol,True,quimioluminiscencia,9,180,serum,false,520.0,516.6837,3.3163
-913,ECN-CAT-URO-107,Confirmación de Ácido úrico en orina,True,microscopia,16,135,urine,false,560.0,570.1901,-10.1901
-922,ECN-CAT-MOL-108,Confirmación de Citomegalovirus,True,pcr,19,465,blood,true,950.0,949.189,0.811
-929,ECN-CAT-URO-109,Confirmación de Potasio en orina,True,tira reactiva,8,60,urine,false,390.0,374.0209,15.9791
-930,ECN-CAT-MOL-109,Confirmación de Virus herpes simple 1,True,pcr,15,435,swab,true,850.0,865.5023,-15.5023
-936,ECN-CAT-END-110,Confirmación de Prolactina,True,quimioluminiscencia,27,240,plasma,true,940.0,923.2119,16.7881
-937,ECN-CAT-URO-110,Confirmación de Cloro en orina,True,microscopia,4,90,urine,false,310.0,313.4491,-3.4491
-939,ECN-CAT-QC-111,Confirmación de Fosfatasa alcalina,True,colorimetria,18,105,serum,false,510.0,523.7975,-13.7975
-942,ECN-CAT-MIC-111,Confirmación de Antibiograma,True,cultivo,9,765,other,false,470.0,487.2367,-17.2367
-950,ECN-CAT-MIC-112,Confirmación de Tinción de Gram,True,microscopia,5,90,other,true,270.0,305.5693,-35.5693
-955,ECN-CAT-QC-113,Confirmación de Albúmina,True,espectrofotometria,10,75,serum,false,390.0,371.345,18.655
-956,ECN-CAT-HEM-113,Confirmación de Linfocitos,True,citometria,17,165,blood,false,650.0,651.5756,-1.5756
-972,ECN-CAT-HEM-115,Confirmación de Eosinófilos,True,impedancia,9,90,blood,false,350.0,374.6885,-24.6885
-986,ECN-CAT-MOL-116,Confirmación de Dengue por PCR,True,rt-pcr,17,390,blood,true,910.0,932.6415,-22.6415
-987,ECN-CAT-QC-117,Confirmación de Magnesio,True,colorimetria,24,120,serum,false,690.0,649.8308,40.1692
-988,ECN-CAT-HEM-117,Confirmación de Velocidad de sedimentación,True,microscopia,1,90,blood,false,190.0,196.5394,-6.5394
-1010,ECN-CAT-MOL-119,Confirmación de Panel respiratorio molecular,True,rt-pcr,5,330,swab,true,670.0,677.7941,-7.7941
-1013,ECN-CAT-INM-120,Confirmación de CA 15-3,True,quimioluminiscencia,26,240,serum,true,880.0,884.4928,-4.4928
-1014,ECN-CAT-MIC-120,Confirmación de Helicobacter pylori,True,inmunocromatografia,3,60,stool,true,290.0,309.8043,-19.8043
-1015,ECN-CAT-COA-120,Confirmación de Factor de von Willebrand,True,coagulometria,10,105,plasma,false,430.0,454.8978,-24.8978
-1018,ECN-CAT-MOL-120,Confirmación de Panel gastrointestinal molecular,True,rt-pcr,1,315,other,true,570.0,608.5084,-38.5084
-1019,ECN-CAT-QC-121,Confirmación de Hierro sérico,True,enzimatico,8,75,serum,false,280.0,283.437,-3.437
-1020,ECN-CAT-HEM-121,Confirmación de Morfología eritrocitaria,True,impedancia,15,105,blood,false,530.0,500.7218,29.2782
-1031,ECN-CAT-COA-122,Confirmación de Mezcla de TP,True,coagulometria,2,60,plasma,false,290.0,279.0628,10.9372
-1039,ECN-CAT-COA-123,Confirmación de Factor V,True,coagulometria,28,165,plasma,true,850.0,842.9334,7.0666
-1040,ECN-CAT-END-123,Confirmación de 17-hidroxiprogesterona,True,elisa,5,135,serum,false,400.0,396.2359,3.7641
-1051,ECN-CAT-QC-125,Confirmación de Hemoglobina glucosilada,True,espectrofotometria,22,135,blood,false,630.0,665.2379,-35.2379
-1054,ECN-CAT-MIC-125,Confirmación de Candida albicans,True,cultivo,13,795,swab,false,570.0,561.1966,8.8034
-1071,ECN-CAT-QC-138,Determinación de Albúmina,True,enzimatico,21,105,serum,false,550.0,555.7301,-5.7301
-1073,ECN-CAT-QC-140,Determinación de Calcio,True,colorimetria,10,90,serum,false,430.0,357.3112,72.6888
-1075,ECN-CAT-QC-142,Determinación de Magnesio,True,espectrofotometria,4,75,serum,false,280.0,249.986,30.014
-1076,ECN-CAT-QC-143,Determinación de Sodio,True,colorimetria,31,165,plasma,true,830.0,829.1932,0.8068
-1078,ECN-CAT-QC-145,Determinación de Cloro,True,espectrofotometria,20,135,plasma,false,580.0,610.7998,-30.7998
-1079,ECN-CAT-QC-146,Determinación de Hierro sérico,True,colorimetria,17,105,serum,false,520.0,503.571,16.429
-1080,ECN-CAT-QC-147,Determinación de Amilasa,True,enzimatico,14,90,plasma,false,430.0,427.9629,2.0371
-1084,ECN-CAT-QC-151,Cuantificación de Glucosa,True,espectrofotometria,27,150,plasma,true,820.0,762.321,57.679
-1087,ECN-CAT-QC-154,Cuantificación de Ácido úrico,True,espectrofotometria,18,105,serum,false,460.0,542.5056,-82.5056
-1097,ECN-CAT-QC-164,Cuantificación de Proteínas totales,True,colorimetria,8,60,serum,false,230.0,307.5095,-77.5095
-1104,ECN-CAT-QC-171,Cuantificación de Hierro sérico,True,enzimatico,7,60,plasma,false,280.0,277.0287,2.9713
-1110,ECN-CAT-QC-177,Evaluación de Urea,True,enzimatico,14,75,plasma,false,460.0,423.2885,36.7115
-1115,ECN-CAT-QC-182,Evaluación de Bilirrubina total,True,colorimetria,24,135,serum,false,650.0,654.5051,-4.5051
-1118,ECN-CAT-QC-185,Evaluación de Aspartato aminotransferasa,True,colorimetria,10,90,plasma,false,390.0,375.8038,14.1962
-1119,ECN-CAT-QC-186,Evaluación de Fosfatasa alcalina,True,enzimatico,7,75,serum,false,340.0,263.2105,76.7895
-1123,ECN-CAT-QC-190,Evaluación de Calcio,True,espectrofotometria,20,135,serum,false,590.0,592.3072,-2.3072
-1128,ECN-CAT-QC-195,Evaluación de Cloro,True,enzimatico,1,30,plasma,false,170.0,146.3211,23.6789
-1130,ECN-CAT-QC-197,Evaluación de Amilasa,True,colorimetria,24,120,plasma,false,720.0,668.3234,51.6766
-1131,ECN-CAT-QC-198,Evaluación de Lipasa,True,enzimatico,21,105,serum,false,530.0,555.7301,-25.7301
-1135,ECN-CAT-QC-202,Control de Urea,True,espectrofotometria,4,45,serum,false,260.0,240.6373,19.3627
-1145,ECN-CAT-QC-212,Control de Gamma glutamil transferasa,True,colorimetria,24,135,serum,false,690.0,654.5051,35.4949
-1163,ECN-CAT-QC-230,Confirmación de Colesterol total,True,colorimetria,10,90,serum,false,400.0,357.3112,42.6888
-1168,ECN-CAT-QC-235,Confirmación de Aspartato aminotransferasa,True,espectrofotometria,20,135,plasma,false,600.0,610.7998,-10.7998
-1181,ECN-CAT-HEM-129,Determinación de Eritrocitos,True,impedancia,1,45,blood,false,280.0,198.8535,81.1465
-1188,ECN-CAT-HEM-136,Determinación de Ancho de distribución eritrocitaria,True,citometria,5,120,blood,true,380.0,400.096,-20.096
-1194,ECN-CAT-HEM-142,Determinación de Velocidad de sedimentación,True,citometria,12,135,blood,false,480.0,541.0945,-61.0945
-1195,ECN-CAT-HEM-143,Determinación de Frotis de sangre periférica,True,microscopia,9,105,blood,false,280.0,363.0257,-83.0257
-1198,ECN-CAT-HEM-146,Determinación de Morfología eritrocitaria,True,microscopia,25,165,blood,true,720.0,710.6083,9.3917
-1202,ECN-CAT-HEM-150,Determinación de Prueba de falciformación,True,impedancia,8,75,blood,false,360.0,349.7876,10.2124
-1206,ECN-CAT-HEM-154,Cuantificación de Eritrocitos,True,citometria,21,195,blood,false,800.0,741.8303,58.1697
-1211,ECN-CAT-HEM-159,Cuantificación de Hemoglobina corpuscular media,True,impedancia,1,60,blood,false,240.0,203.5278,36.4722
-1212,ECN-CAT-HEM-160,Cuantificación de Concentración media de hemoglobina,True,citometria,28,210,blood,true,900.0,893.3514,6.6486
-1213,ECN-CAT-HEM-161,Cuantificación de Ancho de distribución eritrocitaria,True,microscopia,25,180,blood,true,700.0,715.2827,-15.2827
-1217,ECN-CAT-HEM-165,Cuantificación de Eosinófilos,True,impedancia,8,75,blood,false,420.0,349.7876,70.2124
-1221,ECN-CAT-HEM-169,Cuantificación de Conteo diferencial,True,citometria,21,180,blood,false,740.0,737.156,2.844
-1230,ECN-CAT-HEM-178,Evaluación de Hematocrito,True,citometria,19,165,blood,false,620.0,692.0286,-72.0286
-1239,ECN-CAT-HEM-187,Evaluación de Neutrófilos,True,citometria,12,135,blood,true,500.0,546.3558,-46.3558
-1242,ECN-CAT-HEM-190,Evaluación de Eosinófilos,True,citometria,28,195,blood,true,940.0,888.6771,51.3229
-1243,ECN-CAT-HEM-191,Evaluación de Basófilos,True,microscopia,25,165,blood,true,740.0,710.6083,29.3917
-1245,ECN-CAT-HEM-193,Evaluación de Frotis de sangre periférica,True,citometria,19,150,blood,false,680.0,687.3543,-7.3543
-1253,ECN-CAT-HEM-201,Control de Biometría hemática,True,impedancia,15,105,blood,false,540.0,500.7218,39.2782
-1254,ECN-CAT-HEM-202,Control de Hemoglobina,True,citometria,12,135,blood,false,560.0,541.0945,18.9055
-1266,ECN-CAT-HEM-214,Control de Monocitos,True,citometria,21,180,blood,false,740.0,737.156,2.844
-1274,ECN-CAT-HEM-222,Control de Morfología leucocitaria,True,impedancia,22,135,blood,false,600.0,651.6559,-51.6559
-1277,ECN-CAT-HEM-225,Control de Prueba de falciformación,True,impedancia,8,75,blood,false,340.0,349.7876,-9.7876
-1283,ECN-CAT-HEM-231,Confirmación de Plaquetas,True,impedancia,15,105,blood,false,480.0,500.7218,-20.7218
-1300,ECN-CAT-INM-129,Determinación de Inmunoglobulina A,True,inmunoensayo,9,120,serum,false,420.0,440.6176,-20.6176
-1302,ECN-CAT-INM-131,Determinación de Inmunoglobulina M,True,quimioluminiscencia,3,150,serum,false,310.0,385.976,-75.976
-1307,ECN-CAT-INM-136,Determinación de Anticuerpos anti-DNA,True,elisa,13,150,serum,true,550.0,567.9835,-17.9835
-1309,ECN-CAT-INM-138,Determinación de Procalcitonina,True,inmunoensayo,2,90,serum,false,300.0,289.6835,10.3165
-1313,ECN-CAT-INM-142,Determinación de Alfafetoproteína,True,elisa,20,165,serum,false,640.0,708.982,-68.982
-1315,ECN-CAT-INM-144,Determinación de CA 19-9,True,inmunoensayo,9,105,serum,false,480.0,435.9433,44.0567
-1316,ECN-CAT-INM-145,Determinación de CA 15-3,True,elisa,6,135,serum,false,430.0,416.4624,13.5376
-1323,ECN-CAT-INM-152,Cuantificación de Factor reumatoide,True,quimioluminiscencia,10,165,serum,false,460.0,532.2359,-72.2359
-1325,ECN-CAT-INM-154,Cuantificación de Inmunoglobulina A,True,elisa,29,225,serum,true,970.0,914.9791,55.0209
-1334,ECN-CAT-INM-163,Cuantificación de Procalcitonina,True,elisa,22,195,serum,false,850.0,758.7836,91.2164
-1338,ECN-CAT-INM-167,Cuantificación de Alfafetoproteína,True,quimioluminiscencia,10,180,serum,false,430.0,536.9102,-106.9102
-1341,ECN-CAT-INM-170,Cuantificación de CA 15-3,True,quimioluminiscencia,26,240,serum,false,880.0,879.2315,0.7685
-1350,ECN-CAT-INM-179,Evaluación de Inmunoglobulina A,True,quimioluminiscencia,19,210,serum,false,760.0,728.2973,31.7027
-1353,ECN-CAT-INM-182,Evaluación de Inmunoglobulina E,True,quimioluminiscencia,10,165,serum,false,500.0,532.2359,-32.2359
-1359,ECN-CAT-INM-188,Evaluación de Procalcitonina,True,quimioluminiscencia,12,195,serum,false,590.0,582.0375,7.9625
-1365,ECN-CAT-INM-194,Evaluación de CA 19-9,True,quimioluminiscencia,19,225,serum,false,730.0,732.9716,-2.9716
-1370,ECN-CAT-INM-199,Evaluación de Serología para rubéola,True,elisa,29,225,serum,true,980.0,914.9791,65.0209
-1380,ECN-CAT-INM-209,Control de Complemento C4,True,quimioluminiscencia,19,225,serum,false,800.0,732.9716,67.0284
-1386,ECN-CAT-INM-215,Control de Troponina I,True,quimioluminiscencia,26,240,serum,true,890.0,884.4928,5.5072
-1405,ECN-CAT-INM-234,Confirmación de Complemento C4,True,inmunoensayo,9,120,serum,false,450.0,440.6176,9.3824
-1408,ECN-CAT-INM-237,Confirmación de Anticuerpos anticardiolipina,True,inmunoensayo,30,195,serum,true,810.0,894.0071,-84.0071
-1413,ECN-CAT-INM-242,Confirmación de Alfafetoproteína,True,quimioluminiscencia,10,165,serum,false,480.0,532.2359,-52.2359
-1422,ECN-CAT-MIC-132,Determinación de Hemocultivo,True,cultivo,3,750,blood,false,440.0,338.3407,101.6593
-1426,ECN-CAT-MIC-136,Determinación de Antibiograma,True,cultivo,21,795,other,true,700.0,744.5646,-44.5646
-1428,ECN-CAT-MIC-138,Determinación de Baciloscopía,True,microscopia,10,135,other,false,420.0,415.4635,4.5365
-1430,ECN-CAT-MIC-140,Determinación de Coprológico,True,microscopia,4,90,stool,false,260.0,272.7962,-12.7962
-1431,ECN-CAT-MIC-141,Determinación de Amiba en fresco,True,microscopia,31,195,stool,true,880.0,856.8933,23.1067
-1441,ECN-CAT-MIC-151,Cuantificación de Urocultivo,True,cultivo,21,810,urine,false,720.0,777.3452,-57.3452
-1447,ECN-CAT-MIC-157,Cuantificación de Hemocultivo,True,cultivo,23,825,blood,true,860.0,771.5037,88.4963
-1449,ECN-CAT-MIC-159,Cuantificación de Cultivo de heridas,True,cultivo,17,810,swab,false,680.0,646.777,33.223
-1455,ECN-CAT-MIC-165,Cuantificación de Coprológico,True,microscopia,24,165,stool,true,680.0,705.9592,-25.9592
-1456,ECN-CAT-MIC-166,Cuantificación de Amiba en fresco,True,microscopia,21,150,stool,false,580.0,635.344,-55.344
-1457,ECN-CAT-MIC-167,Cuantificación de Sangre oculta en heces,True,inmunocromatografia,13,105,stool,false,600.0,520.8309,79.1691
-1459,ECN-CAT-MIC-169,Cuantificación de Adenovirus en heces,True,inmunocromatografia,7,75,stool,true,420.0,395.3846,24.6154
-1467,ECN-CAT-MIC-177,Evaluación de Coprocultivo,True,cultivo,3,750,stool,true,440.0,359.1794,80.8206
-1468,ECN-CAT-MIC-178,Evaluación de Exudado faríngeo,True,cultivo,1,735,swab,false,360.0,299.7813,60.2187
-1469,ECN-CAT-MIC-179,Evaluación de Exudado nasal,True,cultivo,27,855,swab,true,920.0,868.3263,51.6737
-1470,ECN-CAT-MIC-180,Evaluación de Exudado vaginal,True,cultivo,24,840,swab,false,760.0,797.7111,-37.7111
-1472,ECN-CAT-MIC-182,Evaluación de Hemocultivo,True,cultivo,13,795,blood,false,620.0,554.6287,65.3713
-1474,ECN-CAT-MIC-184,Evaluación de Cultivo de heridas,True,cultivo,7,765,swab,false,440.0,430.489,9.511
-1485,ECN-CAT-MIC-195,Evaluación de Helicobacter pylori,True,inmunocromatografia,24,135,stool,false,760.0,752.6711,7.3289
-1489,ECN-CAT-MIC-199,Evaluación de Shigella,True,cultivo,7,750,stool,false,420.0,434.8241,-14.8241
-1493,ECN-CAT-MIC-203,Control de Exudado faríngeo,True,cultivo,20,825,swab,false,780.0,712.1308,67.8692
-1497,ECN-CAT-MIC-207,Control de Hemocultivo,True,cultivo,3,765,blood,false,340.0,343.0151,-3.0151
-1498,ECN-CAT-MIC-208,Control de Cultivo de esputo,True,cultivo,1,735,other,false,300.0,316.076,-16.076
-1502,ECN-CAT-MIC-212,Control de Tinción de Gram,True,microscopia,13,135,other,false,520.0,476.143,43.857
-1504,ECN-CAT-MIC-214,Control de Búsqueda de hongos,True,microscopia,7,105,other,false,380.0,345.4353,34.5647
-1510,ECN-CAT-MIC-220,Control de Helicobacter pylori,True,inmunocromatografia,14,90,stool,false,520.0,536.3831,-16.3831
-1521,ECN-CAT-MIC-231,Confirmación de Exudado uretral,True,cultivo,31,855,swab,true,940.0,949.2323,-9.2323
-1537,ECN-CAT-COA-128,Determinación de Tiempo de trombina,True,coagulometria,28,165,plasma,true,850.0,842.9334,7.0666
-1538,ECN-CAT-COA-129,Determinación de Fibrinógeno,True,coagulometria,25,165,plasma,false,770.0,776.9926,-6.9926
-1543,ECN-CAT-COA-134,Determinación de Actividad de factor XI,True,coagulometria,5,75,plasma,false,290.0,344.4166,-54.4166
-1544,ECN-CAT-COA-135,Determinación de Actividad de factor XII,True,coagulometria,32,180,plasma,true,910.0,928.5137,-18.5137
-1554,ECN-CAT-COA-145,Determinación de Factor de von Willebrand,True,coagulometria,22,135,plasma,false,700.0,706.9644,-6.9644
-1555,ECN-CAT-COA-146,Determinación de Mezcla de TTPa,True,coagulometria,14,120,plasma,false,610.0,540.4781,69.5219
-1559,ECN-CAT-COA-150,Determinación de Factor X,True,coagulometria,32,195,plasma,true,880.0,933.188,-53.188
-1563,ECN-CAT-COA-154,Cuantificación de Fibrinógeno,True,coagulometria,15,120,plasma,false,530.0,560.7046,-30.7046
-1572,ECN-CAT-COA-163,Cuantificación de Proteína S funcional,True,coagulometria,8,90,plasma,false,410.0,409.7705,0.2295
-1579,ECN-CAT-COA-170,Cuantificación de Factor de von Willebrand,True,coagulometria,12,90,plasma,true,420.0,495.9378,-75.9378
-1581,ECN-CAT-COA-172,Cuantificación de Mezcla de TP,True,coagulometria,1,75,plasma,false,290.0,263.5106,26.4894
-1586,ECN-CAT-COA-177,Evaluación de Tiempo de tromboplastina parcial,True,coagulometria,11,105,plasma,false,470.0,475.1243,-5.1243
-1588,ECN-CAT-COA-179,Evaluación de Fibrinógeno,True,coagulometria,5,75,plasma,false,300.0,344.4166,-44.4166
-1592,ECN-CAT-COA-183,Evaluación de Actividad de factor IX,True,coagulometria,18,135,plasma,false,650.0,626.0584,23.9416
-1593,ECN-CAT-COA-184,Evaluación de Actividad de factor XI,True,coagulometria,15,120,plasma,false,570.0,560.7046,9.2954
-1594,ECN-CAT-COA-185,Evaluación de Actividad de factor XII,True,coagulometria,12,90,plasma,false,480.0,490.6764,-10.6764
-1598,ECN-CAT-COA-189,Evaluación de Anticoagulante lúpico,True,coagulometria,25,150,plasma,false,750.0,772.3182,-22.3182
-1629,ECN-CAT-COA-220,Control de Factor de von Willebrand,True,coagulometria,22,150,plasma,false,700.0,711.6387,-11.6387
-1633,ECN-CAT-COA-224,Control de Factor VII,True,coagulometria,5,75,plasma,false,300.0,344.4166,-44.4166
-1636,ECN-CAT-COA-227,Confirmación de Tiempo de tromboplastina parcial,True,coagulometria,21,150,plasma,false,750.0,691.4122,58.5878
-1638,ECN-CAT-COA-229,Confirmación de Fibrinógeno,True,coagulometria,15,105,plasma,false,580.0,556.0303,23.9697
-1644,ECN-CAT-COA-235,Confirmación de Actividad de factor XII,True,coagulometria,22,150,plasma,false,670.0,711.6387,-41.6387
-1648,ECN-CAT-COA-239,Confirmación de Anticoagulante lúpico,True,coagulometria,5,75,plasma,false,370.0,344.4166,25.5834
-1654,ECN-CAT-END-126,Determinación de Hormona estimulante de tiroides,True,inmunoensayo,12,135,serum,false,580.0,505.9715,74.0285
-1656,ECN-CAT-END-128,Determinación de Tiroxina total,True,elisa,6,135,serum,false,500.0,416.4624,83.5376
-1657,ECN-CAT-END-129,Determinación de Triyodotironina libre,True,inmunoensayo,3,75,plasma,false,280.0,323.7282,-43.7282
-1662,ECN-CAT-END-134,Determinación de Hormona de crecimiento,True,elisa,13,150,serum,false,580.0,562.7222,17.2778
-1690,ECN-CAT-END-162,Cuantificación de Hormona foliculoestimulante,True,inmunoensayo,19,135,serum,false,720.0,647.5569,72.4431
-1692,ECN-CAT-END-164,Cuantificación de Progesterona,True,elisa,13,165,serum,false,620.0,567.3965,52.6035
-1693,ECN-CAT-END-165,Cuantificación de Testosterona total,True,inmunoensayo,5,105,plasma,false,420.0,373.5299,46.4701
-1695,ECN-CAT-END-167,Cuantificación de Dehidroepiandrosterona,True,elisa,29,225,plasma,true,920.0,933.4717,-13.4717
-1697,ECN-CAT-END-169,Cuantificación de Renina,True,quimioluminiscencia,23,225,plasma,false,840.0,832.3702,7.6298
-1698,ECN-CAT-END-170,Cuantificación de Paratohormona,True,elisa,15,180,serum,true,720.0,617.7852,102.2148
-1702,ECN-CAT-END-174,Cuantificación de Hormona antimülleriana,True,inmunoensayo,3,75,serum,false,300.0,305.2357,-5.2357
-1707,ECN-CAT-END-179,Evaluación de Triyodotironina libre,True,elisa,13,150,plasma,false,600.0,581.2147,18.7853
-1710,ECN-CAT-END-182,Evaluación de Cortisol,True,elisa,29,210,serum,true,980.0,910.3048,69.6952
-1720,ECN-CAT-END-192,Evaluación de Dehidroepiandrosterona,True,inmunoensayo,19,150,serum,false,660.0,652.2313,7.7687
-1722,ECN-CAT-END-194,Evaluación de Renina,True,elisa,13,150,serum,false,520.0,562.7222,-42.7222
-1728,ECN-CAT-END-200,Evaluación de Somatomedina C,True,elisa,15,165,serum,false,740.0,607.8495,132.1505
-1729,ECN-CAT-END-201,Control de Hormona estimulante de tiroides,True,inmunoensayo,12,120,plasma,false,540.0,519.7897,20.2103
-1734,ECN-CAT-END-206,Control de Insulina,True,elisa,22,210,serum,false,840.0,763.458,76.542
-1735,ECN-CAT-END-207,Control de Cortisol,True,inmunoensayo,19,165,plasma,false,720.0,675.3982,44.6018
-1736,ECN-CAT-END-208,Control de Hormona adrenocorticotropa,True,quimioluminiscencia,16,195,serum,false,700.0,662.9435,37.0565
-1737,ECN-CAT-END-209,Control de Hormona de crecimiento,True,elisa,13,150,plasma,false,580.0,581.2147,-1.2147
-1754,ECN-CAT-END-226,Confirmación de Hormona estimulante de tiroides,True,quimioluminiscencia,2,150,serum,false,460.0,365.7495,94.2505
-1755,ECN-CAT-END-227,Confirmación de Tiroxina libre,True,elisa,29,225,plasma,true,1000.0,933.4717,66.5283
-1757,ECN-CAT-END-229,Confirmación de Triyodotironina libre,True,quimioluminiscencia,23,225,plasma,false,760.0,832.3702,-72.3702
-1759,ECN-CAT-END-231,Confirmación de Insulina,True,inmunoensayo,12,135,plasma,false,580.0,524.464,55.536
-1766,ECN-CAT-END-238,Confirmación de Estradiol,True,quimioluminiscencia,16,195,serum,true,640.0,668.2048,-28.2048
-1769,ECN-CAT-END-241,Confirmación de Testosterona libre,True,quimioluminiscencia,2,135,plasma,false,420.0,379.5678,40.4322
-1773,ECN-CAT-URO-126,Determinación de Examen general de orina,True,tira reactiva,20,105,urine,false,600.0,630.7618,-30.7618
-1774,ECN-CAT-URO-127,Determinación de Microalbúmina en orina,True,microscopia,17,135,urine,false,590.0,590.4166,-0.4166
-1776,ECN-CAT-URO-129,Determinación de Glucosa en orina,True,tira reactiva,6,60,urine,false,390.0,333.5679,56.4321
-1778,ECN-CAT-URO-131,Determinación de Calcio en orina,True,colorimetria,30,150,urine,true,880.0,874.5077,5.4923
-1781,ECN-CAT-URO-134,Determinación de Potasio en orina,True,colorimetria,16,120,urine,false,670.0,576.7267,93.2733
-1783,ECN-CAT-URO-136,Determinación de Fósforo en orina,True,microscopia,10,120,urine,true,420.0,449.4181,-29.4181
-1784,ECN-CAT-URO-137,Determinación de Magnesio en orina,True,colorimetria,7,60,urine,false,370.0,375.9909,-5.9909
-1786,ECN-CAT-URO-139,Determinación de Osmolalidad urinaria,True,microscopia,26,195,urine,true,860.0,796.4137,63.5863
-1792,ECN-CAT-URO-145,Determinación de Leucocitos en orina,True,microscopia,3,90,urine,false,300.0,293.2226,6.7774
-1797,ECN-CAT-URO-150,Determinación de Relación albúmina creatinina,True,tira reactiva,13,75,urine,false,540.0,479.8277,60.1723
-1807,ECN-CAT-URO-160,Cuantificación de Cloro en orina,True,microscopia,3,90,urine,false,360.0,293.2226,66.7774
-1808,ECN-CAT-URO-161,Cuantificación de Fósforo en orina,True,colorimetria,30,165,urine,true,920.0,879.182,40.818
-1809,ECN-CAT-URO-162,Cuantificación de Magnesio en orina,True,tira reactiva,27,135,urine,true,730.0,786.9573,-56.9573
-1810,ECN-CAT-URO-163,Cuantificación de Urea en orina,True,microscopia,24,165,urine,false,720.0,741.3507,-21.3507
-1813,ECN-CAT-URO-166,Cuantificación de Sedimento urinario,True,microscopia,10,120,urine,false,450.0,444.1568,5.8432
-1816,ECN-CAT-URO-169,Cuantificación de Nitritos en orina,True,microscopia,26,180,urine,true,900.0,791.7394,108.2606
-1821,ECN-CAT-URO-174,Cuantificación de Bilirrubina en orina,True,tira reactiva,6,60,urine,false,390.0,333.5679,56.4321
-1823,ECN-CAT-URO-176,Evaluación de Examen general de orina,True,colorimetria,30,165,urine,true,890.0,879.182,10.818
-1825,ECN-CAT-URO-178,Evaluación de Proteínas en orina,True,microscopia,24,165,urine,false,780.0,741.3507,38.6493
-1827,ECN-CAT-URO-180,Evaluación de Creatinina en orina,True,tira reactiva,13,90,urine,false,490.0,484.502,5.498
-1828,ECN-CAT-URO-181,Evaluación de Calcio en orina,True,microscopia,10,120,urine,false,420.0,444.1568,-24.1568
-1831,ECN-CAT-URO-184,Evaluación de Potasio en orina,True,microscopia,26,195,urine,true,870.0,796.4137,73.5863
-1833,ECN-CAT-URO-186,Evaluación de Fósforo en orina,True,tira reactiva,20,105,urine,false,670.0,630.7618,39.2382
-1844,ECN-CAT-URO-197,Evaluación de Cilindros urinarios,True,colorimetria,7,75,urine,false,390.0,380.6653,9.3347
-1846,ECN-CAT-URO-199,Evaluación de Bilirrubina en orina,True,microscopia,26,195,urine,true,840.0,796.4137,43.5863
-1849,ECN-CAT-URO-202,Control de Microalbúmina en orina,True,microscopia,17,150,urine,false,580.0,595.0909,-15.0909
-1851,ECN-CAT-URO-204,Control de Glucosa en orina,True,tira reactiva,6,60,urine,true,430.0,338.8292,91.1708
-1852,ECN-CAT-URO-205,Control de Creatinina en orina,True,microscopia,3,90,urine,false,370.0,293.2226,76.7774
-1854,ECN-CAT-URO-207,Control de Ácido úrico en orina,True,tira reactiva,27,135,urine,true,740.0,786.9573,-46.9573
-1855,ECN-CAT-URO-208,Control de Sodio en orina,True,microscopia,24,165,urine,false,670.0,741.3507,-71.3507
-1871,ECN-CAT-URO-224,Control de Bilirrubina en orina,True,colorimetria,16,105,urine,false,690.0,572.0524,117.9476
-1876,ECN-CAT-URO-229,Confirmación de Glucosa en orina,True,microscopia,26,180,urine,true,880.0,791.7394,88.2606
-1884,ECN-CAT-URO-237,Confirmación de Magnesio en orina,True,tira reactiva,27,120,urine,true,770.0,782.283,-12.283
-1887,ECN-CAT-URO-240,Confirmación de Depuración de creatinina,True,tira reactiva,13,90,urine,false,560.0,484.502,75.498
-1895,ECN-CAT-MOL-129,Determinación de Virus del papiloma humano,True,pcr,14,435,swab,true,880.0,845.2758,34.7242
-1898,ECN-CAT-MOL-132,Determinación de Virus de Epstein-Barr,True,pcr,5,390,blood,true,580.0,642.6464,-62.6464
-1899,ECN-CAT-MOL-133,Determinación de Citomegalovirus,True,pcr,27,495,blood,true,1160.0,1120.3497,39.6503
-1904,ECN-CAT-MOL-138,Determinación de Mycobacterium tuberculosis,True,pcr,7,405,other,true,760.0,710.6363,49.3637
-1911,ECN-CAT-MOL-145,Determinación de Panel gastrointestinal molecular,True,rt-pcr,11,345,other,true,800.0,820.1221,-20.1221
-1912,ECN-CAT-MOL-146,Determinación de Trombofilia hereditaria,True,pcr,8,390,blood,true,740.0,703.3259,36.6741
-1915,ECN-CAT-MOL-149,Determinación de HLA-B27,True,pcr,24,480,blood,true,1140.0,1054.9958,85.0042
-1917,ECN-CAT-MOL-151,Cuantificación de Detección molecular de SARS-CoV-2,True,rt-pcr,18,390,swab,true,940.0,959.4359,-19.4359
-1919,ECN-CAT-MOL-153,Cuantificación de Virus de influenza B,True,rt-pcr,7,360,swab,false,780.0,722.3344,57.6656
-1921,ECN-CAT-MOL-155,Cuantificación de Virus de hepatitis B,True,pcr,1,375,plasma,true,560.0,543.081,16.919
-1924,ECN-CAT-MOL-158,Cuantificación de Citomegalovirus,True,pcr,17,450,blood,true,1020.0,904.0617,115.9383
-1927,ECN-CAT-MOL-161,Cuantificación de Chlamydia trachomatis,True,pcr,8,405,swab,true,700.0,714.5682,-14.5682
-1929,ECN-CAT-MOL-163,Cuantificación de Mycobacterium tuberculosis,True,pcr,27,480,other,true,1200.0,1138.5379,61.4621
-1939,ECN-CAT-MOL-173,Cuantificación de BCR-ABL cuantitativo,True,pcr,17,450,blood,true,980.0,904.0617,75.9383
-1945,ECN-CAT-MOL-179,Evaluación de Virus del papiloma humano,True,pcr,24,480,swab,true,1080.0,1061.5638,18.4362
-1954,ECN-CAT-MOL-188,Evaluación de Mycobacterium tuberculosis,True,pcr,17,435,other,true,960.0,922.25,37.75
-1957,ECN-CAT-MOL-191,Evaluación de Dengue por PCR,True,rt-pcr,8,345,blood,true,720.0,736.58,-16.58
-1958,ECN-CAT-MOL-192,Evaluación de Zika por PCR,True,rt-pcr,5,330,blood,true,680.0,671.2262,8.7738
-1959,ECN-CAT-MOL-193,Evaluación de Chikungunya por PCR,True,rt-pcr,27,435,blood,true,1260.0,1148.9294,111.0706
-1965,ECN-CAT-MOL-199,Evaluación de HLA-B27,True,pcr,4,390,blood,true,660.0,622.4199,37.5801
-1968,ECN-CAT-MOL-202,Control de Virus de influenza A,True,rt-pcr,25,405,swab,true,1140.0,1105.6957,34.3043
-1971,ECN-CAT-MOL-205,Control de Virus de hepatitis B,True,pcr,11,420,plasma,true,760.0,759.369,0.631
-1972,ECN-CAT-MOL-206,Control de Virus de hepatitis C,True,pcr,8,390,plasma,true,660.0,689.3408,-29.3408
-1977,ECN-CAT-MOL-211,Control de Chlamydia trachomatis,True,pcr,18,450,swab,true,940.0,930.8561,9.1439
-1978,ECN-CAT-MOL-212,Control de Neisseria gonorrhoeae,True,pcr,15,435,swab,true,900.0,865.5023,34.4977
-1985,ECN-CAT-MOL-219,Control de Panel respiratorio molecular,True,rt-pcr,14,375,swab,true,940.0,873.8556,66.1444
-1990,ECN-CAT-MOL-224,Control de HLA-B27,True,pcr,24,465,blood,true,1080.0,1050.3215,29.6785
-1992,ECN-CAT-MOL-226,Confirmación de Detección molecular de SARS-CoV-2,True,rt-pcr,18,375,swab,true,940.0,954.7616,-14.7616
-2002,ECN-CAT-MOL-236,Confirmación de Chlamydia trachomatis,True,pcr,8,405,swab,true,700.0,714.5682,-14.5682
-2005,ECN-CAT-MOL-239,Confirmación de Bordetella pertussis,True,pcr,24,480,swab,true,1140.0,1061.5638,78.4362
+parameter_count,duration_minutes,method,sample_type,requires_special_processing,normal_price,predicted_price,residual
+15,105,impedancia,blood,false,510.0,500.72,9.28
+1,75,inmunoensayo,plasma,false,270.0,283.28,-13.28
+8,90,coagulometria,plasma,false,390.0,409.77,-19.77
+2,30,tira reactiva,urine,false,210.0,243.31,-33.31
+13,150,elisa,serum,false,580.0,562.72,17.28
+6,60,tira reactiva,urine,false,390.0,333.57,56.43
+12,75,colorimetria,urine,false,490.0,481.8,8.2
+13,795,cultivo,swab,false,570.0,561.2,8.8
+30,225,elisa,serum,true,940.0,935.21,4.79
+26,195,microscopia,urine,true,840.0,796.41,43.59
+20,135,espectrofotometria,serum,false,590.0,592.31,-2.31
+2,150,quimioluminiscencia,serum,false,320.0,365.75,-45.75
+10,120,microscopia,urine,false,420.0,444.16,-24.16
+7,360,rt-pcr,swab,false,780.0,722.33,57.67
+9,765,cultivo,urine,false,460.0,520.6,-60.6
+18,105,colorimetria,serum,false,550.0,523.8,26.2
+10,135,microscopia,other,false,420.0,415.46,4.54
+16,195,quimioluminiscencia,serum,false,700.0,662.94,37.06
+27,240,quimioluminiscencia,plasma,true,940.0,923.21,16.79
+22,150,coagulometria,plasma,false,710.0,711.64,-1.64
+19,165,inmunoensayo,plasma,false,720.0,675.4,44.6
+7,90,inmunoensayo,plasma,false,440.0,409.31,30.69
+7,105,inmunoensayo,plasma,false,430.0,413.98,16.02
+20,105,enzimatico,plasma,false,560.0,554.0,6.0
+15,120,coagulometria,plasma,false,570.0,560.7,9.3
+3,60,espectrofotometria,serum,false,190.0,225.09,-35.09
+20,135,espectrofotometria,plasma,false,600.0,610.8,-10.8
+21,210,quimioluminiscencia,serum,false,800.0,768.75,31.25
+21,180,citometria,blood,false,740.0,737.16,2.84
+13,120,inmunoensayo,serum,false,560.0,521.52,38.48
+10,75,espectrofotometria,serum,false,390.0,371.34,18.66
+13,150,elisa,plasma,false,600.0,581.21,18.79
+14,375,rt-pcr,swab,true,940.0,873.86,66.14
+15,165,elisa,serum,false,740.0,607.85,132.15
+0,48,cultivo,unknown,sin_especificar,280.0,60.02,219.98
+10,120,microscopia,urine,true,420.0,449.42,-29.42
+23,840,cultivo,swab,true,780.0,782.75,-2.75
+24,840,cultivo,swab,false,760.0,797.71,-37.71
+26,195,microscopia,urine,true,870.0,796.41,73.59
+27,240,quimioluminiscencia,serum,true,930.0,904.72,25.28
+7,765,cultivo,swab,false,440.0,430.49,9.51
+5,390,pcr,blood,true,580.0,642.65,-62.65
+24,165,microscopia,urine,false,670.0,741.35,-71.35
+18,105,espectrofotometria,serum,false,460.0,542.51,-82.51
+10,75,espectrofotometria,plasma,false,380.0,389.84,-9.84
+23,225,quimioluminiscencia,plasma,false,760.0,832.37,-72.37
+20,105,tira reactiva,urine,false,600.0,630.76,-30.76
+12,90,colorimetria,urine,false,450.0,486.47,-36.47
+20,120,tira reactiva,urine,false,620.0,635.44,-15.44
+5,330,rt-pcr,swab,true,670.0,677.79,-7.79
+15,375,rt-pcr,swab,true,880.0,894.08,-14.08
+24,480,pcr,blood,true,1140.0,1055.0,85.0
+18,105,colorimetria,plasma,false,540.0,542.29,-2.29
+21,810,cultivo,stool,true,750.0,741.95,8.05
+2,75,coagulometria,plasma,false,280.0,283.74,-3.74
+3,390,pcr,blood,true,610.0,602.19,7.81
+13,90,tira reactiva,urine,false,560.0,484.5,75.5
+10,105,coagulometria,plasma,false,430.0,454.9,-24.9
+8,75,enzimatico,serum,false,280.0,283.44,-3.44
+27,240,quimioluminiscencia,plasma,true,930.0,923.21,6.79
+1,90,microscopia,blood,false,180.0,196.54,-16.54
+17,450,pcr,blood,true,1020.0,904.06,115.94
+5,135,elisa,serum,false,400.0,396.24,3.76
+30,165,colorimetria,serum,true,800.0,790.47,9.53
+21,225,quimioluminiscencia,serum,false,810.0,773.42,36.58
+8,60,tira reactiva,urine,false,390.0,374.02,15.98
+24,120,colorimetria,plasma,false,720.0,668.32,51.68
+15,180,elisa,serum,true,720.0,617.79,102.21
+24,165,microscopia,urine,false,720.0,741.35,-21.35
+12,135,citometria,blood,false,560.0,541.09,18.91
+30,165,colorimetria,urine,true,920.0,879.18,40.82
+13,150,elisa,serum,false,520.0,562.72,-42.72
+3,375,pcr,swab,true,600.0,604.09,-4.09
+8,405,pcr,swab,true,700.0,714.57,-14.57
+26,240,quimioluminiscencia,serum,true,890.0,884.49,5.51
+30,195,inmunoensayo,serum,true,810.0,894.01,-84.01
+24,165,coagulometria,plasma,false,740.0,756.77,-16.77
+13,75,tira reactiva,urine,false,540.0,479.83,60.17
+19,135,inmunoensayo,serum,false,670.0,647.56,22.44
+13,135,microscopia,other,false,520.0,476.14,43.86
+10,165,quimioluminiscencia,serum,false,480.0,532.24,-52.24
+15,105,impedancia,blood,false,480.0,500.72,-20.72
+5,75,coagulometria,plasma,false,290.0,344.42,-54.42
+3,75,inmunoensayo,serum,false,300.0,305.24,-5.24
+6,135,elisa,serum,false,430.0,416.46,13.54
+22,135,espectrofotometria,plasma,false,610.0,651.25,-41.25
+12,135,inmunoensayo,plasma,false,580.0,524.46,55.54
+11,780,cultivo,other,false,530.0,532.36,-2.36
+26,195,microscopia,urine,true,860.0,796.41,63.59
+28,210,citometria,blood,true,900.0,893.35,6.65
+11,105,coagulometria,plasma,false,470.0,475.12,-5.12
+9,780,cultivo,other,true,450.0,497.17,-47.17
+12,135,citometria,blood,false,480.0,541.09,-61.09
+0,20,enzimatico,unknown,sin_especificar,90.0,138.08,-48.08
+12,150,elisa,serum,false,520.0,542.5,-22.5
+19,150,inmunoensayo,serum,false,660.0,652.23,7.77
+27,165,impedancia,blood,true,760.0,767.4,-7.4
+17,810,cultivo,swab,false,680.0,646.78,33.22
+13,420,pcr,swab,true,810.0,820.37,-10.37
+29,225,elisa,serum,true,980.0,914.98,65.02
+13,420,pcr,blood,true,820.0,813.81,6.19
+16,195,quimioluminiscencia,serum,true,640.0,668.2,-28.2
+2,135,quimioluminiscencia,plasma,false,420.0,379.57,40.43
+12,90,coagulometria,plasma,false,480.0,490.68,-10.68
+12,135,citometria,blood,true,500.0,546.36,-46.36
+5,75,coagulometria,plasma,false,300.0,344.42,-44.42
+12,75,colorimetria,blood,false,380.0,425.57,-45.57
+15,360,rt-pcr,swab,true,870.0,889.41,-19.41
+12,90,colorimetria,serum,false,420.0,397.76,22.24
+5,75,coagulometria,plasma,false,370.0,344.42,25.58
+0,20,colorimetria,unknown,sin_especificar,100.0,166.83,-66.83
+6,60,tira reactiva,urine,false,390.0,333.57,56.43
+17,150,microscopia,urine,false,580.0,595.09,-15.09
+26,180,microscopia,urine,true,880.0,791.74,88.26
+1,750,cultivo,stool,false,320.0,313.47,6.53
+28,165,coagulometria,plasma,true,850.0,842.93,7.07
+5,120,citometria,blood,true,380.0,400.1,-20.1
+1,315,rt-pcr,other,true,570.0,608.51,-38.51
+21,810,cultivo,urine,false,720.0,777.35,-57.35
+7,60,colorimetria,urine,false,370.0,375.99,-5.99
+18,135,coagulometria,plasma,false,650.0,626.06,23.94
+27,840,cultivo,stool,true,870.0,872.66,-2.66
+14,90,enzimatico,plasma,false,450.0,427.96,22.04
+14,120,coagulometria,plasma,false,610.0,540.48,69.52
+11,780,cultivo,swab,true,530.0,521.33,8.67
+6,135,elisa,serum,false,500.0,416.46,83.54
+6,135,elisa,serum,false,380.0,416.46,-36.46
+9,120,inmunoensayo,serum,false,420.0,440.62,-20.62
+25,180,inmunoensayo,serum,true,810.0,788.2,21.8
+7,90,inmunoensayo,serum,false,430.0,390.82,39.18
+19,165,citometria,blood,false,620.0,692.03,-72.03
+21,150,coagulometria,plasma,false,750.0,691.41,58.59
+22,150,coagulometria,plasma,false,700.0,711.64,-11.64
+12,90,coagulometria,plasma,true,420.0,495.94,-75.94
+25,165,microscopia,blood,true,740.0,710.61,29.39
+17,390,rt-pcr,blood,true,910.0,932.64,-22.64
+9,405,pcr,other,true,710.0,751.09,-41.09
+10,105,inmunoensayo,serum,false,450.0,456.17,-6.17
+27,150,impedancia,blood,true,750.0,762.72,-12.72
+1,735,cultivo,swab,false,360.0,299.78,60.22
+6,60,colorimetria,serum,false,250.0,267.06,-17.06
+4,90,microscopia,stool,false,260.0,272.8,-12.8
+4,45,espectrofotometria,serum,false,260.0,240.64,19.36
+18,120,colorimetria,serum,false,510.0,528.47,-18.47
+21,795,cultivo,other,true,700.0,744.56,-44.56
+28,180,microscopia,urine,true,840.0,832.19,7.81
+24,480,pcr,swab,true,1080.0,1061.56,18.44
+4,390,pcr,blood,true,660.0,622.42,37.58
+16,135,microscopia,urine,false,560.0,570.19,-10.19
+30,180,coagulometria,plasma,true,860.0,888.06,-28.06
+28,195,citometria,blood,true,940.0,888.68,51.32
+25,180,microscopia,blood,true,720.0,715.28,4.72
+0,60,coagulometria,unknown,sin_especificar,180.0,253.71,-73.71
+7,75,enzimatico,serum,false,340.0,263.21,76.79
+13,360,rt-pcr,swab,true,810.0,848.95,-38.95
+20,105,tira reactiva,urine,false,670.0,630.76,39.24
+9,90,impedancia,blood,false,350.0,374.69,-24.69
+31,195,microscopia,stool,true,880.0,856.89,23.11
+1,90,microscopia,blood,false,190.0,196.54,-6.54
+19,150,inmunoensayo,serum,false,660.0,652.23,7.77
+12,135,inmunoensayo,serum,false,580.0,505.97,74.03
+1,60,impedancia,blood,false,240.0,203.53,36.47
+15,150,microscopia,other,true,520.0,526.53,-6.53
+21,105,enzimatico,serum,false,550.0,555.73,-5.73
+15,435,pcr,blood,true,840.0,858.93,-18.93
+2,60,coagulometria,plasma,false,270.0,279.06,-9.06
+21,105,enzimatico,serum,false,530.0,555.73,-25.73
+14,75,enzimatico,plasma,false,460.0,423.29,36.71
+31,855,cultivo,swab,true,940.0,949.23,-9.23
+17,390,rt-pcr,swab,true,940.0,939.21,0.79
+24,165,microscopia,stool,true,680.0,705.96,-25.96
+26,135,enzimatico,serum,true,690.0,671.47,18.53
+27,855,cultivo,swab,true,920.0,868.33,51.67
+22,210,elisa,serum,false,840.0,763.46,76.54
+10,165,quimioluminiscencia,serum,false,500.0,532.24,-32.24
+23,210,elisa,serum,false,810.0,783.68,26.32
+11,150,citometria,blood,false,520.0,525.54,-5.54
+12,120,inmunoensayo,plasma,false,540.0,519.79,20.21
+4,90,inmunoensayo,serum,false,300.0,330.14,-30.14
+23,180,citometria,blood,false,760.0,777.61,-17.61
+19,390,rt-pcr,swab,true,980.0,979.66,0.34
+5,105,citometria,blood,false,390.0,390.16,-0.16
+26,180,microscopia,urine,true,900.0,791.74,108.26
+1,375,pcr,plasma,true,560.0,543.08,16.92
+7,105,inmunoensayo,serum,false,420.0,395.49,24.51
+3,750,cultivo,swab,false,350.0,344.91,5.09
+15,105,coagulometria,plasma,false,580.0,556.03,23.97
+6,60,tira reactiva,urine,true,430.0,338.83,91.17
+18,105,colorimetria,serum,false,540.0,523.8,16.2
+2,90,inmunoensayo,serum,false,300.0,289.68,10.32
+30,165,colorimetria,urine,true,860.0,879.18,-19.18
+10,90,colorimetria,plasma,false,390.0,375.8,14.2
+24,135,colorimetria,serum,false,650.0,654.51,-4.51
+24,135,colorimetria,serum,false,690.0,654.51,35.49
+8,75,impedancia,blood,false,420.0,349.79,70.21
+13,150,elisa,serum,true,550.0,567.98,-17.98
+28,165,espectrofotometria,serum,true,750.0,768.73,-18.73
+14,90,enzimatico,plasma,false,430.0,427.96,2.04
+10,90,colorimetria,serum,false,430.0,357.31,72.69
+19,465,pcr,blood,true,950.0,949.19,0.81
+13,165,elisa,serum,false,620.0,567.4,52.6
+18,105,colorimetria,urine,false,600.0,612.51,-12.51
+21,150,microscopia,stool,false,580.0,635.34,-55.34
+25,180,microscopia,blood,true,700.0,715.28,-15.28
+11,150,elisa,plasma,false,550.0,540.76,9.24
+22,135,coagulometria,plasma,false,700.0,706.96,-6.96
+3,150,quimioluminiscencia,plasma,false,400.0,404.47,-4.47
+29,480,pcr,blood,true,1170.0,1156.13,13.87
+27,135,tira reactiva,urine,true,740.0,786.96,-46.96
+18,105,colorimetria,serum,false,510.0,523.8,-13.8
+30,150,colorimetria,urine,true,880.0,874.51,5.49
+21,195,citometria,blood,false,800.0,741.83,58.17
+13,150,elisa,plasma,false,580.0,581.21,-1.21
+12,90,colorimetria,plasma,false,380.0,416.26,-36.26
+3,750,cultivo,stool,true,440.0,359.18,80.82
+11,420,pcr,plasma,true,750.0,759.37,-9.37
+31,165,colorimetria,plasma,true,830.0,829.19,0.81
+0,20,enzimatico,unknown,sin_especificar,110.0,138.08,-28.08
+8,60,colorimetria,serum,false,230.0,307.51,-77.51
+1,90,inmunoensayo,plasma,false,260.0,287.95,-27.95
+4,45,espectrofotometria,serum,false,260.0,240.64,19.36
+22,150,coagulometria,plasma,false,670.0,711.64,-41.64
+27,255,quimioluminiscencia,plasma,true,920.0,927.89,-7.89
+25,465,pcr,blood,true,1070.0,1070.55,-0.55
+25,165,coagulometria,plasma,false,770.0,776.99,-6.99
+3,150,quimioluminiscencia,serum,false,310.0,385.98,-75.98
+1,30,enzimatico,plasma,false,170.0,146.32,23.68
+16,135,microscopia,urine,false,590.0,570.19,19.81
+5,105,inmunoensayo,plasma,false,420.0,373.53,46.47
+14,195,quimioluminiscencia,serum,false,620.0,622.49,-2.49
+25,165,microscopia,blood,true,710.0,710.61,-0.61
+13,795,cultivo,blood,false,620.0,554.63,65.37
+20,135,espectrofotometria,plasma,false,580.0,610.8,-30.8
+8,405,pcr,swab,true,700.0,714.57,-14.57
+6,75,coagulometria,plasma,false,370.0,364.64,5.36
+16,135,inmunoensayo,serum,false,590.0,586.88,3.12
+3,75,inmunoensayo,plasma,false,280.0,323.73,-43.73
+18,105,colorimetria,plasma,false,550.0,542.29,7.71
+28,150,espectrofotometria,plasma,true,790.0,782.55,7.45
+20,120,tira reactiva,urine,false,610.0,635.44,-25.44
+9,90,inmunocromatografia,stool,true,410.0,440.51,-30.51
+13,90,tira reactiva,urine,false,490.0,484.5,5.5
+1,75,coagulometria,plasma,false,290.0,263.51,26.49
+4,60,espectrofotometria,plasma,false,250.0,263.8,-13.8
+9,765,cultivo,other,false,470.0,487.24,-17.24
+27,150,espectrofotometria,plasma,true,820.0,762.32,57.68
+23,825,cultivo,blood,true,860.0,771.5,88.5
+8,90,coagulometria,plasma,false,410.0,409.77,0.23
+0,20,colorimetria,unknown,sin_especificar,90.0,166.83,-76.83
+5,75,coagulometria,plasma,false,300.0,344.42,-44.42
+15,210,quimioluminiscencia,plasma,false,630.0,665.88,-35.88
+0,120,quimioluminiscencia,unknown,sin_especificar,360.0,349.54,10.46
+0,15,inmunoensayo,unknown,sin_especificar,120.0,259.45,-139.45
+8,390,pcr,plasma,true,660.0,689.34,-29.34
+16,120,coagulometria,plasma,false,590.0,580.93,9.07
+4,90,inmunoensayo,serum,false,330.0,330.14,-0.14
+7,75,inmunocromatografia,stool,true,420.0,395.38,24.62
+17,165,citometria,blood,false,650.0,651.58,-1.58
+10,120,microscopia,urine,false,450.0,444.16,5.84
+15,105,impedancia,blood,false,540.0,500.72,39.28
+19,390,rt-pcr,blood,true,960.0,973.09,-13.09
+26,165,coagulometria,plasma,true,770.0,802.48,-32.48
+24,150,coagulometria,plasma,false,740.0,752.09,-12.09
+1,390,pcr,blood,true,530.0,561.74,-31.74
+19,810,cultivo,other,false,680.0,703.52,-23.52
+21,225,quimioluminiscencia,serum,false,760.0,773.42,-13.42
+27,120,tira reactiva,urine,true,770.0,782.28,-12.28
+22,135,espectrofotometria,blood,false,620.0,665.24,-45.24
+19,225,quimioluminiscencia,serum,false,730.0,732.97,-2.97
+20,825,cultivo,swab,false,780.0,712.13,67.87
+5,105,citometria,blood,false,400.0,390.16,9.84
+18,105,colorimetria,urine,false,610.0,612.51,-2.51
+29,210,elisa,serum,true,980.0,910.3,69.7
+2,75,coagulometria,plasma,false,270.0,283.74,-13.74
+10,105,microscopia,urine,false,420.0,439.48,-19.48
+3,765,cultivo,blood,false,340.0,343.02,-3.02
+5,120,citometria,blood,false,390.0,394.83,-4.83
+27,135,tira reactiva,urine,true,730.0,786.96,-56.96
+18,375,rt-pcr,swab,true,940.0,954.76,-14.76
+19,150,citometria,blood,false,680.0,687.35,-7.35
+17,105,colorimetria,serum,false,520.0,503.57,16.43
+11,135,citometria,blood,false,520.0,520.87,-0.87
+10,180,quimioluminiscencia,serum,false,430.0,536.91,-106.91
+3,90,microscopia,urine,false,370.0,293.22,76.78
+3,150,quimioluminiscencia,plasma,false,390.0,404.47,-14.47
+22,135,espectrofotometria,plasma,false,620.0,651.25,-31.25
+9,105,microscopia,blood,false,280.0,363.03,-83.03
+4,90,microscopia,urine,false,310.0,313.45,-3.45
+27,495,pcr,blood,true,1160.0,1120.35,39.65
+25,180,microscopia,blood,true,710.0,715.28,-5.28
+19,135,inmunoensayo,serum,false,720.0,647.56,72.44
+2,150,quimioluminiscencia,serum,false,460.0,365.75,94.25
+15,435,pcr,swab,true,900.0,865.5,34.5
+12,150,elisa,serum,false,510.0,542.5,-32.5
+23,225,quimioluminiscencia,plasma,false,840.0,832.37,7.63
+8,75,impedancia,blood,false,360.0,349.79,10.21
+15,105,impedancia,blood,false,500.0,500.72,-0.72
+22,150,inmunoensayo,serum,false,700.0,712.91,-12.91
+3,60,inmunocromatografia,stool,true,290.0,309.8,-19.8
+8,60,tira reactiva,urine,false,370.0,374.02,-4.02
+8,390,pcr,blood,true,740.0,703.33,36.67
+10,90,colorimetria,serum,false,400.0,357.31,42.69
+12,90,colorimetria,urine,false,480.0,486.47,-6.47
+27,480,pcr,other,true,1200.0,1138.54,61.46
+7,105,microscopia,other,false,380.0,345.44,34.56
+23,195,citometria,blood,false,800.0,782.28,17.72
+4,60,espectrofotometria,plasma,false,240.0,263.8,-23.8
+19,225,quimioluminiscencia,serum,false,800.0,732.97,67.03
+26,240,quimioluminiscencia,serum,true,880.0,884.49,-4.49
+24,465,pcr,blood,true,1080.0,1050.32,29.68
+7,390,pcr,plasma,true,650.0,669.11,-19.11
+30,165,colorimetria,urine,true,850.0,879.18,-29.18
+12,195,quimioluminiscencia,serum,false,590.0,582.04,7.96
+19,210,quimioluminiscencia,serum,false,760.0,728.3,31.7
+2,135,quimioluminiscencia,serum,false,330.0,361.08,-31.08
+3,90,microscopia,urine,false,360.0,293.22,66.78
+29,225,elisa,plasma,true,1000.0,933.47,66.53
+19,120,inmunocromatografia,stool,false,620.0,646.86,-26.86
+24,480,pcr,swab,true,1140.0,1061.56,78.44
+20,165,elisa,serum,false,640.0,708.98,-68.98
+17,450,pcr,swab,true,870.0,910.63,-40.63
+30,150,colorimetria,serum,true,780.0,785.8,-5.8
+29,225,elisa,plasma,true,920.0,933.47,-13.47
+9,180,quimioluminiscencia,plasma,false,500.0,535.18,-35.18
+9,165,quimioluminiscencia,plasma,false,510.0,530.5,-20.5
+18,450,pcr,swab,true,940.0,930.86,9.14
+7,405,pcr,other,true,760.0,710.64,49.36
+1,45,impedancia,blood,false,280.0,198.85,81.15
+6,135,elisa,serum,false,390.0,416.46,-26.46
+8,105,coagulometria,plasma,false,400.0,414.44,-14.44
+15,120,coagulometria,plasma,false,530.0,560.7,-30.7
+30,165,colorimetria,urine,true,890.0,879.18,10.82
+8,60,enzimatico,plasma,false,270.0,297.26,-27.26
+24,135,inmunocromatografia,stool,false,760.0,752.67,7.33
+25,165,microscopia,blood,true,720.0,710.61,9.39
+27,420,rt-pcr,blood,true,1160.0,1144.26,15.74
+17,450,pcr,blood,true,980.0,904.06,75.94
+22,195,elisa,serum,false,850.0,758.78,91.22
+21,180,citometria,blood,false,740.0,737.16,2.84
+9,180,quimioluminiscencia,serum,false,520.0,516.68,3.32
+9,405,pcr,blood,true,720.0,728.23,-8.23
+24,120,colorimetria,serum,false,690.0,649.83,40.17
+22,135,impedancia,blood,false,600.0,651.66,-51.66
+25,150,coagulometria,plasma,false,750.0,772.32,-22.32
+0,2880,cultivo microbiologico,unknown,sin_especificar,380.0,414.94,-34.94
+7,60,enzimatico,plasma,false,280.0,277.03,2.97
+11,120,microscopia,other,true,440.0,436.28,3.72
+9,120,inmunoensayo,serum,false,450.0,440.62,9.38
+1,735,cultivo,other,false,300.0,316.08,-16.08
+14,435,pcr,swab,true,880.0,845.28,34.72
+22,135,espectrofotometria,blood,false,630.0,665.24,-35.24
+17,135,microscopia,urine,false,590.0,590.42,-0.42
+5,90,microscopia,other,true,270.0,305.57,-35.57
+16,135,microscopia,urine,false,590.0,570.19,19.81
+10,165,quimioluminiscencia,serum,false,460.0,532.24,-72.24
+1,75,inmunoensayo,plasma,false,300.0,283.28,16.72
+7,90,microscopia,blood,false,290.0,317.9,-27.9
+7,750,cultivo,stool,false,420.0,434.82,-14.82
+1,735,cultivo,other,false,320.0,316.08,3.92
+2,60,coagulometria,plasma,false,290.0,279.06,10.94
+14,90,enzimatico,serum,false,440.0,409.47,30.53
+32,195,coagulometria,plasma,true,880.0,933.19,-53.19
+20,225,quimioluminiscencia,serum,false,740.0,753.2,-13.2
+26,240,quimioluminiscencia,serum,false,880.0,879.23,0.77
+11,345,rt-pcr,other,true,800.0,820.12,-20.12
+11,420,pcr,plasma,true,760.0,759.37,0.63
+28,165,coagulometria,plasma,true,850.0,842.93,7.07
+24,210,elisa,serum,false,760.0,803.91,-43.91
+24,165,microscopia,urine,false,780.0,741.35,38.65
+9,105,inmunoensayo,serum,false,480.0,435.94,44.06
+25,405,rt-pcr,swab,true,1140.0,1105.7,34.3
+3,750,cultivo,blood,false,440.0,338.34,101.66
+7,75,colorimetria,urine,false,390.0,380.67,9.33
+3,90,microscopia,urine,false,300.0,293.22,6.78
+15,105,impedancia,blood,false,530.0,500.72,29.28
+24,195,elisa,serum,false,810.0,799.24,10.76
+26,165,coagulometria,plasma,true,810.0,802.48,7.52
+14,90,inmunocromatografia,stool,false,520.0,536.38,-16.38
+15,435,pcr,swab,true,850.0,865.5,-15.5
+17,435,pcr,other,true,960.0,922.25,37.75
+17,810,cultivo,swab,false,660.0,646.78,13.22
+20,225,quimioluminiscencia,serum,false,740.0,753.2,-13.2
+3,150,quimioluminiscencia,serum,false,400.0,385.98,14.02
+27,435,rt-pcr,blood,true,1260.0,1148.93,111.07
+10,120,inmunoensayo,serum,false,450.0,460.84,-10.84
+3,60,impedancia,blood,false,220.0,243.98,-23.98
+23,165,microscopia,stool,true,670.0,685.73,-15.73
+16,105,colorimetria,urine,false,690.0,572.05,117.95
+8,75,impedancia,blood,false,340.0,349.79,-9.79
+5,330,rt-pcr,blood,true,680.0,671.23,8.77
+10,90,coagulometria,plasma,false,420.0,450.22,-30.22
+18,390,rt-pcr,swab,true,940.0,959.44,-19.44
+11,420,pcr,swab,true,740.0,779.92,-39.92
+8,345,rt-pcr,blood,true,720.0,736.58,-16.58
+29,225,elisa,serum,true,970.0,914.98,55.02
+27,240,quimioluminiscencia,serum,true,920.0,904.72,15.28
+4,75,espectrofotometria,serum,false,280.0,249.99,30.01
+13,105,inmunocromatografia,stool,false,600.0,520.83,79.17
+32,180,coagulometria,plasma,true,910.0,928.51,-18.51
+16,120,colorimetria,urine,false,670.0,576.73,93.27
