@@ -1,18 +1,18 @@
 {
-  "generatedAt": "2026-07-22T06:53:07.419Z",
-  "periodStart": "2026-02-01T00:00:00.000Z",
-  "periodEnd": "2026-07-22T06:53:07.419Z",
+  "generatedAt": "2026-08-02T04:00:32.995Z",
+  "periodStart": "2026-02-02T04:00:32.995Z",
+  "periodEnd": "2026-08-02T04:00:32.995Z",
   "periodMonths": 6,
   "unitOfAnalysis": "Un estudio individual activo del catalogo ECONOLAB",
-  "datasetFingerprintSha256": "ccc1d2e53a54412fff2b0cd8753d925e6d6f90aa9c2e8746fe7f5321f703b92f",
+  "datasetFingerprintSha256": "4bf3c8443fa22fe1592c148c4e8ae62bb6092eefc9134a6facb68b21302e4e23",
   "composition": {
-    "totalRows": 1048,
+    "totalRows": 2000,
     "realRows": 48,
-    "syntheticRows": 1000,
-    "syntheticPercentage": 95.42,
-    "totalRequestCount": 962,
-    "syntheticRequestCount": 930,
-    "syntheticRequestPercentage": 96.67
+    "syntheticRows": 1952,
+    "syntheticPercentage": 97.6,
+    "totalRequestCount": 2379,
+    "syntheticRequestCount": 1713,
+    "syntheticRequestPercentage": 72.01
   },
   "sources": {
     "price": "operativo.studies.normalPrice",
@@ -29,8 +29,5 @@
     "Paquetes, estudios inactivos o suspendidos",
     "MLTRAIN y registros marcados como DATOS SINTETICOS",
     "Ordenes canceladas para calcular request_count"
-  ],
-  "deployment": {
-    "persisted": false
-  }
+  ]
 }

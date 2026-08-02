@@ -1,7 +1,8 @@
 -- ==========================================================================
 -- ETL DE REGRESION: PostgreSQL -> una fila de dataset por estudio
 -- ==========================================================================
--- X: `parameter_count` y `method`.
+-- X: `parameter_count`, `duration_minutes`, `method`, `sample_type`
+-- y `requires_special_processing`.
 -- Y: `normal_price`.
 -- `study_id`, `study_code`, `study_name` e `is_synthetic` se conservan para
 -- trazabilidad; el entrenador no usa esos identificadores como variables X.
@@ -17,6 +18,9 @@ SELECT
   ) AS is_synthetic,
   study.type::text AS type,
   COALESCE(NULLIF(BTRIM(study.method), ''), 'sin_metodo') AS method,
+  study."durationMinutes" AS duration_minutes,
+  COALESCE(NULLIF(BTRIM(study."sampleType"), ''), 'unknown') AS sample_type,
+  study."requiresSpecialProcessing" AS requires_special_processing,
   COUNT(detail.id) FILTER (
     WHERE detail."isActive" = true
       AND detail."dataType" = 'parameter'
@@ -35,5 +39,8 @@ GROUP BY
   study.indicator,
   study.type,
   study.method,
+  study."durationMinutes",
+  study."sampleType",
+  study."requiresSpecialProcessing",
   study."normalPrice"
 ORDER BY study.id;

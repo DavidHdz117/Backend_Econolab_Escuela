@@ -1,8 +1,8 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "modelName": "econolab_study_normal_price",
-  "modelVersion": "2.0.0",
-  "generatedAt": "2026-07-22T06:52:13.755775+00:00",
+  "modelVersion": "3.0.0",
+  "generatedAt": "2026-08-02T04:40:38.613317+00:00",
   "algorithm": "ridge_regression",
   "hyperparameters": {
     "alpha": 0.1
@@ -12,36 +12,40 @@
   "randomSeed": 42,
   "dataset": {
     "relativePath": "05_Datasets/02_regresion_estudios_dataset.csv",
-    "sha256": "cd18cfee75ba536865b9f44a3e84608e52ed0830c15565a3f9784227b5c90e61",
-    "validRows": 1048,
+    "sha256": "adfe26931a33a5fcbc604d9377e9b008e2c358141b9bdaa5dc3951158a71d898",
+    "validRows": 2000,
     "audit": {
-      "syntheticRows": 1000,
+      "syntheticRows": 1952,
       "realRows": 48,
-      "syntheticFraction": 0.954198,
+      "syntheticFraction": 0.976,
       "usedAsFeature": false
     }
   },
   "split": {
     "strategy": "holdout_80_20",
     "testFraction": 0.2,
-    "trainingSamples": 838,
-    "testSamples": 210,
+    "trainingSamples": 1600,
+    "testSamples": 400,
     "audit": {
-      "trainSyntheticRows": 800,
+      "trainSyntheticRows": 1562,
       "trainRealRows": 38,
-      "trainSyntheticFraction": 0.954654,
-      "testSyntheticRows": 200,
+      "trainSyntheticFraction": 0.97625,
+      "testSyntheticRows": 390,
       "testRealRows": 10,
-      "testSyntheticFraction": 0.952381
+      "testSyntheticFraction": 0.975
     }
   },
   "features": {
     "input": [
       "parameter_count",
-      "method"
+      "duration_minutes",
+      "method",
+      "sample_type",
+      "requires_special_processing"
     ],
     "orderedEncoded": [
       "parameter_count_scaled",
+      "duration_minutes_scaled",
       "method=aglutinacion",
       "method=automatizado",
       "method=citometria",
@@ -65,104 +69,159 @@
       "method=rt-pcr",
       "method=sin_metodo",
       "method=tira reactiva",
-      "method=tira reactiva y microscopia"
+      "method=tira reactiva y microscopia",
+      "sample_type=blood",
+      "sample_type=other",
+      "sample_type=plasma",
+      "sample_type=serum",
+      "sample_type=stool",
+      "sample_type=swab",
+      "sample_type=unknown",
+      "sample_type=urine",
+      "requires_special_processing=false",
+      "requires_special_processing=sin_especificar",
+      "requires_special_processing=true"
     ],
     "numeric": {
       "parameter_count": {
-        "mean": 14.889021479713604,
-        "scale": 9.062543160796794,
+        "median": 15.0,
+        "mean": 15.285,
+        "scale": 8.952515009761223,
         "minimum": 0,
-        "maximum": 30
+        "maximum": 32
+      },
+      "duration_minutes": {
+        "median": 150.0,
+        "mean": 210.83125,
+        "scale": 202.9183863612105,
+        "minimum": 15,
+        "maximum": 2880
       }
     },
     "categorical": {
-      "method": [
-        "aglutinacion",
-        "automatizado",
-        "citometria",
-        "citometria / hematologia automatizada",
-        "coagulometria",
-        "colorimetria",
-        "cultivo",
-        "cultivo microbiologico",
-        "elisa",
-        "enzimatico",
-        "enzimatico colorimetrico",
-        "espectrofotometria",
-        "hemaglutinacion",
-        "impedancia",
-        "inmunocromatografia",
-        "inmunoensayo",
-        "inmunoturbidimetria",
-        "microscopia",
-        "pcr",
-        "quimioluminiscencia",
-        "rt-pcr",
-        "sin_metodo",
-        "tira reactiva",
-        "tira reactiva y microscopia"
-      ]
+      "method": {
+        "categories": [
+          "aglutinacion",
+          "automatizado",
+          "citometria",
+          "citometria / hematologia automatizada",
+          "coagulometria",
+          "colorimetria",
+          "cultivo",
+          "cultivo microbiologico",
+          "elisa",
+          "enzimatico",
+          "enzimatico colorimetrico",
+          "espectrofotometria",
+          "hemaglutinacion",
+          "impedancia",
+          "inmunocromatografia",
+          "inmunoensayo",
+          "inmunoturbidimetria",
+          "microscopia",
+          "pcr",
+          "quimioluminiscencia",
+          "rt-pcr",
+          "sin_metodo",
+          "tira reactiva",
+          "tira reactiva y microscopia"
+        ],
+        "defaultValue": "coagulometria"
+      },
+      "sample_type": {
+        "categories": [
+          "blood",
+          "other",
+          "plasma",
+          "serum",
+          "stool",
+          "swab",
+          "unknown",
+          "urine"
+        ],
+        "defaultValue": "plasma"
+      },
+      "requires_special_processing": {
+        "categories": [
+          "false",
+          "sin_especificar",
+          "true"
+        ],
+        "defaultValue": "false"
+      }
     }
   },
   "coefficients": {
-    "intercept": 562.1143598980238,
+    "intercept": 555.9104753355347,
     "values": [
-      197.2110600472259,
-      -45.82154736747803,
-      -52.829658850774806,
-      38.43407665346975,
-      -52.82965885077437,
-      -15.174960876924919,
-      -62.896489504386544,
-      43.92096412245783,
-      110.80670478558837,
-      39.83625307421173,
-      -115.02657746291256,
-      -136.2977378436686,
-      -59.84336694338831,
-      -98.28420430531943,
-      -55.840967404663104,
-      -10.360070202784561,
-      3.237928229440784,
-      106.55940501347409,
-      -53.38852997746464,
-      279.44656887989413,
-      76.7371817438684,
-      327.27412751250887,
-      -116.46602248713805,
-      -43.81830454099274,
-      -107.37511339622826
+      181.0780292809325,
+      63.233786881526406,
+      -1.81014593980359,
+      -3.0282314003344837,
+      83.44308970075915,
+      -11.527006967038005,
+      61.03313401466836,
+      -13.386553921555125,
+      -128.91956776169712,
+      -656.5131435617373,
+      112.64761865549714,
+      -42.133444533246845,
+      -74.80451919384276,
+      5.321533158219489,
+      -52.73216463823153,
+      -8.260455994233519,
+      36.72432798019766,
+      80.79773857063063,
+      141.16014753679806,
+      -24.597537064023044,
+      241.85561480147655,
+      138.1664810120317,
+      289.1326672260038,
+      -75.16337060340186,
+      -35.583137350018994,
+      -61.82307372914057,
+      -7.3202986585364975,
+      15.542299711066804,
+      -21.305406551863555,
+      -39.79797775498906,
+      8.257046584868487,
+      -0.7523653699890672,
+      -3.5332202655140272,
+      48.909922305599274,
+      -0.8640612347661848,
+      -3.533220265514895,
+      4.3972814959513205
     ]
   },
   "metrics": {
     "train": {
-      "mae": 20.5498,
-      "rmse": 31.3735,
-      "r2": 0.9822
+      "mae": 27.222,
+      "rmse": 36.5651,
+      "r2": 0.9748
     },
     "test": {
-      "mae": 20.7193,
-      "rmse": 26.8872,
-      "r2": 0.9851
+      "mae": 30.404,
+      "rmse": 41.4118,
+      "r2": 0.9674
     },
     "testByOrigin": {
       "real": {
         "samples": 10,
-        "mae": 50.271,
-        "rmse": 60.5238,
-        "r2": 0.6747
+        "mae": 73.3448,
+        "rmse": 94.4998,
+        "r2": 0.2069
       },
       "synthetic": {
-        "samples": 200,
-        "mae": 19.2418,
-        "rmse": 23.9982,
-        "r2": 0.9866
+        "samples": 390,
+        "mae": 29.3029,
+        "rmse": 39.1143,
+        "r2": 0.969
       }
     },
     "baselineTest": {
-      "mae": 185.2857,
-      "rmse": 221.0742,
-      "r2": -0.0049
+      "mae": 191.1623,
+      "rmse": 229.4183,
+      "r2": -0.0001
     }
   },
   "usage": {

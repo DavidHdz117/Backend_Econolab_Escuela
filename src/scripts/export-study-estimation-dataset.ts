@@ -15,6 +15,9 @@ type RegressionDatasetRow = {
   type: string;
   method: string;
   parameter_count: number;
+  duration_minutes: number;
+  sample_type: string;
+  requires_special_processing: boolean | null;
   normal_price: string | number;
 };
 
@@ -84,6 +87,9 @@ async function main() {
       'type',
       'method',
       'parameter_count',
+      'duration_minutes',
+      'sample_type',
+      'requires_special_processing',
       'normal_price',
     ];
     const csv = toCsv(
@@ -96,6 +102,11 @@ async function main() {
         row.type,
         row.method,
         row.parameter_count,
+        row.duration_minutes,
+        row.sample_type,
+        row.requires_special_processing == null
+          ? ''
+          : String(row.requires_special_processing),
         row.normal_price,
       ]),
     );

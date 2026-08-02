@@ -5,21 +5,46 @@ import {
   Injectable,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { StudyType } from '../entities/study.entity';
+import { StudySampleType, StudyType } from '../entities/study.entity';
 
 const STUDY_PRICE_ARTIFACT_RELATIVE_PATH =
   'ml/regression/artifacts/regression_price_model.json';
+const NUMERIC_FEATURES = ['parameter_count', 'duration_minutes'] as const;
+const CATEGORICAL_FEATURES = [
+  'method',
+  'sample_type',
+  'requires_special_processing',
+] as const;
+
+type NumericFeatureName = (typeof NUMERIC_FEATURES)[number];
+type CategoricalFeatureName = (typeof CATEGORICAL_FEATURES)[number];
 
 export type StudyEstimationInput = {
   type: StudyType;
   parameterCount: number;
+  durationMinutes?: number;
   method?: string;
+  sampleType?: StudySampleType | string;
+  requiresSpecialProcessing?: boolean | null;
 };
 
 type RegressionMetrics = {
   mae: number;
   rmse: number;
   r2: number;
+};
+
+type NumericFeatureConfig = {
+  median: number;
+  mean: number;
+  scale: number;
+  minimum: number;
+  maximum: number;
+};
+
+type CategoricalFeatureConfig = {
+  categories: string[];
+  defaultValue: string;
 };
 
 type StudyPriceArtifact = {
@@ -42,17 +67,8 @@ type StudyPriceArtifact = {
   features: {
     input: string[];
     orderedEncoded: string[];
-    numeric: {
-      parameter_count: {
-        mean: number;
-        scale: number;
-        minimum: number;
-        maximum: number;
-      };
-    };
-    categorical: {
-      method: string[];
-    };
+    numeric: Record<NumericFeatureName, NumericFeatureConfig>;
+    categorical: Record<CategoricalFeatureName, CategoricalFeatureConfig>;
   };
   coefficients: {
     intercept: number;
@@ -73,7 +89,7 @@ type StudyPriceArtifact = {
  * PASO 5: modelo de regresion utilizado por la API.
  *
  * Esta clase NO entrena durante una peticion. Al iniciar Nest carga el JSON
- * generado previamente por 06_Notebooks/02_regresion_precio_estudios.ipynb.
+ * generado previamente por el proceso offline de entrenamiento.
  */
 @Injectable()
 export class StudyEstimationModel {
@@ -92,12 +108,8 @@ export class StudyEstimationModel {
     }
 
     const artifact = this.getArtifactOrFail();
-
-    // PASO 6A: aplicar exactamente la misma transformacion aprendida en train.
     const encodedInput = this.encodeInput(input, artifact);
 
-    // PASO 6B: aqui se USA el modelo: intercepto + X por coeficientes.
-    // No hay fit/reentrenamiento ni consulta a BD dentro de esta peticion.
     const rawPrice =
       artifact.coefficients.intercept +
       this.dot(encodedInput, artifact.coefficients.values);
@@ -124,7 +136,13 @@ export class StudyEstimationModel {
         priceRootMeanSquaredError: artifact.metrics.test.rmse,
         priceR2: artifact.metrics.test.r2,
         baselineMeanAbsoluteError: artifact.metrics.baselineTest.mae,
-        featuresUsed: ['metodo', 'numero_parametros'],
+        featuresUsed: [
+          'numero_parametros',
+          'duracion_minutos',
+          'metodo',
+          'tipo_muestra',
+          'procesamiento_especial',
+        ],
       },
       warnings: this.buildWarnings(input, artifact),
     };
@@ -152,8 +170,6 @@ export class StudyEstimationModel {
         : resolve(process.cwd(), configuredPath);
     }
 
-    // Primero busca el artefacto academico generado por la libreta; si no existe,
-    // conserva compatibilidad con la copia historica de `ml-artifacts`.
     const candidates = [
       resolve(process.cwd(), STUDY_PRICE_ARTIFACT_RELATIVE_PATH),
       resolve(
@@ -184,29 +200,41 @@ export class StudyEstimationModel {
     value: unknown,
   ): asserts value is StudyPriceArtifact {
     const artifact = value as Partial<StudyPriceArtifact> | null;
-    const numeric = artifact?.features?.numeric?.parameter_count;
-    const methodCategories = artifact?.features?.categorical?.method;
+    const numeric = artifact?.features?.numeric;
+    const categorical = artifact?.features?.categorical;
     const coefficients = artifact?.coefficients?.values;
-    const expectedCoefficientCount = 1 + (methodCategories?.length ?? 0);
+    const expectedCoefficientCount =
+      NUMERIC_FEATURES.length +
+      CATEGORICAL_FEATURES.reduce(
+        (total, feature) =>
+          total + (categorical?.[feature]?.categories?.length ?? 0),
+        0,
+      );
 
     if (
       !artifact ||
-      artifact.schemaVersion !== 1 ||
+      artifact.schemaVersion !== 2 ||
       typeof artifact.modelName !== 'string' ||
       typeof artifact.modelVersion !== 'string' ||
       typeof artifact.generatedAt !== 'string' ||
       artifact.algorithm !== 'ridge_regression' ||
       artifact.target !== 'normal_price' ||
       !Number.isInteger(artifact.randomSeed) ||
+      !Array.isArray(artifact.features?.input) ||
+      !NUMERIC_FEATURES.every((feature) =>
+        artifact.features?.input?.includes(feature),
+      ) ||
+      !CATEGORICAL_FEATURES.every((feature) =>
+        artifact.features?.input?.includes(feature),
+      ) ||
       !numeric ||
-      !this.isFiniteNumber(numeric.mean) ||
-      !this.isFiniteNumber(numeric.scale) ||
-      numeric.scale <= 0 ||
-      !this.isFiniteNumber(numeric.minimum) ||
-      !this.isFiniteNumber(numeric.maximum) ||
-      numeric.minimum > numeric.maximum ||
-      !Array.isArray(methodCategories) ||
-      methodCategories.length === 0 ||
+      !categorical ||
+      !NUMERIC_FEATURES.every((feature) =>
+        this.isValidNumericFeatureConfig(numeric[feature]),
+      ) ||
+      !CATEGORICAL_FEATURES.every((feature) =>
+        this.isValidCategoricalFeatureConfig(categorical[feature]),
+      ) ||
       !this.isFiniteNumber(artifact.coefficients?.intercept) ||
       !Array.isArray(coefficients) ||
       coefficients.length !== expectedCoefficientCount ||
@@ -226,13 +254,45 @@ export class StudyEstimationModel {
     input: StudyEstimationInput,
     artifact: StudyPriceArtifact,
   ) {
-    const numeric = artifact.features.numeric.parameter_count;
-    const normalizedMethod = this.normalizeCategory(input.method, 'sin_metodo');
+    const parameterConfig = artifact.features.numeric.parameter_count;
+    const durationConfig = artifact.features.numeric.duration_minutes;
+    const methodConfig = artifact.features.categorical.method;
+    const sampleTypeConfig = artifact.features.categorical.sample_type;
+    const specialProcessingConfig =
+      artifact.features.categorical.requires_special_processing;
+
+    const parameterCount = this.normalizeNumericInput(
+      input.parameterCount,
+      parameterConfig.median,
+    );
+    const durationMinutes = this.normalizeNumericInput(
+      input.durationMinutes,
+      durationConfig.median,
+    );
+    const normalizedMethod = this.normalizeCategory(
+      input.method,
+      methodConfig.defaultValue,
+    );
+    const normalizedSampleType = this.normalizeCategory(
+      input.sampleType,
+      sampleTypeConfig.defaultValue,
+    );
+    const normalizedSpecialProcessing = this.normalizeBooleanCategory(
+      input.requiresSpecialProcessing,
+      specialProcessingConfig.defaultValue,
+    );
 
     return [
-      (input.parameterCount - numeric.mean) / numeric.scale,
-      ...artifact.features.categorical.method.map((category) =>
+      (parameterCount - parameterConfig.mean) / parameterConfig.scale,
+      (durationMinutes - durationConfig.mean) / durationConfig.scale,
+      ...methodConfig.categories.map((category) =>
         normalizedMethod === category ? 1 : 0,
+      ),
+      ...sampleTypeConfig.categories.map((category) =>
+        normalizedSampleType === category ? 1 : 0,
+      ),
+      ...specialProcessingConfig.categories.map((category) =>
+        normalizedSpecialProcessing === category ? 1 : 0,
       ),
     ];
   }
@@ -242,49 +302,100 @@ export class StudyEstimationModel {
     artifact: StudyPriceArtifact,
   ) {
     const warnings: string[] = [];
-    const numeric = artifact.features.numeric.parameter_count;
-    const method = this.normalizeCategory(input.method, 'sin_metodo');
+    const parameterConfig = artifact.features.numeric.parameter_count;
+    const durationConfig = artifact.features.numeric.duration_minutes;
+    const methodConfig = artifact.features.categorical.method;
+    const sampleTypeConfig = artifact.features.categorical.sample_type;
+    const specialProcessingConfig =
+      artifact.features.categorical.requires_special_processing;
 
     const syntheticFraction = artifact.dataset?.audit?.syntheticFraction;
     const realMetrics = artifact.metrics.testByOrigin?.real;
-    if (
-      typeof syntheticFraction === 'number' &&
-      syntheticFraction >= 0.8
-    ) {
+    if (typeof syntheticFraction === 'number' && syntheticFraction >= 0.8) {
       const realEvaluation = realMetrics
         ? ` En ${realMetrics.samples} estudios reales de prueba, el MAE fue $${realMetrics.mae.toFixed(2)} MXN.`
         : '';
       warnings.push(
-        `Prototipo académico: ${(syntheticFraction * 100).toFixed(2)} % del dataset es demostrativo.${realEvaluation} Confirma el precio antes de guardar.`,
+        `Prototipo academico: ${(syntheticFraction * 100).toFixed(2)} % del dataset es demostrativo.${realEvaluation} Confirma el precio antes de guardar.`,
       );
     }
 
-    if (!artifact.features.categorical.method.includes(method)) {
+    const method = this.normalizeCategory(input.method, methodConfig.defaultValue);
+    if (input.method && !methodConfig.categories.includes(method)) {
       warnings.push(
         'El metodo no aparecio en entrenamiento; se calculo con la referencia general.',
       );
     }
 
+    const sampleType = this.normalizeCategory(
+      input.sampleType,
+      sampleTypeConfig.defaultValue,
+    );
+    if (input.sampleType && !sampleTypeConfig.categories.includes(sampleType)) {
+      warnings.push(
+        'El tipo de muestra no aparecio en entrenamiento; se calculo con la referencia general.',
+      );
+    }
+
+    const specialProcessing = this.normalizeBooleanCategory(
+      input.requiresSpecialProcessing,
+      specialProcessingConfig.defaultValue,
+    );
     if (
-      input.parameterCount < numeric.minimum ||
-      input.parameterCount > numeric.maximum
+      input.requiresSpecialProcessing != null &&
+      !specialProcessingConfig.categories.includes(specialProcessing)
     ) {
       warnings.push(
-        `El numero de parametros esta fuera del rango entrenado (${numeric.minimum}-${numeric.maximum}).`,
+        'La combinacion de procesamiento especial no aparecio en entrenamiento; se calculo con la referencia general.',
+      );
+    }
+
+    if (
+      input.parameterCount < parameterConfig.minimum ||
+      input.parameterCount > parameterConfig.maximum
+    ) {
+      warnings.push(
+        `El numero de parametros esta fuera del rango entrenado (${parameterConfig.minimum}-${parameterConfig.maximum}).`,
+      );
+    }
+
+    if (
+      this.isFiniteNumber(input.durationMinutes) &&
+      (input.durationMinutes < durationConfig.minimum ||
+        input.durationMinutes > durationConfig.maximum)
+    ) {
+      warnings.push(
+        `La duracion esta fuera del rango entrenado (${durationConfig.minimum}-${durationConfig.maximum} minutos).`,
       );
     }
 
     return warnings;
   }
 
-  private normalizeCategory(value: string | undefined, fallback: string) {
-    const normalized = (value ?? '')
+  private normalizeCategory(
+    value: string | StudySampleType | undefined,
+    fallback: string,
+  ) {
+    const normalized = String(value ?? '')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .trim()
       .toLowerCase()
       .replace(/\s+/g, ' ');
     return normalized || fallback;
+  }
+
+  private normalizeBooleanCategory(
+    value: boolean | null | undefined,
+    fallback: string,
+  ) {
+    if (value === true) return 'true';
+    if (value === false) return 'false';
+    return fallback;
+  }
+
+  private normalizeNumericInput(value: unknown, fallback: number) {
+    return this.isFiniteNumber(value) ? value : fallback;
   }
 
   private isValidMetrics(value: unknown): value is RegressionMetrics {
@@ -294,6 +405,35 @@ export class StudyEstimationModel {
         this.isFiniteNumber(metrics.mae) &&
         this.isFiniteNumber(metrics.rmse) &&
         this.isFiniteNumber(metrics.r2),
+    );
+  }
+
+  private isValidNumericFeatureConfig(
+    value: unknown,
+  ): value is NumericFeatureConfig {
+    const feature = value as Partial<NumericFeatureConfig> | null;
+    return Boolean(
+      feature &&
+        this.isFiniteNumber(feature.median) &&
+        this.isFiniteNumber(feature.mean) &&
+        this.isFiniteNumber(feature.scale) &&
+        feature.scale > 0 &&
+        this.isFiniteNumber(feature.minimum) &&
+        this.isFiniteNumber(feature.maximum) &&
+        feature.minimum <= feature.maximum,
+    );
+  }
+
+  private isValidCategoricalFeatureConfig(
+    value: unknown,
+  ): value is CategoricalFeatureConfig {
+    const feature = value as Partial<CategoricalFeatureConfig> | null;
+    return Boolean(
+      feature &&
+        typeof feature.defaultValue === 'string' &&
+        Array.isArray(feature.categories) &&
+        feature.categories.length > 0 &&
+        feature.categories.every((category) => typeof category === 'string'),
     );
   }
 

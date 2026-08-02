@@ -30,6 +30,18 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 RANDOM_SEED = 42
 TEST_FRACTION = 0.20
 RIDGE_ALPHA = 0.10
+NUMERIC_FEATURE_COLUMNS = ["parameter_count", "duration_minutes"]
+CATEGORICAL_FEATURE_COLUMNS = [
+    "method",
+    "sample_type",
+    "requires_special_processing",
+]
+FEATURE_COLUMNS = [
+    *NUMERIC_FEATURE_COLUMNS,
+    *CATEGORICAL_FEATURE_COLUMNS,
+]
+TARGET_COLUMN = "normal_price"
+SPECIAL_PROCESSING_FALLBACK = "sin_especificar"
 
 
 def project_root() -> Path:
@@ -51,6 +63,15 @@ def normalize_category(value: object, fallback: str) -> str:
     return text or fallback
 
 
+def normalize_special_processing(value: object) -> str:
+    normalized = normalize_category(value, "")
+    if normalized in {"true", "1", "yes", "si"}:
+        return "true"
+    if normalized in {"false", "0", "no"}:
+        return "false"
+    return SPECIAL_PROCESSING_FALLBACK
+
+
 def clean_dataset(raw: pd.DataFrame) -> pd.DataFrame:
     """Limpia nulos, duplicados y valores imposibles antes de separar datos."""
 
@@ -62,6 +83,9 @@ def clean_dataset(raw: pd.DataFrame) -> pd.DataFrame:
         "type",
         "method",
         "parameter_count",
+        "duration_minutes",
+        "sample_type",
+        "requires_special_processing",
         "normal_price",
     }
     missing = sorted(required.difference(raw.columns))
@@ -72,15 +96,32 @@ def clean_dataset(raw: pd.DataFrame) -> pd.DataFrame:
     clean["parameter_count"] = pd.to_numeric(
         clean["parameter_count"], errors="coerce"
     )
+    clean["duration_minutes"] = pd.to_numeric(
+        clean["duration_minutes"], errors="coerce"
+    )
     clean["normal_price"] = pd.to_numeric(clean["normal_price"], errors="coerce")
-    clean = clean.dropna(subset=["study_id", "parameter_count", "normal_price"])
+    clean = clean.dropna(subset=["study_id", "normal_price"])
     clean = clean.drop_duplicates(subset=["study_id"], keep="last")
     clean = clean[
-        (clean["parameter_count"] >= 0)
-        & (clean["normal_price"] > 0)
+        (clean["normal_price"] > 0)
         & np.isfinite(clean["normal_price"])
+        & (
+            clean["parameter_count"].isna()
+            | (
+                (clean["parameter_count"] >= 0)
+                & np.isfinite(clean["parameter_count"])
+            )
+        )
+        & (
+            clean["duration_minutes"].isna()
+            | (
+                (clean["duration_minutes"] > 0)
+                & np.isfinite(clean["duration_minutes"])
+            )
+        )
     ].copy()
-    clean["parameter_count"] = clean["parameter_count"].astype(int)
+    clean["parameter_count"] = clean["parameter_count"].round(0)
+    clean["duration_minutes"] = clean["duration_minutes"].round(0)
     clean["is_synthetic"] = clean["is_synthetic"].map(
         lambda value: str(value).strip().lower() in {"true", "1", "yes", "si"}
     )
@@ -89,6 +130,12 @@ def clean_dataset(raw: pd.DataFrame) -> pd.DataFrame:
     clean["method"] = clean["method"].map(
         lambda value: normalize_category(value, "sin_metodo")
     )
+    clean["sample_type"] = clean["sample_type"].map(
+        lambda value: normalize_category(value, "unknown")
+    )
+    clean["requires_special_processing"] = clean[
+        "requires_special_processing"
+    ].map(normalize_special_processing)
     return clean.sort_values("study_id").reset_index(drop=True)
 
 
@@ -115,10 +162,6 @@ def train_and_export(root: Path | None = None) -> dict:
     if len(dataset) < 10:
         raise ValueError("Se necesitan al menos 10 estudios validos para entrenar.")
 
-    feature_columns = ["parameter_count", "method"]
-    target_column = "normal_price"
-    # Se estratifica por procedencia para conservar una proporcion auditable
-    # similar de datos reales/demostrativos en train y test. Esta columna no es X.
     stratify = (
         dataset["is_synthetic"]
         if dataset["is_synthetic"].nunique() > 1
@@ -126,7 +169,6 @@ def train_and_export(root: Path | None = None) -> dict:
         else None
     )
 
-    # PASO 3: train y test se separan ANTES de ajustar transformaciones/modelo.
     train_rows, test_rows = train_test_split(
         dataset,
         test_size=TEST_FRACTION,
@@ -174,8 +216,8 @@ def train_and_export(root: Path | None = None) -> dict:
     )
     preprocessor = ColumnTransformer(
         transformers=[
-            ("numeric", numeric_pipeline, ["parameter_count"]),
-            ("categorical", categorical_pipeline, ["method"]),
+            ("numeric", numeric_pipeline, NUMERIC_FEATURE_COLUMNS),
+            ("categorical", categorical_pipeline, CATEGORICAL_FEATURE_COLUMNS),
         ],
         remainder="drop",
     )
@@ -186,20 +228,18 @@ def train_and_export(root: Path | None = None) -> dict:
         ]
     )
 
-    # PASO 4: el modelo aprende SOLO con el conjunto de entrenamiento.
-    model.fit(train_rows[feature_columns], train_rows[target_column])
-    train_prediction = model.predict(train_rows[feature_columns])
-    test_prediction = model.predict(test_rows[feature_columns])
+    model.fit(train_rows[FEATURE_COLUMNS], train_rows[TARGET_COLUMN])
+    train_prediction = model.predict(train_rows[FEATURE_COLUMNS])
+    test_prediction = model.predict(test_rows[FEATURE_COLUMNS])
 
-    # Baseline justo: siempre predice el promedio aprendido en train.
     baseline = DummyRegressor(strategy="mean")
-    baseline.fit(train_rows[feature_columns], train_rows[target_column])
-    baseline_test_prediction = baseline.predict(test_rows[feature_columns])
+    baseline.fit(train_rows[FEATURE_COLUMNS], train_rows[TARGET_COLUMN])
+    baseline_test_prediction = baseline.predict(test_rows[FEATURE_COLUMNS])
 
-    train_metrics = metric_values(train_rows[target_column], train_prediction)
-    test_metrics = metric_values(test_rows[target_column], test_prediction)
+    train_metrics = metric_values(train_rows[TARGET_COLUMN], train_prediction)
+    test_metrics = metric_values(test_rows[TARGET_COLUMN], test_prediction)
     baseline_metrics = metric_values(
-        test_rows[target_column], baseline_test_prediction
+        test_rows[TARGET_COLUMN], baseline_test_prediction
     )
     test_metrics_by_origin = {}
     for origin_name, synthetic_value in (("real", False), ("synthetic", True)):
@@ -209,7 +249,7 @@ def train_and_export(root: Path | None = None) -> dict:
                 "samples": int(origin_mask.sum()),
                 **rounded_metrics(
                     metric_values(
-                        test_rows.loc[origin_mask, target_column],
+                        test_rows.loc[origin_mask, TARGET_COLUMN],
                         test_prediction[origin_mask.to_numpy()],
                     )
                 ),
@@ -223,6 +263,9 @@ def train_and_export(root: Path | None = None) -> dict:
             "is_synthetic",
             "method",
             "parameter_count",
+            "duration_minutes",
+            "sample_type",
+            "requires_special_processing",
             "normal_price",
         ]
     ].copy()
@@ -238,27 +281,47 @@ def train_and_export(root: Path | None = None) -> dict:
     )
 
     fitted_preprocessor = model.named_steps["preprocessor"]
-    numeric_scaler = fitted_preprocessor.named_transformers_["numeric"].named_steps[
-        "scaler"
-    ]
-    onehot = fitted_preprocessor.named_transformers_["categorical"].named_steps[
-        "onehot"
-    ]
+    numeric_transformer = fitted_preprocessor.named_transformers_["numeric"]
+    categorical_transformer = fitted_preprocessor.named_transformers_["categorical"]
+    numeric_imputer = numeric_transformer.named_steps["imputer"]
+    numeric_scaler = numeric_transformer.named_steps["scaler"]
+    categorical_imputer = categorical_transformer.named_steps["imputer"]
+    onehot = categorical_transformer.named_steps["onehot"]
     regressor = model.named_steps["regressor"]
-    method_categories = [str(value) for value in onehot.categories_[0].tolist()]
-    ordered_features = [
-        "parameter_count_scaled",
-        *[f"method={value}" for value in method_categories],
-    ]
+
+    numeric_feature_summary = {}
+    for index, feature_name in enumerate(NUMERIC_FEATURE_COLUMNS):
+        values = train_rows[feature_name].dropna()
+        median_value = float(numeric_imputer.statistics_[index])
+        numeric_feature_summary[feature_name] = {
+            "median": median_value,
+            "mean": float(numeric_scaler.mean_[index]),
+            "scale": float(numeric_scaler.scale_[index]),
+            "minimum": int(values.min()) if not values.empty else int(round(median_value)),
+            "maximum": int(values.max()) if not values.empty else int(round(median_value)),
+        }
+
+    categorical_feature_summary = {}
+    ordered_features = [f"{feature_name}_scaled" for feature_name in NUMERIC_FEATURE_COLUMNS]
+    for index, feature_name in enumerate(CATEGORICAL_FEATURE_COLUMNS):
+        categories = [str(value) for value in onehot.categories_[index].tolist()]
+        default_value = str(categorical_imputer.statistics_[index])
+        categorical_feature_summary[feature_name] = {
+            "categories": categories,
+            "defaultValue": default_value,
+        }
+        ordered_features.extend(
+            [f"{feature_name}={value}" for value in categories]
+        )
 
     dataset_sha256 = hashlib.sha256(dataset_path.read_bytes()).hexdigest()
     dataset_synthetic = int(dataset["is_synthetic"].sum())
     train_synthetic = int(train_rows["is_synthetic"].sum())
     test_synthetic = int(test_rows["is_synthetic"].sum())
     artifact = {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "modelName": "econolab_study_normal_price",
-        "modelVersion": "2.0.0",
+        "modelVersion": "3.0.0",
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "algorithm": "ridge_regression",
         "hyperparameters": {"alpha": RIDGE_ALPHA},
@@ -293,19 +356,10 @@ def train_and_export(root: Path | None = None) -> dict:
             },
         },
         "features": {
-            "input": ["parameter_count", "method"],
+            "input": FEATURE_COLUMNS,
             "orderedEncoded": ordered_features,
-            "numeric": {
-                "parameter_count": {
-                    "mean": float(numeric_scaler.mean_[0]),
-                    "scale": float(numeric_scaler.scale_[0]),
-                    "minimum": int(train_rows["parameter_count"].min()),
-                    "maximum": int(train_rows["parameter_count"].max()),
-                }
-            },
-            "categorical": {
-                "method": method_categories,
-            },
+            "numeric": numeric_feature_summary,
+            "categorical": categorical_feature_summary,
         },
         "coefficients": {
             "intercept": float(regressor.intercept_),

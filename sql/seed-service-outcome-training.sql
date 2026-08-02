@@ -2,16 +2,16 @@
 -- ECONOLAB - HISTORIAL PARA EL PRONÓSTICO DE RESULTADO DE SERVICIOS
 -- PostgreSQL / transaccional / idempotente
 --
--- Lote reservado: ECO-ML-000001 ... ECO-ML-000500
+-- Lote reservado: ECO-ML-000001 ... ECO-ML-001988
 --
--- El script crea o actualiza exactamente 500 órdenes históricas y reconstruye
+-- El script crea o actualiza exactamente 1,988 órdenes históricas y reconstruye
 -- únicamente los ítems de ese lote. Los IDs de las órdenes se conservan en
 -- ejecuciones posteriores gracias al UPSERT por folio.
 --
 -- Distribución objetivo:
---   300 completed_on_time (60 %): status=completed y completedAt<=deliveryAt
---   150 delayed           (30 %): status=delayed y completedAt>deliveryAt
---    50 cancelled         (10 %): status=cancelled y completedAt IS NULL
+-- 1,193 completed_on_time (60 %): status=completed y completedAt<=deliveryAt
+--   596 delayed           (30 %): status=delayed y completedAt>deliveryAt
+--   199 cancelled         (10 %): status=cancelled y completedAt IS NULL
 --
 -- IMPORTANTE: son datos de demostración para entrenar el clasificador; no
 -- representan atenciones clínicas reales.
@@ -49,7 +49,7 @@ BEGIN
   INTO foreign_reserved_folio_count
   FROM operativo.service_orders AS service
   WHERE service.folio ~ '^ECO-ML-[0-9]{6}$'
-    AND REPLACE(service.folio, 'ECO-ML-', '')::integer BETWEEN 1 AND 500
+    AND REPLACE(service.folio, 'ECO-ML-', '')::integer BETWEEN 1 AND 1988
     AND service.notes IS DISTINCT FROM
       'Historial de demostración para entrenamiento del pronóstico de servicios.';
 
@@ -73,7 +73,7 @@ BEGIN
 
   IF foreign_reserved_folio_count <> 0 THEN
     RAISE EXCEPTION
-      'Carga cancelada: % folios ECO-ML-000001...ECO-ML-000500 ya pertenecen a órdenes ajenas al lote.',
+      'Carga cancelada: % folios ECO-ML-000001...ECO-ML-001988 ya pertenecen a órdenes ajenas al lote.',
       foreign_reserved_folio_count;
   END IF;
 END;
@@ -119,7 +119,7 @@ WHERE "isActive" = true
 CREATE UNIQUE INDEX seed_ml_active_studies_rotation_idx
   ON seed_ml_active_studies(rotation_number);
 
--- Planeación determinista de las 500 órdenes.
+-- Planeación determinista de las 1,988 órdenes.
 -- Primero se crean X con variación y traslape; después se calcula un riesgo con
 -- ruido determinista no observable por el modelo. Así Y no es una copia obvia
 -- de una sola X y la evaluación no resulta artificialmente perfecta.
@@ -128,7 +128,7 @@ WITH numbered AS (
   SELECT
     sequence_number,
     'ECO-ML-' || LPAD(sequence_number::text, 6, '0') AS folio
-  FROM generate_series(1, 500) AS sequence_number
+  FROM generate_series(1, 1988) AS sequence_number
 ),
 features AS (
   SELECT
@@ -173,8 +173,8 @@ labeled AS (
   SELECT
     ranked.*,
     CASE
-      WHEN risk_position <= 50 THEN 'cancelled'
-      WHEN risk_position <= 200 THEN 'delayed'
+      WHEN risk_position <= 199 THEN 'cancelled'
+      WHEN risk_position <= 795 THEN 'delayed'
       ELSE 'completed_on_time'
     END AS outcome
   FROM ranked
@@ -308,7 +308,7 @@ INNER JOIN operativo.service_orders AS service
 CREATE UNIQUE INDEX seed_ml_saved_orders_id_idx
   ON seed_ml_saved_orders(service_order_id);
 
--- Única reconstrucción destructiva: ítems de los 500 folios reservados.
+-- Única reconstrucción destructiva: ítems de los 1,988 folios reservados.
 -- Ninguna orden ajena al lote participa en esta operación.
 DELETE FROM operativo.service_order_items AS item
 USING seed_ml_saved_orders AS saved
@@ -452,11 +452,11 @@ BEGIN
     covered_doctor_count
   FROM seed_ml_saved_orders;
 
-  IF order_count <> 500
-    OR distinct_order_id_count <> 500
-    OR active_order_count <> 500 THEN
+  IF order_count <> 1988
+    OR distinct_order_id_count <> 1988
+    OR active_order_count <> 1988 THEN
     RAISE EXCEPTION
-      'Verificación fallida: órdenes=%, IDs distintos=%, activas=% (esperado 500/500/500).',
+      'Verificación fallida: órdenes=%, IDs distintos=%, activas=% (esperado 1988/1988/1988).',
       order_count,
       distinct_order_id_count,
       active_order_count;
@@ -538,12 +538,12 @@ BEGIN
   INNER JOIN seed_ml_saved_orders AS saved
     ON saved.service_order_id = service.id;
 
-  IF completed_on_time_count <> 300
-    OR delayed_count <> 150
-    OR cancelled_count <> 50
+  IF completed_on_time_count <> 1193
+    OR delayed_count <> 596
+    OR cancelled_count <> 199
     OR invalid_outcome_count <> 0 THEN
     RAISE EXCEPTION
-      'Verificación fallida: en tiempo=%, retrasadas=%, canceladas=%, inválidas=% (esperado 300/150/50/0).',
+      'Verificación fallida: en tiempo=%, retrasadas=%, canceladas=%, inválidas=% (esperado 1193/596/199/0).',
       completed_on_time_count,
       delayed_count,
       cancelled_count,
@@ -642,7 +642,7 @@ COMMIT;
 
 WITH batch AS (
   SELECT 'ECO-ML-' || LPAD(number::text, 6, '0') AS folio
-  FROM generate_series(1, 500) AS number
+  FROM generate_series(1, 1988) AS number
 )
 SELECT
   COUNT(*) AS training_orders,
@@ -668,7 +668,7 @@ INNER JOIN operativo.service_orders AS service
 
 WITH batch AS (
   SELECT 'ECO-ML-' || LPAD(number::text, 6, '0') AS folio
-  FROM generate_series(1, 500) AS number
+  FROM generate_series(1, 1988) AS number
 ),
 item_counts AS (
   SELECT
@@ -690,7 +690,7 @@ FROM item_counts;
 
 WITH batch AS (
   SELECT 'ECO-ML-' || LPAD(number::text, 6, '0') AS folio
-  FROM generate_series(1, 500) AS number
+  FROM generate_series(1, 1988) AS number
 ),
 patient_usage AS (
   SELECT service.patient_id, COUNT(*) AS order_count
@@ -717,13 +717,13 @@ SELECT
 -- ============================================================================
 -- LIMPIEZA OPCIONAL (NO SE EJECUTA)
 -- Descomenta el bloque completo únicamente si deseas retirar este lote.
--- Nunca elimina órdenes fuera de ECO-ML-000001 ... ECO-ML-000500.
+-- Nunca elimina órdenes fuera de ECO-ML-000001 ... ECO-ML-001988.
 -- ============================================================================
 
 -- BEGIN;
 -- WITH batch AS (
 --   SELECT 'ECO-ML-' || LPAD(number::text, 6, '0') AS folio
---   FROM generate_series(1, 500) AS number
+--   FROM generate_series(1, 1988) AS number
 -- )
 -- DELETE FROM operativo.service_order_items AS item
 -- USING operativo.service_orders AS service, batch
@@ -732,7 +732,7 @@ SELECT
 --
 -- WITH batch AS (
 --   SELECT 'ECO-ML-' || LPAD(number::text, 6, '0') AS folio
---   FROM generate_series(1, 500) AS number
+--   FROM generate_series(1, 1988) AS number
 -- )
 -- DELETE FROM operativo.service_orders AS service
 -- USING batch

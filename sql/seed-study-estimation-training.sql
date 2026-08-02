@@ -1,5 +1,5 @@
 -- ============================================================================
--- ECONOLAB: catalogo operativo de 1,000 estudios para entrenamiento de precio
+-- ECONOLAB: catalogo operativo de 1,952 estudios para entrenamiento de precio
 -- PostgreSQL
 --
 -- Convierte el lote historico MLTRAIN en estudios activos y visibles. Si el
@@ -37,7 +37,7 @@ WITH base AS (
     1 + ((series_number - 1) / 8) AS area_variant,
     1 + (((series_number - 1) / 8) % 25) AS analyte_number,
     1 + ((series_number * 7) % 30) AS parameter_count
-  FROM generate_series(1, 1000) AS series_number
+  FROM generate_series(1, 1952) AS series_number
 ), catalog AS (
   SELECT
     *,
@@ -149,8 +149,9 @@ WITH base AS (
       ])[1 + ((area_variant - 1) % 25)]
     END AS analyte,
     (ARRAY[
-      'Determinación', 'Cuantificación', 'Evaluación', 'Control', 'Confirmación'
-    ])[1 + ((area_variant - 1) / 25)] AS presentation,
+      'Determinación', 'Cuantificación', 'Evaluación', 'Control',
+      'Confirmación', 'Perfil', 'Tamiz', 'Seguimiento', 'Panel', 'Validación'
+    ])[1 + (((area_variant - 1) / 25) % 10)] AS presentation,
     CASE area_number
       WHEN 1 THEN CASE
         WHEN analyte_number = 25 THEN 'blood'
@@ -465,7 +466,7 @@ COMMIT;
 
 -- ============================================================================
 -- VERIFICACION
--- Debe devolver 1,000 estudios activos y cero registros MLTRAIN pendientes.
+-- Debe devolver 1,952 estudios activos y cero registros MLTRAIN pendientes.
 -- ============================================================================
 
 SELECT
