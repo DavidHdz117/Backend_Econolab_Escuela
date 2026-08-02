@@ -1,4 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  PythonBridgeError,
+  pythonModelAvailable,
+  runPythonJsonSync,
+} from 'src/common/ml/python-json-runner';
 
 export type StudyClusteringRow = {
   studyId: number;
@@ -104,6 +109,8 @@ const MAX_CATEGORIES = 20;
 const MAX_ITERATIONS = 100;
 const EPSILON = 1e-6;
 export const STUDY_CLUSTERING_RANDOM_SEED = 20260721;
+const PYTHON_CLUSTERING_SCRIPT_RELATIVE_PATH =
+  'ml-artifacts/scripts/clustering_model.py';
 const UNKNOWN_CATEGORIES = new Set([
   'unknown',
   'sin_especificar',
@@ -120,6 +127,30 @@ export class StudyClusteringModel {
    * mostrar el resultado; no se agregan al vector que aprende K-Means.
    */
   analyze(rows: StudyClusteringRow[], options: StudyClusteringOptions = {}) {
+    if (pythonModelAvailable(PYTHON_CLUSTERING_SCRIPT_RELATIVE_PATH)) {
+      try {
+        return runPythonJsonSync<
+          ReturnType<StudyClusteringModel['analyzeInTypeScript']>
+        >(
+          PYTHON_CLUSTERING_SCRIPT_RELATIVE_PATH,
+          'analyze',
+          { rows, options },
+          { timeoutMs: 120_000 },
+        );
+      } catch (error) {
+        if (!(error instanceof PythonBridgeError)) {
+          throw error;
+        }
+      }
+    }
+
+    return this.analyzeInTypeScript(rows, options);
+  }
+
+  private analyzeInTypeScript(
+    rows: StudyClusteringRow[],
+    options: StudyClusteringOptions = {},
+  ) {
     // PASO 2: quitar duplicados y corregir valores faltantes o incorrectos.
     const prepared = this.prepareRows(rows);
     const cleanRows = prepared.rows;
@@ -337,6 +368,36 @@ export class StudyClusteringModel {
           : []),
       ],
     };
+  }
+
+  assignManyUsingExportedModel(
+    rows: StudyClusteringRow[],
+    artifact?: StudyClusteringArtifact | null,
+  ) {
+    if (pythonModelAvailable(PYTHON_CLUSTERING_SCRIPT_RELATIVE_PATH)) {
+      try {
+        const result = runPythonJsonSync<{
+          assignments: Array<{
+            cluster: number;
+            distanceToCentroid: number;
+            isOutlier: boolean;
+          }>;
+        }>(
+          PYTHON_CLUSTERING_SCRIPT_RELATIVE_PATH,
+          'assign',
+          { rows },
+          { timeoutMs: 60_000 },
+        );
+        return result.assignments;
+      } catch (error) {
+        if (!(error instanceof PythonBridgeError)) {
+          throw error;
+        }
+      }
+    }
+
+    if (!artifact) return null;
+    return rows.map((row) => this.assignFromArtifact(row, artifact));
   }
 
   /** Valida el JSON antes de usarlo; evita tratar un objeto cualquiera como modelo. */

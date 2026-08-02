@@ -11,7 +11,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import pickle
 import shutil
+import sys
 import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
@@ -48,6 +51,27 @@ def project_root() -> Path:
     """Obtiene la raiz del backend, no la de una computadora especifica."""
 
     return Path(__file__).resolve().parents[2]
+
+
+def resolve_pickle_path(root: Path, requested: str | None = None) -> Path:
+    if requested:
+        candidate = Path(requested)
+        return candidate if candidate.is_absolute() else root / candidate
+
+    configured = os.environ.get("STUDY_PRICE_MODEL_PKL_PATH", "").strip()
+    if configured:
+        candidate = Path(configured)
+        return candidate if candidate.is_absolute() else root / candidate
+
+    candidates = [
+        root / "07_Modelos" / "regression_price_model.pkl",
+        root / "ml" / "regression" / "artifacts" / "regression_price_model.pkl",
+        root / "ml-artifacts" / "regression_price_model.pkl",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
 
 
 def normalize_category(value: object, fallback: str) -> str:
@@ -392,6 +416,9 @@ def train_and_export(root: Path | None = None) -> dict:
     notebook_artifact = (
         academic_ml_artifact_directory / "regression_price_model.json"
     )
+    academic_pickle = model_directory / "regression_price_model.pkl"
+    notebook_pickle = academic_ml_artifact_directory / "regression_price_model.pkl"
+    deployment_pickle = deployment_directory / "regression_price_model.pkl"
     deployment_artifact = deployment_directory / "regression_price_model.json"
     metrics_path = model_directory / "regression_metrics.json"
     notebook_metrics_path = report_directory / "regression_metrics.json"
@@ -401,7 +428,19 @@ def train_and_export(root: Path | None = None) -> dict:
     notebook_artifact.write_text(
         json.dumps(artifact, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
+    model_bundle = {
+        "model": model,
+        "feature_columns": FEATURE_COLUMNS,
+        "numeric_features": NUMERIC_FEATURE_COLUMNS,
+        "categorical_features": CATEGORICAL_FEATURE_COLUMNS,
+        "artifact_version": artifact["modelVersion"],
+    }
+    with academic_pickle.open("wb") as handler:
+        pickle.dump(model_bundle, handler)
+    with notebook_pickle.open("wb") as handler:
+        pickle.dump(model_bundle, handler)
     shutil.copyfile(academic_artifact, deployment_artifact)
+    shutil.copyfile(academic_pickle, deployment_pickle)
     metrics_path.write_text(
         json.dumps(artifact["metrics"], indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
@@ -416,18 +455,72 @@ def train_and_export(root: Path | None = None) -> dict:
         "artifact_path": str(academic_artifact),
         "notebook_artifact_path": str(notebook_artifact),
         "deployment_path": str(deployment_artifact),
+        "pickle_path": str(academic_pickle),
         "residuals_path": str(
             dataset_directory / "02_regresion_reales_predichos_test.csv"
         ),
     }
 
 
+def predict_with_exported_model(payload: dict, root: Path | None = None) -> dict:
+    root = root or project_root()
+    pickle_path = resolve_pickle_path(root, payload.get("modelPath"))
+    if not pickle_path.exists():
+        raise FileNotFoundError(
+            f"El modelo de regresion .pkl no existe: {pickle_path}"
+        )
+
+    with pickle_path.open("rb") as handler:
+        bundle = pickle.load(handler)
+
+    model = bundle["model"]
+    row = payload.get("input") or {}
+    frame = pd.DataFrame(
+        [
+            {
+                "parameter_count": pd.to_numeric(
+                    row.get("parameterCount", row.get("parameter_count")),
+                    errors="coerce",
+                ),
+                "duration_minutes": pd.to_numeric(
+                    row.get("durationMinutes", row.get("duration_minutes")),
+                    errors="coerce",
+                ),
+                "method": normalize_category(
+                    row.get("method"),
+                    "sin_metodo",
+                ),
+                "sample_type": normalize_category(
+                    row.get("sampleType", row.get("sample_type")),
+                    "unknown",
+                ),
+                "requires_special_processing": normalize_special_processing(
+                    row.get(
+                        "requiresSpecialProcessing",
+                        row.get("requires_special_processing"),
+                    )
+                ),
+            }
+        ]
+    )
+    predicted = float(model.predict(frame)[0])
+    return {"predictedNormalPrice": predicted}
+
+
 if __name__ == "__main__":
-    result = train_and_export()
-    summary = {
-        "message": "Modelo de regresion entrenado y exportado.",
-        "split": result["artifact"]["split"],
-        "metrics": result["artifact"]["metrics"],
-        "artifact": result["artifact_path"],
-    }
-    print(json.dumps(summary, indent=2, ensure_ascii=False))
+    command = sys.argv[1] if len(sys.argv) > 1 else "train"
+    if command == "predict":
+        payload = json.loads(sys.stdin.read().strip() or "{}")
+        print(json.dumps(predict_with_exported_model(payload), ensure_ascii=False))
+    elif command in {"train", "train_csv"}:
+        result = train_and_export()
+        summary = {
+            "message": "Modelo de regresion entrenado y exportado.",
+            "split": result["artifact"]["split"],
+            "metrics": result["artifact"]["metrics"],
+            "artifact": result["artifact_path"],
+            "pickle": result["pickle_path"],
+        }
+        print(json.dumps(summary, indent=2, ensure_ascii=False))
+    else:
+        raise SystemExit(f"Comando no soportado: {command}")

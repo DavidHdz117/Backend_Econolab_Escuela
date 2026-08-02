@@ -32,10 +32,20 @@ const METADATA_PATH = resolve(
   '05_Datasets',
   'clustering_estudios_metadata.json',
 );
+const ASSIGNMENTS_PATH = resolve(
+  BACKEND_ROOT,
+  '05_Datasets',
+  'clustering_estudios_asignaciones.csv',
+);
 const ML_METADATA_PATH = resolve(
   ML_ROOT,
   'reports',
   'clustering_estudios_metadata.json',
+);
+const ML_ASSIGNMENTS_PATH = resolve(
+  ML_ROOT,
+  'reports',
+  'clustering_estudios_asignaciones.csv',
 );
 const ARTIFACT_PATH = resolve(
   BACKEND_ROOT,
@@ -263,11 +273,49 @@ function main() {
       'Ordenes canceladas para calcular request_count',
     ],
   };
+  const assignmentsCsv = toCsv(
+    [
+      'study_id',
+      'code',
+      'name',
+      'cluster',
+      'distance_to_centroid',
+      'outlier_score',
+      'is_outlier',
+      'is_synthetic',
+      'price',
+      'delivery_hours',
+      'parameter_count',
+      'request_count',
+      'sample_type',
+      'analysis_method',
+      'requires_special_processing',
+    ],
+    result.studies.map((study) => [
+      study.studyId,
+      study.code,
+      study.name,
+      study.cluster,
+      study.distanceToCentroid,
+      study.outlierScore,
+      toCsvBooleanValue(study.isOutlier),
+      toCsvBooleanValue(study.isSynthetic === true),
+      study.values.price,
+      study.values.deliveryHours,
+      study.values.parameterCount,
+      study.values.requestCount,
+      study.values.sampleType,
+      study.values.analysisMethod,
+      toCsvBooleanValue(study.values.requiresSpecialProcessing),
+    ]),
+  );
 
   writeFileSync(ARTIFACT_PATH, `${JSON.stringify(artifactDocument, null, 2)}\n`, 'utf8');
   writeFileSync(ML_ARTIFACT_PATH, `${JSON.stringify(artifactDocument, null, 2)}\n`, 'utf8');
   writeFileSync(METADATA_PATH, `${JSON.stringify(metadataDocument, null, 2)}\n`, 'utf8');
   writeFileSync(ML_METADATA_PATH, `${JSON.stringify(metadataDocument, null, 2)}\n`, 'utf8');
+  writeFileSync(ASSIGNMENTS_PATH, assignmentsCsv, 'utf8');
+  writeFileSync(ML_ASSIGNMENTS_PATH, assignmentsCsv, 'utf8');
 
   console.log(
     JSON.stringify(
@@ -275,6 +323,7 @@ function main() {
         dataset: '05_Datasets/clustering_estudios.csv',
         artifact: '07_Modelos/clustering_estudios_model.json',
         metadata: '05_Datasets/clustering_estudios_metadata.json',
+        assignments: '05_Datasets/clustering_estudios_asignaciones.csv',
         rows: dataset.length,
         selectedK: result.model.selectedK,
         silhouette: result.model.silhouetteScore,

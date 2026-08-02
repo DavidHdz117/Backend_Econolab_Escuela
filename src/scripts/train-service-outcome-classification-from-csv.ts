@@ -35,6 +35,11 @@ const TEST_CSV_PATH = resolve(
   '05_Datasets',
   '03_clasificacion_resultado_servicios_test.csv',
 );
+const TEST_PREDICTIONS_CSV_PATH = resolve(
+  BACKEND_ROOT,
+  '05_Datasets',
+  '03_clasificacion_resultado_servicios_predicciones_test.csv',
+);
 const ML_TRAIN_CSV_PATH = resolve(
   ML_ROOT,
   'data',
@@ -44,6 +49,11 @@ const ML_TEST_CSV_PATH = resolve(
   ML_ROOT,
   'data',
   'classification_service_outcomes_test.csv',
+);
+const ML_TEST_PREDICTIONS_CSV_PATH = resolve(
+  ML_ROOT,
+  'reports',
+  'classification_service_outcomes_test_predictions.csv',
 );
 const ARTIFACT_PATH = resolve(
   BACKEND_ROOT,
@@ -426,6 +436,59 @@ function main() {
   });
   writeJsonAtomically(ARTIFACT_PATH, artifact);
   writeJsonAtomically(ML_ARTIFACT_PATH, artifact);
+
+  const testTrainingRows = trainingRows.filter((row) => testIds.has(row.orderId));
+  const testInputRows = testTrainingRows.map((row) => ({
+    promisedLeadHours: row.promisedLeadHours,
+    registrationHour: row.registrationHour,
+    registrationWeekday: row.registrationWeekday,
+    itemCount: row.itemCount,
+    totalQuantity: row.totalQuantity,
+    distinctStudyCount: row.distinctStudyCount,
+    packageComponentCount: row.packageComponentCount,
+    subtotalAmount: row.subtotalAmount,
+    courtesyPercent: row.courtesyPercent,
+    discountAmount: row.discountAmount,
+    totalAmount: row.totalAmount,
+    branchName: row.branchName,
+    dominantPriceType: row.dominantPriceType,
+  }));
+  const predictedTest = model.predictFromArtifact(testInputRows, artifact).predictions;
+  const acceptedRowsByOrderId = new Map(
+    acceptedRows.map((row) => [Number(row.order_id), row] as const),
+  );
+  const predictionCsv = toCsv(
+    [
+      'order_id',
+      'source_folio',
+      'is_synthetic',
+      'source_created_at',
+      'actual_outcome',
+      'predicted_outcome',
+      'confidence',
+      'probability_completed_on_time',
+      'probability_delayed',
+      'probability_cancelled',
+    ],
+    testTrainingRows.map((row, index) => {
+      const original = acceptedRowsByOrderId.get(row.orderId);
+      const prediction = predictedTest[index];
+      return [
+        row.orderId,
+        original?.source_folio ?? '',
+        isTruthySyntheticFlag(original?.is_synthetic) ? 'true' : 'false',
+        row.sourceCreatedAt,
+        row.outcome,
+        prediction.outcome,
+        prediction.probability.toFixed(4),
+        prediction.probabilities.completed_on_time.toFixed(4),
+        prediction.probabilities.delayed.toFixed(4),
+        prediction.probabilities.cancelled.toFixed(4),
+      ];
+    }),
+  );
+  writeFileSync(TEST_PREDICTIONS_CSV_PATH, predictionCsv, 'utf8');
+  writeFileSync(ML_TEST_PREDICTIONS_CSV_PATH, predictionCsv, 'utf8');
 
   const syntheticRows = acceptedRows.filter(
     (row) => isTruthySyntheticFlag(row.is_synthetic),

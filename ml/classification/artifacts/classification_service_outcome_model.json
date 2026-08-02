@@ -1,9 +1,9 @@
 {
   "artifactType": "econolab_service_outcome_classifier",
   "schemaVersion": 2,
-  "trainedAt": "2026-08-04T06:05:50.000Z",
-  "datasetSha256": "c863ad7b0cc9f91a18bd32a00f0a497b2918e9908a08890d81ff451f96cd1f44",
-  "sourceWatermark": "2026-08-04T06:05:50.000Z",
+  "trainedAt": "2026-08-04T06:05:50+00:00",
+  "datasetSha256": "5e7ad7a98908c3505c53c86f882c3cbff71f679198a0e7d5468f49984661b2a2",
+  "sourceWatermark": "2026-08-04T06:05:50+00:00",
   "model": {
     "algorithm": "multinomial_logistic_regression",
     "version": "3.0.0",
@@ -45,16 +45,16 @@
       "cancelled": 37
     },
     "eligiblePeriod": {
-      "start": "2025-11-01T14:07:00.000Z",
-      "end": "2026-07-31T18:03:00.000Z"
+      "start": "2025-11-01T14:07:00+00:00",
+      "end": "2026-07-31T18:03:00+00:00"
     },
     "trainingPeriod": {
-      "start": "2025-11-01T14:07:00.000Z",
-      "end": "2026-05-30T23:53:40.000Z"
+      "start": "2025-11-01T14:07:00+00:00",
+      "end": "2026-05-30T23:53:40+00:00"
     },
     "testPeriod": {
-      "start": "2026-05-31T04:27:50.000Z",
-      "end": "2026-07-31T18:03:00.000Z"
+      "start": "2026-05-31T04:27:50+00:00",
+      "end": "2026-07-31T18:03:00+00:00"
     },
     "predictorsX": [
       "promisedLeadHours",
@@ -74,53 +74,53 @@
     "targetY": "outcome"
   },
   "evaluation": {
-    "accuracy": 0.765,
+    "accuracy": 0.795,
     "confusionMatrix": {
       "completed_on_time": {
-        "completed_on_time": 199,
-        "delayed": 31,
-        "cancelled": 7
+        "completed_on_time": 202,
+        "delayed": 33,
+        "cancelled": 2
       },
       "delayed": {
-        "completed_on_time": 33,
-        "delayed": 71,
-        "cancelled": 22
+        "completed_on_time": 27,
+        "delayed": 82,
+        "cancelled": 17
       },
       "cancelled": {
         "completed_on_time": 0,
-        "delayed": 1,
-        "cancelled": 36
+        "delayed": 3,
+        "cancelled": 34
       }
     },
     "metricsByClass": {
       "completed_on_time": {
-        "precision": 0.8578,
-        "recall": 0.8397,
-        "f1Score": 0.8486,
+        "precision": 0.8821,
+        "recall": 0.8523,
+        "f1Score": 0.867,
         "support": 237
       },
       "delayed": {
-        "precision": 0.6893,
-        "recall": 0.5635,
-        "f1Score": 0.6201,
+        "precision": 0.6949,
+        "recall": 0.6508,
+        "f1Score": 0.6721,
         "support": 126
       },
       "cancelled": {
-        "precision": 0.5538,
-        "recall": 0.973,
-        "f1Score": 0.7059,
+        "precision": 0.6415,
+        "recall": 0.9189,
+        "f1Score": 0.7556,
         "support": 37
       }
     },
     "macroAverage": {
-      "precision": 0.7003,
-      "recall": 0.7921,
-      "f1Score": 0.7249
+      "precision": 0.7395,
+      "recall": 0.8073,
+      "f1Score": 0.7649
     },
     "weightedAverage": {
-      "precision": 0.7766,
-      "recall": 0.765,
-      "f1Score": 0.7634
+      "precision": 0.8009,
+      "recall": 0.795,
+      "f1Score": 0.7953
     },
     "baseline": {
       "strategy": "majority_class",
@@ -146,20 +146,20 @@
       "metricsByClass": {
         "completed_on_time": {
           "precision": 0.5925,
-          "recall": 1,
+          "recall": 1.0,
           "f1Score": 0.7441,
           "support": 237
         },
         "delayed": {
-          "precision": 0,
-          "recall": 0,
-          "f1Score": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1Score": 0.0,
           "support": 126
         },
         "cancelled": {
-          "precision": 0,
-          "recall": 0,
-          "f1Score": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1Score": 0.0,
           "support": 37
         }
       },
@@ -179,58 +179,58 @@
     "numeric": [
       {
         "key": "promisedLeadHours",
-        "mean": 41.56069156776233,
-        "standardDeviation": 18.870512751443346
+        "mean": 41.5607,
+        "standardDeviation": 18.8705
       },
       {
         "key": "registrationHour",
-        "mean": 12.232874958333353,
-        "standardDeviation": 6.213635963895418
+        "mean": 12.2329,
+        "standardDeviation": 6.2136
       },
       {
         "key": "registrationWeekday",
-        "mean": 2.975625,
-        "standardDeviation": 2.008116246479532
+        "mean": 2.9756,
+        "standardDeviation": 2.0081
       },
       {
         "key": "itemCount",
-        "mean": 3.45125,
-        "standardDeviation": 1.7727446058301808
+        "mean": 3.4512,
+        "standardDeviation": 1.7727
       },
       {
         "key": "totalQuantity",
-        "mean": 3.51625,
-        "standardDeviation": 1.8485767329218445
+        "mean": 3.5162,
+        "standardDeviation": 1.8486
       },
       {
         "key": "distinctStudyCount",
-        "mean": 3.386875,
-        "standardDeviation": 1.727990953209827
+        "mean": 3.3869,
+        "standardDeviation": 1.728
       },
       {
         "key": "packageComponentCount",
-        "mean": 0.013125,
-        "standardDeviation": 0.1339878142780163
+        "mean": 0.0131,
+        "standardDeviation": 0.134
       },
       {
         "key": "subtotalAmount",
-        "mean": 2064.3928125,
-        "standardDeviation": 1080.59042349754
+        "mean": 2064.3928,
+        "standardDeviation": 1080.5904
       },
       {
         "key": "courtesyPercent",
         "mean": 9.1375,
-        "standardDeviation": 6.576936501898102
+        "standardDeviation": 6.5769
       },
       {
         "key": "discountAmount",
-        "mean": 195.54300625,
-        "standardDeviation": 187.9496036861337
+        "mean": 195.543,
+        "standardDeviation": 187.9496
       },
       {
         "key": "totalAmount",
-        "mean": 1868.8498062499993,
-        "standardDeviation": 980.2909881182727
+        "mean": 1868.8498,
+        "standardDeviation": 980.291
       }
     ],
     "categorical": [
@@ -241,8 +241,7 @@
           "matriz - centro",
           "sucursal centro",
           "sucursal norte",
-          "sucursal sur",
-          "__other__"
+          "sucursal sur"
         ]
       },
       {
@@ -252,8 +251,7 @@
           "hospital",
           "normal",
           "other",
-          "special",
-          "__other__"
+          "special"
         ]
       }
     ]
@@ -261,87 +259,80 @@
   "classifier": {
     "weights": [
       [
-        0.6617689555571984,
-        0.9366434552906329,
-        0.050772040255545645,
-        -0.003384717875847226,
-        -0.5776594442763638,
-        -0.795716014260045,
-        -0.3435096033060264,
-        0.015696729281653065,
-        -0.002858524967405288,
-        -0.024627367808452066,
-        -0.1736378768420081,
-        0.030140311183485057,
-        0.15570620710627178,
-        -0.000966677611109648,
-        0.1735506823211645,
-        0.07916337925944283,
-        0.09482202624067082,
-        0,
-        0.006362250174559132,
-        0.2680177222753708,
-        -0.10230534590259738,
-        0.16808120173706834,
-        0.16211978903203933,
-        0
+        -3.6482,
+        -1.7143,
+        -0.0456,
+        0.0565,
+        1.116,
+        1.8542,
+        0.3063,
+        0.0396,
+        0.0679,
+        0.7842,
+        -0.286,
+        0.1297,
+        0.0555,
+        0.3738,
+        -1.1161,
+        0.5213,
+        0.1198,
+        0.9186,
+        -0.7116,
+        1.246,
+        -0.9368,
+        -0.562
       ],
       [
-        0.5240668405551463,
-        0.11628331587361002,
-        -0.0012942190835043487,
-        -0.03845268364182773,
-        0.1400384870179407,
-        0.3572579432988611,
-        -0.08547494193309178,
-        -0.03184308280498969,
-        -0.18557874080470832,
-        -0.0514674234179743,
-        -0.010928837803365956,
-        -0.20247104358819268,
-        -0.21501556981574946,
-        -0.1302619500516978,
-        0.470613234078396,
-        0.038050233164657075,
-        0.24098664259068828,
-        0,
-        -0.1067423197382211,
-        0.004676156238386662,
-        -0.06880039981813005,
-        0.2156182613721918,
-        0.359620891912065,
-        0
+        1.8806,
+        1.4655,
+        0.0314,
+        -0.0039,
+        -1.0633,
+        -2.8751,
+        0.6582,
+        0.0371,
+        0.2059,
+        -0.3058,
+        -0.0406,
+        0.2347,
+        0.4363,
+        -0.2351,
+        0.4075,
+        -0.3276,
+        -0.257,
+        -0.4217,
+        0.6816,
+        -1.177,
+        0.7252,
+        0.216
       ],
       [
-        -1.1858357961123425,
-        -1.0529267711642376,
-        -0.049477821172041254,
-        0.04183740151767491,
-        0.43762095725842354,
-        0.438458070961184,
-        0.4289845452391188,
-        0.016146353523336626,
-        0.18843726577211378,
-        0.07609479122642632,
-        0.18456671464537416,
-        0.1723307324047074,
-        0.05930936270947818,
-        0.1312286276628074,
-        -0.6441639163995609,
-        -0.11721361242410007,
-        -0.33580866883135896,
-        0,
-        0.1003800695636617,
-        -0.2726938785137576,
-        0.17110574572072723,
-        -0.38369946310926034,
-        -0.5217406809441041,
-        0
+        1.7676,
+        0.2488,
+        0.0142,
+        -0.0526,
+        -0.0527,
+        1.0209,
+        -0.9645,
+        -0.0767,
+        -0.2738,
+        -0.4784,
+        0.3266,
+        -0.3644,
+        -0.4918,
+        -0.1387,
+        0.7086,
+        -0.1937,
+        0.1372,
+        -0.497,
+        0.03,
+        -0.069,
+        0.2116,
+        0.3459
       ]
     ]
   },
   "warnings": [
-    "Las clases estan desbalanceadas; se aplicaron pesos inversos y deben revisarse las metricas por clase.",
-    "Las variables vacias, constantes o con al menos 99 % del mismo valor fueron omitidas del modelo."
+    "Las clases estan desbalanceadas; se aplicaron pesos inversos y deben revisarse las metricas por clase."
   ]
 }

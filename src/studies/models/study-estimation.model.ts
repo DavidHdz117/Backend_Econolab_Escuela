@@ -5,6 +5,11 @@ import {
   Injectable,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import {
+  PythonBridgeError,
+  pythonModelAvailable,
+  runPythonJsonSync,
+} from 'src/common/ml/python-json-runner';
 import { StudySampleType, StudyType } from '../entities/study.entity';
 
 const STUDY_PRICE_ARTIFACT_RELATIVE_PATH =
@@ -95,6 +100,7 @@ type StudyPriceArtifact = {
 export class StudyEstimationModel {
   private artifact?: StudyPriceArtifact;
   private artifactProblem?: string;
+  private readonly pythonScriptPath = 'ml-artifacts/scripts/regression_train.py';
 
   constructor() {
     this.loadArtifact();
@@ -108,11 +114,7 @@ export class StudyEstimationModel {
     }
 
     const artifact = this.getArtifactOrFail();
-    const encodedInput = this.encodeInput(input, artifact);
-
-    const rawPrice =
-      artifact.coefficients.intercept +
-      this.dot(encodedInput, artifact.coefficients.values);
+    const rawPrice = this.predictUsingExportedModel(input, artifact);
     const suggestedNormalPrice = this.roundToStep(Math.max(0, rawPrice), 10);
     const priceMargin = Math.max(10, artifact.metrics.test.mae);
 
@@ -146,6 +148,34 @@ export class StudyEstimationModel {
       },
       warnings: this.buildWarnings(input, artifact),
     };
+  }
+
+  private predictUsingExportedModel(
+    input: StudyEstimationInput,
+    artifact: StudyPriceArtifact,
+  ) {
+    if (pythonModelAvailable(this.pythonScriptPath)) {
+      try {
+        const result = runPythonJsonSync<{ predictedNormalPrice: number }>(
+          this.pythonScriptPath,
+          'predict',
+          { input },
+        );
+        if (this.isFiniteNumber(result.predictedNormalPrice)) {
+          return result.predictedNormalPrice;
+        }
+      } catch (error) {
+        if (!(error instanceof PythonBridgeError)) {
+          throw error;
+        }
+      }
+    }
+
+    const encodedInput = this.encodeInput(input, artifact);
+    return (
+      artifact.coefficients.intercept +
+      this.dot(encodedInput, artifact.coefficients.values)
+    );
   }
 
   private loadArtifact() {

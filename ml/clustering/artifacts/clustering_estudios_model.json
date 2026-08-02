@@ -44,32 +44,32 @@
   "preprocessing": {
     "numeric": {
       "price": {
-        "median": 600,
+        "median": 600.0,
         "lowerBound": 139.90000000000003,
-        "upperBound": 1160,
+        "upperBound": 1160.0,
         "mean": 600.424,
-        "standardDeviation": 228.82982830916075
+        "standardDeviation": 228.82982830916077
       },
       "deliveryHours": {
         "median": 2.5,
         "lowerBound": 0.3333333333333333,
         "upperBound": 14.25,
-        "mean": 3.5541916666666675,
-        "standardDeviation": 3.2421138186781673
+        "mean": 3.5541916666666666,
+        "standardDeviation": 3.242113818678161
       },
       "parameterCount": {
-        "median": 15,
-        "lowerBound": 1,
-        "upperBound": 31,
+        "median": 15.0,
+        "lowerBound": 1.0,
+        "upperBound": 31.0,
         "mean": 15.4935,
-        "standardDeviation": 8.589642469276583
+        "standardDeviation": 8.589642469276589
       },
       "requestCount": {
-        "median": 1,
-        "lowerBound": 0,
-        "upperBound": 4,
+        "median": 1.0,
+        "lowerBound": 0.0,
+        "upperBound": 4.0,
         "mean": 1.186,
-        "standardDeviation": 1.1060759467595298
+        "standardDeviation": 1.1060759467595342
       }
     },
     "sampleTypeCategories": [
@@ -171,13 +171,13 @@
       "outlierThreshold": 3.0645251494
     }
   ],
-  "generatedAt": "2026-08-02T04:00:32.995Z",
+  "generatedAt": "2026-08-02T17:57:31.798208+00:00",
   "trainingPeriod": {
-    "start": "2026-02-02T04:00:32.995Z",
-    "end": "2026-08-02T04:00:32.995Z",
+    "start": "2026-02-02T17:57:31.798208+00:00",
+    "end": "2026-08-02T17:57:31.798208+00:00",
     "months": 6
   },
-  "datasetFingerprintSha256": "4bf3c8443fa22fe1592c148c4e8ae62bb6092eefc9134a6facb68b21302e4e23",
+  "datasetFingerprintSha256": "0ba692447a9fc8d3838c2836af9bd58ee936711cdda53f0217ef6857231a845a",
   "datasetComposition": {
     "totalRows": 2000,
     "realRows": 48,
@@ -258,14 +258,14 @@
     {
       "cluster": 1,
       "suggestedName": "Estudios accesibles",
-      "shortDescription": "1040 estudios con precio promedio de $422, entrega de 2.2 horas, 9.1 parámetros y 1.2 solicitudes en el periodo.",
+      "shortDescription": "1040 estudios con precio promedio de $422 MXN, entrega de 2.2 horas, 9.1 parámetros y 1.2 solicitudes en el periodo.",
       "keyCharacteristics": [
-        "Precio promedio $422, dentro del tercio inferior del catálogo.",
+        "Precio promedio $422 MXN, dentro del tercio inferior del catalogo.",
         "68 estudios atípicos detectados."
       ],
       "suggestedAction": "Mantener existencias minimas y monitorear el volumen para conservar una operacion eficiente.",
       "studyCount": 1040,
-      "percentage": 52,
+      "percentage": 52.0,
       "outlierCount": 68,
       "outlierThreshold": 2.7304,
       "averages": {
@@ -338,16 +338,16 @@
     {
       "cluster": 2,
       "suggestedName": "Estudios de mayor costo y de entrega prolongada",
-      "shortDescription": "960 estudios con precio promedio de $793, entrega de 5.1 horas, 22.4 parámetros y 1.2 solicitudes en el periodo.",
+      "shortDescription": "960 estudios con precio promedio de $793 MXN, entrega de 5.1 horas, 22.4 parámetros y 1.2 solicitudes en el periodo.",
       "keyCharacteristics": [
-        "Precio promedio $793, dentro del tercio superior del catálogo.",
-        "5.1 horas de entrega promedio, dentro del tercio más prolongado.",
+        "Precio promedio $793 MXN, dentro del tercio superior del catalogo.",
+        "5.1 horas de entrega promedio, dentro del tercio mas prolongado.",
         "22.4 parámetros promedio, dentro del tercio superior.",
         "129 estudios atípicos detectados."
       ],
       "suggestedAction": "Revisar disponibilidad de equipo, reactivos y tiempos comprometidos para prevenir retrasos operativos.",
       "studyCount": 960,
-      "percentage": 48,
+      "percentage": 48.0,
       "outlierCount": 129,
       "outlierThreshold": 3.0645,
       "averages": {
@@ -383,7 +383,7 @@
         {
           "value": "urine",
           "count": 106,
-          "percentage": 11
+          "percentage": 11.0
         }
       ],
       "analysisMethods": [
@@ -400,7 +400,7 @@
         {
           "value": "coagulometria",
           "count": 106,
-          "percentage": 11
+          "percentage": 11.0
         },
         {
           "value": "elisa",
@@ -439,8 +439,8 @@
       "requestCount": 7
     },
     "winsorizationPercentiles": {
-      "lower": 1,
-      "upper": 99
+      "lower": 1.0,
+      "upper": 99.0
     },
     "ignoredConstantFeatures": [],
     "realRows": 48,
@@ -453,7 +453,7 @@
     "Los valores numericos faltantes o incorrectos se imputaron con la mediana.",
     "Los valores desconocidos de procesamiento especial se imputaron con la moda.",
     "El analisis incluye estudios sinteticos ECN-CAT identificados para auditoria; isSynthetic no se usa como variable de K-Means.",
-    "Los extremos numericos se limitaron a los percentiles 1 y 99 solo para evitar que dominaran K-Means; los valores originales se conservan en los resultados.",
+    "Los extremos numericos se limitaron a los percentiles 1.0 y 99.0 solo para evitar que dominaran K-Means; los valores originales se conservan en los resultados.",
     "request_count incluye demanda demostrativa ECO-ML; synthetic_request_count se conserva solo para auditoria y no entra como variable adicional."
   ],
   "sources": {

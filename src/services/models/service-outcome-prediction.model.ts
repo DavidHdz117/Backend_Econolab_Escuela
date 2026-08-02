@@ -1,6 +1,11 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { existsSync, readFileSync } from 'fs';
 import { isAbsolute, resolve } from 'path';
+import {
+  PythonBridgeError,
+  pythonModelAvailable,
+  runPythonJsonSync,
+} from 'src/common/ml/python-json-runner';
 
 // Y: clases que el modelo aprende a pronosticar.
 export const SERVICE_OUTCOME_CLASSES = [
@@ -263,6 +268,8 @@ const OTHER_CATEGORY = '__other__';
 @Injectable()
 export class ServiceOutcomePredictionModel implements OnModuleInit {
   private readonly logger = new Logger(ServiceOutcomePredictionModel.name);
+  private readonly pythonScriptPath =
+    'ml-artifacts/scripts/classification_model.py';
   private cachedArtifact: ServiceOutcomeModelArtifact | null = null;
   private cachedArtifactPath: string | null = null;
 
@@ -390,7 +397,30 @@ export class ServiceOutcomePredictionModel implements OnModuleInit {
   predictUsingArtifact(
     inputs: ServiceOutcomeFeatures[],
   ): ServiceOutcomePredictionResult {
-    return this.predictFromArtifact(inputs, this.getArtifact());
+    const artifact = this.getArtifact();
+
+    if (pythonModelAvailable(this.pythonScriptPath)) {
+      try {
+        const pythonResult = runPythonJsonSync<{
+          predictions: ServiceOutcomePrediction[];
+        }>(this.pythonScriptPath, 'predict', { inputs });
+        return {
+          predictions: pythonResult.predictions,
+          model: this.toPublicModelMetadata(artifact),
+          warnings: artifact.warnings,
+        };
+      } catch (error) {
+        if (error instanceof PythonBridgeError) {
+          this.logger.warn(
+            `Fallo la inferencia Python de clasificacion; se usara el respaldo TypeScript. ${error.message}`,
+          );
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    return this.predictFromArtifact(inputs, artifact);
   }
 
   /** Util para pruebas y para comprobar un artefacto antes de guardarlo. */

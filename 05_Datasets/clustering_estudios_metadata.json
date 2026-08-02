@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-08-02T04:00:32.995Z",
-  "periodStart": "2026-02-02T04:00:32.995Z",
-  "periodEnd": "2026-08-02T04:00:32.995Z",
+  "generatedAt": "2026-08-02T17:57:31.798208+00:00",
+  "periodStart": "2026-02-02T17:57:31.798208+00:00",
+  "periodEnd": "2026-08-02T17:57:31.798208+00:00",
   "periodMonths": 6,
   "unitOfAnalysis": "Un estudio individual activo del catalogo ECONOLAB",
-  "datasetFingerprintSha256": "4bf3c8443fa22fe1592c148c4e8ae62bb6092eefc9134a6facb68b21302e4e23",
+  "datasetFingerprintSha256": "0ba692447a9fc8d3838c2836af9bd58ee936711cdda53f0217ef6857231a845a",
   "composition": {
     "totalRows": 2000,
     "realRows": 48,

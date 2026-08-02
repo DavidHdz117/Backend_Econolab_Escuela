@@ -1,10 +1,11 @@
 {
   "reportType": "econolab_classification_training_report",
-  "generatedFromSourceWatermark": "2026-08-04T06:05:50.000Z",
+  "generatedFromSourceWatermark": "2026-08-04T06:05:50+00:00",
   "sourceQuery": "05_Datasets/03_clasificacion_resultado_servicios.csv",
   "datasetCsv": "ml/classification/data/classification_service_outcomes.csv",
   "modelArtifact": "ml/classification/artifacts/classification_service_outcome_model.json",
-  "datasetSha256": "c863ad7b0cc9f91a18bd32a00f0a497b2918e9908a08890d81ff451f96cd1f44",
+  "pickleArtifact": "ml/classification/artifacts/classification_service_outcome_model.pkl",
+  "datasetSha256": "5e7ad7a98908c3505c53c86f882c3cbff71f679198a0e7d5468f49984661b2a2",
   "evaluationSplit": {
     "strategy": "temporal_holdout",
     "orderingField": "source_created_at",
@@ -15,16 +16,16 @@
     "trainingRows": 1600,
     "testRows": 400,
     "eligiblePeriod": {
-      "start": "2025-11-01T14:07:00.000Z",
-      "end": "2026-07-31T18:03:00.000Z"
+      "start": "2025-11-01T14:07:00+00:00",
+      "end": "2026-07-31T18:03:00+00:00"
     },
     "trainingPeriod": {
-      "start": "2025-11-01T14:07:00.000Z",
-      "end": "2026-05-30T23:53:40.000Z"
+      "start": "2025-11-01T14:07:00+00:00",
+      "end": "2026-05-30T23:53:40+00:00"
     },
     "testPeriod": {
-      "start": "2026-05-31T04:27:50.000Z",
-      "end": "2026-07-31T18:03:00.000Z"
+      "start": "2026-05-31T04:27:50+00:00",
+      "end": "2026-07-31T18:03:00+00:00"
     },
     "trainingClassDistribution": {
       "completed_on_time": 959,
@@ -69,16 +70,9 @@
     "rowsExtracted": 2000,
     "rowsAccepted": 2000,
     "rowsRejected": 0,
-    "rejectedByReason": {
-      "invalid_order_id": 0,
-      "duplicate_order_id": 0,
-      "invalid_target_y": 0,
-      "invalid_source_created_at": 0,
-      "missing_or_nonpositive_lead_hours": 0,
-      "missing_items": 0,
-      "invalid_numeric_values": 0
-    },
-    "duplicateOrderIds": 0,
+    "syntheticRows": 1988,
+    "realRows": 12,
+    "syntheticProportion": 0.994,
     "nullsByColumn": {
       "order_id": 0,
       "source_folio": 0,
@@ -99,10 +93,7 @@
       "branch_name": 0,
       "dominant_price_type": 0,
       "outcome": 0
-    },
-    "syntheticRows": 1988,
-    "realRows": 12,
-    "syntheticProportion": 0.994
+    }
   },
   "classDistribution": {
     "completed_on_time": 1196,
@@ -119,298 +110,165 @@
       "promised_lead_hours": {
         "nonNullCount": 2000,
         "nullCount": 0,
-        "uniqueCount": 83,
-        "dominantValueProportion": 0.0215,
-        "lowVariability": false,
+        "minimum": 1.0,
+        "maximum": 84.0,
         "mean": 41.6421,
-        "standardDeviation": 18.8397,
-        "minimum": 1,
-        "q1": 26,
-        "median": 42,
-        "q3": 58,
-        "maximum": 84,
-        "iqr": 32,
-        "iqrOutlierCount": 0,
-        "iqrOutlierProportion": 0
+        "standardDeviation": 18.8397
       },
       "registration_hour": {
         "nonNullCount": 2000,
         "nullCount": 0,
-        "uniqueCount": 1257,
-        "dominantValueProportion": 0.0055,
-        "lowVariability": false,
-        "mean": 12.2229,
-        "standardDeviation": 6.278,
-        "minimum": 0,
-        "q1": 7.5125,
-        "median": 12.3833,
-        "q3": 17.1875,
+        "minimum": 0.0,
         "maximum": 23.9833,
-        "iqr": 9.6749,
-        "iqrOutlierCount": 0,
-        "iqrOutlierProportion": 0
+        "mean": 12.2229,
+        "standardDeviation": 6.278
       },
       "registration_weekday": {
         "nonNullCount": 2000,
         "nullCount": 0,
-        "uniqueCount": 7,
-        "dominantValueProportion": 0.1525,
-        "lowVariability": false,
+        "minimum": 0.0,
+        "maximum": 6.0,
         "mean": 2.9625,
-        "standardDeviation": 2.0058,
-        "minimum": 0,
-        "q1": 1,
-        "median": 3,
-        "q3": 5,
-        "maximum": 6,
-        "iqr": 4,
-        "iqrOutlierCount": 0,
-        "iqrOutlierProportion": 0
+        "standardDeviation": 2.0058
       },
       "item_count": {
         "nonNullCount": 2000,
         "nullCount": 0,
-        "uniqueCount": 6,
-        "dominantValueProportion": 0.1975,
-        "lowVariability": false,
+        "minimum": 1.0,
+        "maximum": 6.0,
         "mean": 3.443,
-        "standardDeviation": 1.7705,
-        "minimum": 1,
-        "q1": 2,
-        "median": 3,
-        "q3": 5,
-        "maximum": 6,
-        "iqr": 3,
-        "iqrOutlierCount": 0,
-        "iqrOutlierProportion": 0
+        "standardDeviation": 1.7705
       },
       "total_quantity": {
         "nonNullCount": 2000,
         "nullCount": 0,
-        "uniqueCount": 7,
-        "dominantValueProportion": 0.197,
-        "lowVariability": false,
+        "minimum": 1.0,
+        "maximum": 7.0,
         "mean": 3.5155,
-        "standardDeviation": 1.8514,
-        "minimum": 1,
-        "q1": 2,
-        "median": 3,
-        "q3": 5,
-        "maximum": 7,
-        "iqr": 3,
-        "iqrOutlierCount": 0,
-        "iqrOutlierProportion": 0
+        "standardDeviation": 1.8514
       },
       "distinct_study_count": {
         "nonNullCount": 2000,
         "nullCount": 0,
-        "uniqueCount": 6,
-        "dominantValueProportion": 0.202,
-        "lowVariability": false,
+        "minimum": 1.0,
+        "maximum": 6.0,
         "mean": 3.371,
-        "standardDeviation": 1.7243,
-        "minimum": 1,
-        "q1": 2,
-        "median": 3,
-        "q3": 5,
-        "maximum": 6,
-        "iqr": 3,
-        "iqrOutlierCount": 0,
-        "iqrOutlierProportion": 0
+        "standardDeviation": 1.7243
       },
       "package_component_count": {
         "nonNullCount": 2000,
         "nullCount": 0,
-        "uniqueCount": 4,
-        "dominantValueProportion": 0.9885,
-        "lowVariability": false,
+        "minimum": 0.0,
+        "maximum": 3.0,
         "mean": 0.013,
-        "standardDeviation": 0.1297,
-        "minimum": 0,
-        "q1": 0,
-        "median": 0,
-        "q3": 0,
-        "maximum": 3,
-        "iqr": 0,
-        "iqrOutlierCount": 23,
-        "iqrOutlierProportion": 0.0115
+        "standardDeviation": 0.1297
       },
       "subtotal_amount": {
         "nonNullCount": 2000,
         "nullCount": 0,
-        "uniqueCount": 1472,
-        "dominantValueProportion": 0.0035,
-        "lowVariability": false,
+        "minimum": 75.0,
+        "maximum": 4568.0,
         "mean": 2065.8835,
-        "standardDeviation": 1077.4938,
-        "minimum": 75,
-        "q1": 1104,
-        "median": 2040.5,
-        "q3": 2974,
-        "maximum": 4568,
-        "iqr": 1870,
-        "iqrOutlierCount": 0,
-        "iqrOutlierProportion": 0
+        "standardDeviation": 1077.4938
       },
       "courtesy_percent": {
         "nonNullCount": 2000,
         "nullCount": 0,
-        "uniqueCount": 5,
-        "dominantValueProportion": 0.257,
-        "lowVariability": false,
+        "minimum": 0.0,
+        "maximum": 20.0,
         "mean": 9.2375,
-        "standardDeviation": 6.5978,
-        "minimum": 0,
-        "q1": 5,
-        "median": 10,
-        "q3": 15,
-        "maximum": 20,
-        "iqr": 10,
-        "iqrOutlierCount": 0,
-        "iqrOutlierProportion": 0
+        "standardDeviation": 6.5978
       },
       "discount_amount": {
         "nonNullCount": 2000,
         "nullCount": 0,
-        "uniqueCount": 1441,
-        "dominantValueProportion": 0.2055,
-        "lowVariability": false,
-        "mean": 197.3044,
-        "standardDeviation": 189.2888,
-        "minimum": 0,
-        "q1": 39.6,
-        "median": 152.1,
-        "q3": 314.0625,
+        "minimum": 0.0,
         "maximum": 913.6,
-        "iqr": 274.4625,
-        "iqrOutlierCount": 34,
-        "iqrOutlierProportion": 0.017
+        "mean": 197.3044,
+        "standardDeviation": 189.2888
       },
       "total_amount": {
         "nonNullCount": 2000,
         "nullCount": 0,
-        "uniqueCount": 1828,
-        "dominantValueProportion": 0.002,
-        "lowVariability": false,
-        "mean": 1868.5791,
-        "standardDeviation": 977.6668,
         "minimum": 63.75,
-        "q1": 995.9,
-        "median": 1830.8,
-        "q3": 2731.525,
         "maximum": 4291.5,
-        "iqr": 1735.625,
-        "iqrOutlierCount": 0,
-        "iqrOutlierProportion": 0
+        "mean": 1868.5791,
+        "standardDeviation": 977.6668
       }
     },
     "categorical": {
       "branch_name": {
         "nullCount": 0,
         "cardinality": 5,
-        "dominantValueProportion": 0.265,
-        "lowVariability": false,
-        "mostFrequent": [
-          {
-            "value": "SUCURSAL CENTRO",
-            "count": 530
-          },
-          {
-            "value": "Matriz",
-            "count": 465
-          },
-          {
-            "value": "SUCURSAL SUR",
-            "count": 446
-          },
-          {
-            "value": "Matriz - Centro",
-            "count": 287
-          },
-          {
-            "value": "SUCURSAL NORTE",
-            "count": 272
-          }
-        ]
+        "mostFrequent": {
+          "sucursal centro": 530,
+          "matriz": 465,
+          "sucursal sur": 446,
+          "matriz - centro": 287,
+          "sucursal norte": 272
+        }
       },
       "dominant_price_type": {
         "nullCount": 0,
         "cardinality": 5,
-        "dominantValueProportion": 0.244,
-        "lowVariability": false,
-        "mostFrequent": [
-          {
-            "value": "special",
-            "count": 488
-          },
-          {
-            "value": "dif",
-            "count": 481
-          },
-          {
-            "value": "normal",
-            "count": 453
-          },
-          {
-            "value": "hospital",
-            "count": 314
-          },
-          {
-            "value": "other",
-            "count": 264
-          }
-        ]
+        "mostFrequent": {
+          "special": 488,
+          "dif": 481,
+          "normal": 453,
+          "hospital": 314,
+          "other": 264
+        }
       }
     }
   },
   "evaluation": {
-    "accuracy": 0.765,
+    "accuracy": 0.795,
     "confusionMatrix": {
       "completed_on_time": {
-        "completed_on_time": 199,
-        "delayed": 31,
-        "cancelled": 7
+        "completed_on_time": 202,
+        "delayed": 33,
+        "cancelled": 2
       },
       "delayed": {
-        "completed_on_time": 33,
-        "delayed": 71,
-        "cancelled": 22
+        "completed_on_time": 27,
+        "delayed": 82,
+        "cancelled": 17
       },
       "cancelled": {
         "completed_on_time": 0,
-        "delayed": 1,
-        "cancelled": 36
+        "delayed": 3,
+        "cancelled": 34
       }
     },
     "metricsByClass": {
       "completed_on_time": {
-        "precision": 0.8578,
-        "recall": 0.8397,
-        "f1Score": 0.8486,
+        "precision": 0.8821,
+        "recall": 0.8523,
+        "f1Score": 0.867,
         "support": 237
       },
       "delayed": {
-        "precision": 0.6893,
-        "recall": 0.5635,
-        "f1Score": 0.6201,
+        "precision": 0.6949,
+        "recall": 0.6508,
+        "f1Score": 0.6721,
         "support": 126
       },
       "cancelled": {
-        "precision": 0.5538,
-        "recall": 0.973,
-        "f1Score": 0.7059,
+        "precision": 0.6415,
+        "recall": 0.9189,
+        "f1Score": 0.7556,
         "support": 37
       }
     },
     "macroAverage": {
-      "precision": 0.7003,
-      "recall": 0.7921,
-      "f1Score": 0.7249
+      "precision": 0.7395,
+      "recall": 0.8073,
+      "f1Score": 0.7649
     },
     "weightedAverage": {
-      "precision": 0.7766,
-      "recall": 0.765,
-      "f1Score": 0.7634
+      "precision": 0.8009,
+      "recall": 0.795,
+      "f1Score": 0.7953
     },
     "baseline": {
       "strategy": "majority_class",
@@ -436,20 +294,20 @@
       "metricsByClass": {
         "completed_on_time": {
           "precision": 0.5925,
-          "recall": 1,
+          "recall": 1.0,
           "f1Score": 0.7441,
           "support": 237
         },
         "delayed": {
-          "precision": 0,
-          "recall": 0,
-          "f1Score": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1Score": 0.0,
           "support": 126
         },
         "cancelled": {
-          "precision": 0,
-          "recall": 0,
-          "f1Score": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1Score": 0.0,
           "support": 37
         }
       },

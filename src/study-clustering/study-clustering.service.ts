@@ -432,8 +432,19 @@ export class StudyClusteringService {
       this.clusteringModel.isCompatibleArtifact(artifactCandidate)
         ? artifactCandidate
         : null;
+    const reassignmentRows = assignments.map((assignment) =>
+      this.assignmentAsModelRow(assignment),
+    );
+    const reappliedAssignments =
+      artifact &&
+      typeof this.clusteringModel.assignManyUsingExportedModel === 'function'
+        ? this.clusteringModel.assignManyUsingExportedModel(
+            reassignmentRows,
+            artifact,
+          )
+        : null;
     let artifactMismatches = 0;
-    const returnedStudies = assignments.map((assignment) => {
+    const returnedStudies = assignments.map((assignment, index) => {
       const storedProfile = profileMap.get(assignment.profileId);
       if (!storedProfile) {
         throw new Error(
@@ -444,8 +455,9 @@ export class StudyClusteringService {
       // CARGA Y USO DEL ARTEFACTO: vuelve a preparar la fila con los parametros
       // guardados y calcula el centroide mas cercano, sin reentrenar K-Means.
       const reapplied = artifact
-        ? this.clusteringModel.assignFromArtifact(
-            this.assignmentAsModelRow(assignment),
+        ? reappliedAssignments?.[index] ??
+          this.clusteringModel.assignFromArtifact(
+            reassignmentRows[index],
             artifact,
           )
         : null;
