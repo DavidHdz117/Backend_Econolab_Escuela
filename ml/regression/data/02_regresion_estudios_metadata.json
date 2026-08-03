@@ -1,5 +1,5 @@
 {
-  "exportedAtUtc": "2026-08-02T04:38:27.319Z",
+  "exportedAtUtc": "2026-08-03T17:31:45.242Z",
   "snapshotType": "point_in_time_catalog_snapshot",
   "temporalCoverage": {
     "available": false,
@@ -11,6 +11,6 @@
     "operativo.study_details"
   ],
   "dataset": "05_Datasets/02_regresion_estudios_dataset.csv",
-  "rows": 1048,
-  "sha256": "ac014094b4311acb02e76749bb1377929e10c90bf4311a4032102db68bc8cdbd"
+  "rows": 2000,
+  "sha256": "a51c2bf9ca210bc297e6dee558a097b17e8c366a5b08d71cc5b2753f7bf3bd6d"
 }
