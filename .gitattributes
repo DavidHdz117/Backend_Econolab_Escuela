@@ -5,3 +5,10 @@
 *.jpeg binary
 *.webp binary
 *.svg -text
+*.docx binary
+*.pdf binary
+*.pkl binary
+*.zip binary
+*.tar binary
+*.dump binary
+*.csv -text
