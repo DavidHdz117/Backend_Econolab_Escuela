@@ -1,10 +1,11 @@
 name: Authenticated profile CI
 on:
   push:
-    branches: ['fix/HU-06-perfil-autenticado']
+    branches: [main, 'fix/HU-06-perfil-autenticado']
   pull_request:
     branches: [main]
     paths: ['src/users/**', 'package*.json', '.github/workflows/profile.yml']
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

@@ -18,4 +18,6 @@ Build Nest aprobado. 22 pruebas nuevas del servicio y DTO, incluyendo campos pro
 
 El HTTP real de los módulos Users/Auth, con la base existente y el esquema sincronizado desactivado, aprobó acceso anónimo rechazado, lectura de campos públicos, rechazo de campos protegidos, cambio de nombre, contraseña para cambiar correo, persistencia, login con el correo nuevo, restauración y revocación. Solo se modificó temporalmente la cuenta independiente autorizada, que se restauró. La prueba no envió correos ni ejecutó jobs.
 
-El workflow `profile.yml` instala desde lockfile, revisa el código nuevo, ejecuta sus pruebas y compila Nest. El despliegue publicado requiere integrar el PR de backend y actualizar Render. No se da por publicado solamente porque pase la prueba local.
+El workflow `profile.yml` instala desde lockfile, revisa el código nuevo, ejecuta sus pruebas y compila Nest. También valida los cambios en `main` y admite ejecución manual; las comprobaciones siguen activas después de integrar el PR.
+
+El propietario autorizó explícitamente integrar el backend el 6 de octubre. El PR1 quedó integrado en `main` mediante el commit `933215a`; los PR y la rama `main` del móvil se conservan sin merges. El despliegue publicado requiere actualizar el servicio existente de Render. No se da por publicado solamente porque pase la prueba local o porque el PR esté integrado.
