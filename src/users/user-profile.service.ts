@@ -44,28 +44,8 @@ export class UserProfileService {
       select: ['id', 'nombre', 'email', 'rol', 'password'],
     });
     if (!user) throw new NotFoundException('Usuario no encontrado');
-    const emailChanged =
-      dto.email !== undefined && dto.email !== user.email.toLowerCase();
-    if (emailChanged) {
-      if (!dto.current_password)
-        throw new BadRequestException(
-          'Confirma tu contraseña actual para cambiar el correo',
-        );
-      if (!(await checkPassword(dto.current_password, user.password)))
-        throw new UnauthorizedException('Contraseña actual incorrecta');
-    }
-    if (dto.email !== undefined) {
-      const existing = await this.users.findOne({
-        where: {
-          email: Raw((alias) => `LOWER(${alias}) = :profileEmail`, {
-            profileEmail: dto.email,
-          }),
-        },
-        select: ['id'],
-      });
-      if (existing && String(existing.id) !== String(userId))
-        throw new ConflictException('El correo ya está registrado');
-    }
+    await this.confirmEmailChange(user, dto);
+    await this.checkEmailAvailable(userId, dto.email);
     // Actualización parcial: no sobrescribe rol, contraseña ni otros campos de autenticación.
     const changes: Pick<UpdateProfileDto, 'nombre' | 'email'> = {};
     if (dto.nombre !== undefined) changes.nombre = dto.nombre;
@@ -85,5 +65,33 @@ export class UserProfileService {
       message: 'Perfil actualizado',
       usuario: await this.getProfile(userId),
     };
+  }
+
+  private async confirmEmailChange(
+    user: Pick<User, 'email' | 'password'>,
+    dto: UpdateProfileDto,
+  ) {
+    if (dto.email === undefined || dto.email === user.email.toLowerCase())
+      return;
+    if (!dto.current_password)
+      throw new BadRequestException(
+        'Confirma tu contraseña actual para cambiar el correo',
+      );
+    if (!(await checkPassword(dto.current_password, user.password)))
+      throw new UnauthorizedException('Contraseña actual incorrecta');
+  }
+
+  private async checkEmailAvailable(userId: string, email?: string) {
+    if (email === undefined) return;
+    const existing = await this.users.findOne({
+      where: {
+        email: Raw((alias) => `LOWER(${alias}) = :profileEmail`, {
+          profileEmail: email,
+        }),
+      },
+      select: ['id'],
+    });
+    if (existing && String(existing.id) !== String(userId))
+      throw new ConflictException('El correo ya está registrado');
   }
 }

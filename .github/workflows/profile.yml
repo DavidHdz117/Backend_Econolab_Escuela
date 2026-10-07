@@ -17,9 +17,9 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - name: Validate profile code
-        run: npx eslint src/users/user-profile.controller.ts src/users/user-profile.service.ts src/users/user-profile.service.spec.ts src/users/dto/update-profile.dto.ts src/users/dto/update-profile.dto.spec.ts --max-warnings 0
+        run: node node_modules/eslint/bin/eslint.js src/users/user-profile.controller.ts src/users/user-profile.service.ts src/users/user-profile.service.spec.ts src/users/dto/update-profile.dto.ts src/users/dto/update-profile.dto.spec.ts --max-warnings 0
       - name: Profile validation and security tests
         run: npm test -- --ci --runInBand user-profile update-profile
       - run: npm run build
