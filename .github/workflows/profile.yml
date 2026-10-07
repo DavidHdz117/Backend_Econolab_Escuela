@@ -1,0 +1,25 @@
+name: Authenticated profile CI
+on:
+  push:
+    branches: ['fix/HU-06-perfil-autenticado']
+  pull_request:
+    branches: [main]
+    paths: ['src/users/**', 'package*.json', '.github/workflows/profile.yml']
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Validate profile code
+        run: npx eslint src/users/user-profile.controller.ts src/users/user-profile.service.ts src/users/user-profile.service.spec.ts src/users/dto/update-profile.dto.ts src/users/dto/update-profile.dto.spec.ts --max-warnings 0
+      - name: Profile validation and security tests
+        run: npm test -- --ci --runInBand user-profile update-profile
+      - run: npm run build
