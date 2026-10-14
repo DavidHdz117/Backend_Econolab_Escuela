@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import PDFDocument = require('pdfkit');
 import * as fs from 'fs';
 import * as bwipjs from 'bwip-js';
-import * as QRCode from 'qrcode';
+import { buildPwaQrBuffer } from 'src/common/utils/pwa-qr.util';
 import {ServiceOrder,ServiceOrderItem,} from '../services/entities/service-order.entity';
 import {
   StudyDetail,
@@ -81,31 +81,13 @@ export class ResultsService {
     });
   }
 
-  private async buildQrBuffer(result: StudyResult): Promise<Buffer | null> {
-    const template = process.env.LAB_QR_URL ?? '';
-    const base = process.env.LAB_QR_BASE_URL ?? '';
-    const path =
-      process.env.LAB_QR_PATH ?? `/results/${result.id}`;
-
-    let url = template;
-    if (!url && base) {
-      url = `${base.replace(/\/$/, '')}${path}`;
-    }
-    if (!url) return null;
-
-    const finalUrl = url.includes('{id}')
-      ? url.replace('{id}', String(result.id))
-      : url;
-
-    try {
-      return await QRCode.toBuffer(finalUrl, {
-        type: 'png',
-        width: 140,
-        margin: 1,
+  private async buildQrBuffer(result: StudyResult): Promise<Buffer> {
+    const item = result.serviceOrderItem ??
+      await this.itemRepo.findOne({
+        where: { id: result.serviceOrderItemId },
       });
-    } catch {
-      return null;
-    }
+    if (!item) throw new NotFoundException('Estudio del resultado no encontrado.');
+    return buildPwaQrBuffer('study', item.studyId);
   }
 
   private normalizePdfOptions(
@@ -537,7 +519,7 @@ export class ResultsService {
 
   private drawResultsFooter(
     doc: any,
-    qrBuffer: Buffer | null,
+    qrBuffer: Buffer,
     options: {
       includeSignature: boolean;
       labSchedule: string;
@@ -547,6 +529,7 @@ export class ResultsService {
       signaturePath: string;
       responsibleName: string;
       responsibleLicense: string;
+      qrCaption: string;
     },
   ) {
     const left = 48;
@@ -556,25 +539,12 @@ export class ResultsService {
     doc.moveTo(left, top).lineTo(right, top).strokeColor('#c8ced6').stroke();
 
     const blockTop = top + 12;
-    if (qrBuffer) {
-      doc.image(qrBuffer, left, blockTop, { width: 68, height: 68 });
-    } else {
-      doc.rect(left, blockTop, 68, 68).strokeColor('#c8ced6').stroke();
-      doc
-        .font('Helvetica')
-        .fontSize(7)
-        .fillColor('#7a7a7a')
-        .text('QR', left, blockTop + 26, {
-          width: 68,
-          align: 'center',
-        })
-        .fillColor('black');
-    }
+    doc.image(qrBuffer, left, blockTop, { width: 68, height: 68 });
 
     doc
       .font('Helvetica')
       .fontSize(7)
-      .text('Escanea para validar', left, blockTop + 56, {
+      .text(options.qrCaption, left, blockTop + 72, {
         width: 68,
         align: 'center',
       });
@@ -868,25 +838,11 @@ export class ResultsService {
       doc.moveDown(1.2);
       const footerY = doc.y;
 
-      // QR area
-      if (qrBuffer) {
-        doc.image(qrBuffer, 48, footerY, { width: 70, height: 70 });
-      } else {
-        doc
-          .rect(48, footerY, 70, 70)
-          .strokeColor('#cccccc')
-          .stroke();
-        doc
-          .font('Helvetica')
-          .fontSize(7)
-          .fillColor('#666666')
-          .text('QR', 48, footerY + 28, { width: 70, align: 'center' })
-          .fillColor('black');
-      }
+      doc.image(qrBuffer, 48, footerY, { width: 70, height: 70 });
       doc
         .font('Helvetica')
         .fontSize(7)
-        .text('Escanea para validar', 48, footerY + 56, {
+        .text('Escanea en Estudios', 48, footerY + 74, {
           width: 70,
           align: 'center',
         });
@@ -947,9 +903,7 @@ export class ResultsService {
     sections: ServicePdfSection[],
     options: ResultPdfOptions,
   ): Promise<Buffer> {
-    const qrBuffer = sections[0]
-      ? await this.buildQrBuffer(sections[0].result)
-      : null;
+    const qrBuffer = await buildPwaQrBuffer('service', service.id);
 
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ margin: 48, size: 'A4' });
@@ -1236,19 +1190,12 @@ export class ResultsService {
       doc.moveDown(1.2);
       const footerY = doc.y;
 
-      if (qrBuffer) {
-        doc.image(qrBuffer, 48, footerY, { width: 70, height: 70 });
-      } else {
-        doc
-          .rect(48, footerY, 70, 70)
-          .strokeColor('#cccccc')
-          .stroke();
-      }
+      doc.image(qrBuffer, 48, footerY, { width: 70, height: 70 });
 
       doc
         .font('Helvetica')
         .fontSize(7)
-        .text('Escanea para validar', 48, footerY + 56, {
+        .text('Escanea en Servicios', 48, footerY + 74, {
           width: 70,
           align: 'center',
         });
@@ -1520,6 +1467,7 @@ export class ResultsService {
 
       this.drawResultsFooter(doc, qrBuffer, {
         includeSignature: true,
+        qrCaption: 'Escanea en Estudios',
         labSchedule,
         labSampleSchedule,
         labEmail,
@@ -1538,9 +1486,16 @@ export class ResultsService {
     sections: ServicePdfSection[],
     options: ResultPdfOptions,
   ): Promise<Buffer> {
-    const qrBuffer = sections[0]
-      ? await this.buildQrBuffer(sections[0].result)
-      : null;
+    const qrBuffer = await buildPwaQrBuffer('service', service.id);
+    const studyQrBuffers = new Map<number, Buffer>();
+    for (const section of sections) {
+      if (!studyQrBuffers.has(section.item.studyId)) {
+        studyQrBuffers.set(
+          section.item.studyId,
+          await buildPwaQrBuffer('study', section.item.studyId),
+        );
+      }
+    }
     const barcodeText = service.folio ?? String(service.id);
     const barcodeBuffer = await this.buildBarcodeBuffer(barcodeText, 12);
     const barcodePatientLine = this.buildPersonName(service.patient);
@@ -1629,37 +1584,47 @@ export class ResultsService {
       };
 
       const drawStudyHeader = (section: ServicePdfSection) => {
+        const headerTop = cursorY;
+        doc.image(studyQrBuffers.get(section.item.studyId)!, right - 68, headerTop, {
+          width: 68,
+          height: 68,
+        });
+        doc.font('Helvetica').fontSize(6.5).text('Escanea en Estudios', right - 68, headerTop + 72, {
+          width: 68,
+          align: 'center',
+        });
         const studyTitle = section.item.studyNameSnapshot.toUpperCase();
         doc
           .font('Helvetica-Bold')
           .fontSize(12)
           .text(studyTitle, left, cursorY, {
-            width: right - left,
+            width: right - left - 82,
             align: 'center',
           });
-        cursorY += 18;
+        cursorY = Math.max(headerTop + 18, doc.y + 6);
 
         if (section.result.method) {
           doc
             .font('Helvetica')
             .fontSize(8.8)
             .text(`Metodo: ${section.result.method}`, left, cursorY, {
-              width: right - left,
+              width: right - left - 82,
               align: 'center',
             });
-          cursorY += 14;
+          cursorY = Math.max(cursorY + 14, doc.y + 4);
         }
         if (section.result.observations) {
           doc
             .font('Helvetica')
             .fontSize(8.8)
             .text(`Observaciones: ${section.result.observations}`, left, cursorY, {
-              width: right - left,
+              width: right - left - 82,
               align: 'center',
             });
-          cursorY += 14;
+          cursorY = Math.max(cursorY + 14, doc.y + 4);
         }
 
+        cursorY = Math.max(cursorY, headerTop + 88);
         drawTableHeader();
       };
 
@@ -1680,8 +1645,9 @@ export class ResultsService {
           if (options.studyLayout === 'page-per-study') {
             doc.addPage();
             cursorY = 56;
-          } else {
-            ensureSpace(42, section);
+          } else if (cursorY + 130 > bottomLimit) {
+            doc.addPage();
+            cursorY = 56;
           }
         }
 
@@ -1775,6 +1741,7 @@ export class ResultsService {
 
       this.drawResultsFooter(doc, qrBuffer, {
         includeSignature: options.includeSignature,
+        qrCaption: 'Escanea en Servicios',
         labSchedule,
         labSampleSchedule,
         labEmail,

@@ -1,4 +1,7 @@
 # ECONOLAB - Entrega final de extraccion de conocimiento
+
+Para la generación y prueba de QR reales dentro de los PDF de resultados, consulta [README_QR_RESULTADOS.md](./README_QR_RESULTADOS.md).
+
 Este repositorio concentra la entrega practica del proyecto final de la materia
 de extraccion de conocimiento en bases de datos aplicada al sistema ECONOLAB.
 La rubrica pide al menos dos soluciones; esta entrega documenta **tres**
