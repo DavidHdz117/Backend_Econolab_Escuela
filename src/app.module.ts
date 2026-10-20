@@ -17,6 +17,7 @@ import { DbAdminModule } from './db-admin/db-admin.module';
 import { LossPredictionsModule } from './loss-predictions/loss-predictions.module';
 import { SecurityModule } from './security/security.module';
 import { StudyClusteringModule } from './study-clustering/study-clustering.module';
+import { CashCutsModule } from './cash-cuts/cash-cuts.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { StudyClusteringModule } from './study-clustering/study-clustering.modul
     LossPredictionsModule,
     SecurityModule,
     StudyClusteringModule,
+    CashCutsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,0 +1,23 @@
+name: Cash cuts CI
+on:
+  push:
+    branches: [main, feature/HU-04-cortes]
+  pull_request:
+    branches: [main]
+    paths: ['src/cash-cuts/**', 'src/app.module.ts', '.github/workflows/cash-cuts.yml']
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: node node_modules/eslint/bin/eslint.js src/cash-cuts --max-warnings 0
+      - run: npm test -- --ci --runInBand cash-cuts cash-cut-query
+      - run: npm run build
