@@ -155,6 +155,9 @@ async function run() {
       const result = await request('/privacy/notice'); assert.equal(result.status, 200);
       assert.equal(result.data.ready, true); assert.equal(result.data.supportEmail, '20230009@uthh.edu.mx');
       const html = await request('/privacy'); assert.equal(html.status, 200); assert.match(html.data, /<!doctype html>/i);
+      assert.match(html.headers.get('content-security-policy') ?? '', /default-src 'none'/);
+      assert.match(html.headers.get('content-security-policy') ?? '', /style-src 'sha256-/);
+      assert.ok(!html.headers.get('content-security-policy')?.includes('unsafe-inline'));
       assert.equal((await request('/privacy/account-deletion')).status, 200);
     });
     await test('Consentimiento ausente y opciones desactivadas por defecto', async () => {
