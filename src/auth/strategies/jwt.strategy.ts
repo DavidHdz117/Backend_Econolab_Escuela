@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 
 import { AppJwtPayload } from 'src/common/utils/jwt.util';
 import { UserSession } from '../entities/user-session.entity';
+import { Role } from 'src/common/enums/roles.enum';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -22,6 +23,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       secretOrKey: secret,
       ignoreExpiration: false, // respeta exp del JWT
+      algorithms: ['HS256'],
     });
   }
 
@@ -52,6 +54,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     const { user } = session;
+    if (!user || !user.confirmed || user.rol === Role.Unassigned) {
+      throw new UnauthorizedException('Esta cuenta ya no tiene acceso.');
+    }
 
     // Lo que se inyecta en req.user
     return {

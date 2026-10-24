@@ -16,6 +16,8 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { VerifyMfaDto } from './entities/verify-mfa.dto';
+import { MobileSessionService } from './mobile-session.service';
+import { RefreshDto } from './dto/refresh.dto';
 
 @UsePipes(new ValidationPipe({ transform: true }))
 @Controller('auth')
@@ -23,6 +25,7 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly config: ConfigService,
+    private readonly mobileSessions: MobileSessionService,
   ) {}
 
   @Post('login')
@@ -37,6 +40,16 @@ export class AuthController {
     const ua = (req.headers['user-agent'] as string) || undefined;
     const ip = (req.ip as string) || undefined;
     return this.auth.verifyMfa(dto, ip, ua);
+  }
+
+  @Post('refresh')
+  refresh(@Body() dto: RefreshDto) {
+    return this.mobileSessions.refresh(dto.refreshToken);
+  }
+
+  @Post('mobile/logout')
+  mobileLogout(@Body() dto: RefreshDto) {
+    return this.mobileSessions.revoke(dto.refreshToken);
   }
 
   @Get('google')

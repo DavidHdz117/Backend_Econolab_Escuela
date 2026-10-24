@@ -1,0 +1,48 @@
+name: Mobile sessions and privacy security
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: ['feature/mobile-sessions-privacy']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_USER: econolab_test
+          POSTGRES_PASSWORD: ci-only-local-postgres
+          POSTGRES_DB: econolab_mobile_test
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      NODE_ENV: test
+      DATABASE_HOST: 127.0.0.1
+      DATABASE_PORT: '5432'
+      DATABASE_USER: econolab_test
+      DATABASE_PASS: ci-only-local-postgres
+      DATABASE_NAME: econolab_mobile_test
+      DATABASE_SSL: 'false'
+      THROTTLE_LIMIT: '10000'
+      APP_ENABLE_HSTS: 'false'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - run: npm test -- --ci --runInBand
+      - run: npm run test:mobile-security
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: mobile-security-http
+          path: reports/mobile-security/
+          if-no-files-found: error

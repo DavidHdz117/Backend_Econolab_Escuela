@@ -35,9 +35,9 @@ export class GoogleStrategy extends PassportStrategy(Strategy as any, 'google') 
     // 1) Buscar usuario por email
     let user = await this.usersService.findByEmail(email);
 
-    // 2) Si NO existe → crearlo como ADMIN (SOLO pruebas)
+    // New accounts require an existing administrator to assign a role.
     if (!user) {
-      user = await this.usersService.registerFromGoogleAsAdmin({
+      user = await this.usersService.registerFromGoogle({
         nombre,
         email,
         googleId: profile.id,
@@ -48,9 +48,6 @@ export class GoogleStrategy extends PassportStrategy(Strategy as any, 'google') 
     if (!user.confirmed) {
       user = await this.usersService.confirmFromGoogle(user);
     }
-
-    // 4) ⚠️ SOLO pruebas: si sigue unassigned, darle admin
-    user = await this.usersService.promoteUnassignedToAdminForTesting(user);
 
     // Passport pondrá este user en req.user
     return user;
