@@ -2,6 +2,8 @@ export const SAFE_HTTP_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 export const CSRF_EXCLUDED_ROUTES = [
   /^\/api\/auth\/login$/i,
+  /^\/api\/auth\/refresh$/i,
+  /^\/api\/auth\/mobile\/logout$/i,
   /^\/api\/auth\/mfa\/verify$/i,
   /^\/api\/auth\/google(?:\/callback)?$/i,
   /^\/api\/users\/register$/i,

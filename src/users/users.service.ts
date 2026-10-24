@@ -7,6 +7,7 @@ import { checkPassword, hashPassword } from 'src/common/utils/crypto.util';
 import { generateRandomToken } from 'src/common/utils/token.util';
 import { Role } from 'src/common/enums/roles.enum';
 import { MailService } from 'src/mail/mail.service';
+import { randomBytes } from 'node:crypto';
 
 
 
@@ -172,13 +173,19 @@ export class UsersService {
   }
 
   async setRole(id: string, rol: Role) {
-
-    const user = await this.findOne(id);
-    if (!user) throw new NotFoundException('Usuario no encontrado');
-    if (!user.confirmed) throw new UnauthorizedException('El usuario no ha confirmado su cuenta');
-    user.rol = rol;
-    await this.userRepository.save(user);
-    return { message: 'Rol actualizado', usuario: { id: user.id, rol } };
+    return this.userRepository.manager.transaction(async manager => {
+      await manager.query('SELECT pg_advisory_xact_lock(7732502)');
+      const repository = manager.getRepository(User);
+      const user = await repository.findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!user) throw new NotFoundException('Usuario no encontrado');
+      if (!user.confirmed) throw new UnauthorizedException('El usuario no ha confirmado su cuenta');
+      if (user.rol === Role.Admin && rol !== Role.Admin && await repository.countBy({ rol: Role.Admin, confirmed: true }) <= 1) {
+        throw new ConflictException('Debe quedar otro administrador confirmado a cargo del sistema.');
+      }
+      user.rol = rol;
+      await repository.save(user);
+      return { message: 'Rol actualizado', usuario: { id: user.id, rol } };
+    });
   }
 
   async findConfirmedUnassigned() {
@@ -235,7 +242,7 @@ export class UsersService {
   async create(dto: CreateUserDto) {
     const user = this.userRepository.create({
       ...dto,
-      rol: Role.Admin,
+      rol: Role.Unassigned,
       password: await hashPassword(dto.password),
       token: generateRandomToken(6),
       confirmed: false,
@@ -278,13 +285,13 @@ export class UsersService {
     });
   }
 
-  async registerFromGoogleAsAdmin(data: {
+  async registerFromGoogle(data: {
     nombre: string;
     email: string;
     googleId: string;
   }) {
     const randomPass = await hashPassword(
-      `google-${data.email}-${Date.now()}`
+      randomBytes(32).toString('hex')
     );
 
     const user = this.userRepository.create({
@@ -292,7 +299,7 @@ export class UsersService {
       email: data.email,
       password: randomPass,
       confirmed: true,
-      rol: Role.Admin,        // 👈 ADMIN directo (SOLO pruebas)
+      rol: Role.Unassigned,
       // si tu entidad tiene estos campos, puedes guardarlos:
       // googleId: data.googleId,
       // provider: 'google',
@@ -308,12 +315,4 @@ export class UsersService {
     return this.userRepository.save(user);
   }
 
-  /** ⚠️ SOLO PRUEBAS: promover a admin si sigue unassigned */
-  async promoteUnassignedToAdminForTesting(user: User) {
-    if (user.rol === Role.Unassigned) {
-      user.rol = Role.Admin;
-      return this.userRepository.save(user);
-    }
-    return user;
-  }
 }

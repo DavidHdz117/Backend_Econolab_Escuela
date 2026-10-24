@@ -14,6 +14,7 @@ import { UserLoginLog } from './entities/user-login-log.entity';
 import { User } from 'src/users/entities/user.entity';
 import { UserSession } from './entities/user-session.entity';
 import { GmailOauthController } from './gmail-oauth.controller';
+import { MobileSessionService } from './mobile-session.service';
 
 @Module({
   imports: [
@@ -23,7 +24,7 @@ import { GmailOauthController } from './gmail-oauth.controller';
     UsersModule,
   ],
   controllers: [AuthController, GmailOauthController],
-  providers: [AuthService, JwtStrategy, AuthEventsService, GoogleStrategy],
+  providers: [AuthService, JwtStrategy, AuthEventsService, GoogleStrategy, MobileSessionService],
   exports: [AuthService, AuthEventsService],
 })
 export class AuthModule {}

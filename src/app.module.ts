@@ -18,6 +18,7 @@ import { LossPredictionsModule } from './loss-predictions/loss-predictions.modul
 import { SecurityModule } from './security/security.module';
 import { StudyClusteringModule } from './study-clustering/study-clustering.module';
 import { CashCutsModule } from './cash-cuts/cash-cuts.module';
+import { PrivacyModule } from './privacy/privacy.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { CashCutsModule } from './cash-cuts/cash-cuts.module';
     SecurityModule,
     StudyClusteringModule,
     CashCutsModule,
+    PrivacyModule,
   ],
   controllers: [AppController],
   providers: [AppService],

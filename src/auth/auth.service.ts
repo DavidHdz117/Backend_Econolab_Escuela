@@ -17,6 +17,7 @@ import { AuthEventsService } from './auth-events.service';
 import { UserSession } from './entities/user-session.entity';
 import { User } from 'src/users/entities/user.entity';
 import { VerifyMfaDto } from './entities/verify-mfa.dto';
+import { MobileSessionService } from './mobile-session.service';
 
 @Injectable()
 export class AuthService {
@@ -24,6 +25,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly users: UsersService,
     private readonly authEvents: AuthEventsService,
+    private readonly mobileSessions: MobileSessionService,
 
     @InjectRepository(UserSession)
     private readonly sessionsRepo: Repository<UserSession>,
@@ -66,6 +68,7 @@ export class AuthService {
     user: User,
     ip?: string,
     userAgent?: string,
+    mobile = false,
   ) {
     const expiresAt = new Date(Date.now() + AUTH_SESSION_TTL_MS);
 
@@ -77,6 +80,8 @@ export class AuthService {
         userAgent: userAgent ?? null,
       }),
     );
+
+    if (mobile) return this.mobileSessions.start(session.id, user);
 
     const payload: AppJwtPayload = {
       sub: user.id,
@@ -144,7 +149,7 @@ export class AuthService {
   
     await this.resetLoginAttempts(user);
     await this.clearPendingMfa(user);
-    const authSession = await this.createAuthenticatedSession(user, ip, userAgent);
+    const authSession = await this.createAuthenticatedSession(user, ip, userAgent, dto.mobile === true);
 
     await this.authEvents.logSuccess(user, ip, userAgent);
 
