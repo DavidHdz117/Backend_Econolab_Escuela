@@ -18,8 +18,9 @@ export class SecurityEventsService {
         event: 'suspicious_payload_detected',
         ...this.buildRequestContext(req),
         matches: matches.slice(0, 5).map((match) => ({
-          ...match,
-          value: this.truncate(match.value, 180),
+          kind: match.kind,
+          path: match.path,
+          value: '[REDACTED]',
         })),
       }),
     );
@@ -38,7 +39,9 @@ export class SecurityEventsService {
     return {
       ip: this.getClientIp(req),
       method: req.method,
-      endpoint: req.originalUrl ?? req.url,
+      endpoint: (req.originalUrl ?? req.url)
+        .split('?')[0]
+        .replace(/(\/reset-password\/)[^/]+/i, '$1[REDACTED]'),
       payload: {
         params: this.redactPayload(req.params),
         query: this.redactPayload(req.query),

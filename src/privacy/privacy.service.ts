@@ -13,7 +13,7 @@ import { checkPassword } from 'src/common/utils/crypto.util';
 import { DeleteOwnAccountDto, PrivacyPreferencesDto } from './privacy.dto';
 import { isEmail } from 'class-validator';
 
-export const PRIVACY_NOTICE_VERSION = '2026-10-23';
+export const PRIVACY_NOTICE_VERSION = '2026-10-23.1';
 type PrivacyRow = {
   notice_version: string | null;
   accepted_at: Date | string | null;
@@ -52,7 +52,7 @@ export class PrivacyService {
         'Nombre',
         'Correo electrónico',
         'Contraseña protegida mediante hash',
-        'Rol y sesiones de acceso',
+        'Rol, sesiones y registros de acceso (dirección IP y agente de usuario)',
       ],
       optionalPurposes:
         'Las comunicaciones opcionales y la analítica opcional están desactivadas por defecto. Esta versión no envía campañas ni integra analítica opcional.',
