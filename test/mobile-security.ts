@@ -195,7 +195,8 @@ async function run() {
     });
     // Optional process stays alive only for a scanner against this disposable environment.
     if (process.env.SECURITY_SCAN_HOLD === '1' && !process.exitCode) {
-      await account(Role.Recepcionista, process.env.SECURITY_QA_UI_EMAIL ?? 'native-qa@example.test');
+      await account(Role.Recepcionista, 'native-debug@example.test');
+      await account(Role.Recepcionista, 'native-release@example.test');
       const studyRepo = db.getRepository(Study);
       const study = await studyRepo.save(studyRepo.create({ name: 'Estudio QA seguro', code: `QA-${suffix}`, normalPrice: 120 }));
       await db.getRepository(StudyDetail).save({ studyId: study.id, name: 'Parametro QA', dataType: StudyDetailType.PARAMETER, unit: 'QA', referenceValue: 'Solo pruebas' });
