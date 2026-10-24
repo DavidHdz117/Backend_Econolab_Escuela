@@ -51,7 +51,7 @@ export class MobileSessionService {
     };
   }
 
-  async start(sessionId: string, user: User) {
+  start(sessionId: string, user: User) {
     return this.db.transaction(async (manager) => {
       const session = await manager
         .getRepository(UserSession)
@@ -94,8 +94,7 @@ export class MobileSessionService {
         .findOne({ where: { id: session.id }, relations: ['user'] });
       const user = withUser?.user;
       if (
-        !user ||
-        !user.confirmed ||
+        !user?.confirmed ||
         user.rol === Role.Unassigned ||
         (user.lockUntil && user.lockUntil > new Date())
       )

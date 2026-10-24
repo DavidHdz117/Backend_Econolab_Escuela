@@ -173,13 +173,19 @@ export class UsersService {
   }
 
   async setRole(id: string, rol: Role) {
-
-    const user = await this.findOne(id);
-    if (!user) throw new NotFoundException('Usuario no encontrado');
-    if (!user.confirmed) throw new UnauthorizedException('El usuario no ha confirmado su cuenta');
-    user.rol = rol;
-    await this.userRepository.save(user);
-    return { message: 'Rol actualizado', usuario: { id: user.id, rol } };
+    return this.userRepository.manager.transaction(async manager => {
+      await manager.query('SELECT pg_advisory_xact_lock(7732502)');
+      const repository = manager.getRepository(User);
+      const user = await repository.findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!user) throw new NotFoundException('Usuario no encontrado');
+      if (!user.confirmed) throw new UnauthorizedException('El usuario no ha confirmado su cuenta');
+      if (user.rol === Role.Admin && rol !== Role.Admin && await repository.countBy({ rol: Role.Admin, confirmed: true }) <= 1) {
+        throw new ConflictException('Debe quedar otro administrador confirmado a cargo del sistema.');
+      }
+      user.rol = rol;
+      await repository.save(user);
+      return { message: 'Rol actualizado', usuario: { id: user.id, rol } };
+    });
   }
 
   async findConfirmedUnassigned() {

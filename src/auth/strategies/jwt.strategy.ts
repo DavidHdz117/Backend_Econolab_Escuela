@@ -54,7 +54,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     const { user } = session;
-    if (!user || !user.confirmed || user.rol === Role.Unassigned) {
+    if (!user?.confirmed || user.rol === Role.Unassigned) {
       throw new UnauthorizedException('Esta cuenta ya no tiene acceso.');
     }
 

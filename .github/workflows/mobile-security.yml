@@ -16,7 +16,7 @@ jobs:
         image: postgres:17.6
         env:
           POSTGRES_USER: econolab_test
-          POSTGRES_PASSWORD: ci-only-local-postgres
+          POSTGRES_PASSWORD_FILE: /proc/sys/kernel/random/uuid
           POSTGRES_DB: econolab_mobile_test
         ports: ['5432:5432']
         options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
@@ -25,7 +25,6 @@ jobs:
       DATABASE_HOST: 127.0.0.1
       DATABASE_PORT: '5432'
       DATABASE_USER: econolab_test
-      DATABASE_PASS: ci-only-local-postgres
       DATABASE_NAME: econolab_mobile_test
       DATABASE_SSL: 'false'
       THROTTLE_LIMIT: '10000'
@@ -36,7 +35,13 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      - name: Generar contraseña exclusiva del PostgreSQL desechable
+        run: |
+          DB_PASSWORD=$(openssl rand -hex 32)
+          echo "::add-mask::$DB_PASSWORD"
+          docker exec "${{ job.services.postgres.id }}" psql -U econolab_test -d econolab_mobile_test -c "ALTER ROLE econolab_test WITH PASSWORD '$DB_PASSWORD';"
+          echo "DATABASE_PASS=$DB_PASSWORD" >> "$GITHUB_ENV"
+      - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run build
       - run: npm test -- --ci --runInBand
       - run: npm run test:mobile-security

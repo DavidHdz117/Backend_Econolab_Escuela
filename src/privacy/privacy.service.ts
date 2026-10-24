@@ -11,6 +11,7 @@ import { User } from 'src/users/entities/user.entity';
 import { Role } from 'src/common/enums/roles.enum';
 import { checkPassword } from 'src/common/utils/crypto.util';
 import { DeleteOwnAccountDto, PrivacyPreferencesDto } from './privacy.dto';
+import { isEmail } from 'class-validator';
 
 export const PRIVACY_NOTICE_VERSION = '2026-10-23';
 type PrivacyRow = {
@@ -38,11 +39,7 @@ export class PrivacyService {
         .trim() || null;
     return {
       version: PRIVACY_NOTICE_VERSION,
-      ready: Boolean(
-        supportEmail &&
-          /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail) &&
-          controller,
-      ),
+      ready: Boolean(supportEmail && isEmail(supportEmail) && controller),
       controller,
       supportEmail,
       title: 'Privacidad de tu cuenta Econolab',
@@ -86,7 +83,7 @@ export class PrivacyService {
     };
   }
 
-  async updatePreferences(userId: string, dto: PrivacyPreferencesDto) {
+  updatePreferences(userId: string, dto: PrivacyPreferencesDto) {
     if (
       dto.consent === true &&
       (!this.notice().ready || dto.noticeVersion !== PRIVACY_NOTICE_VERSION)

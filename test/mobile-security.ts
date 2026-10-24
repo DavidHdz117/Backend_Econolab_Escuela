@@ -45,7 +45,12 @@ class SecurityTestModule {}
 
 async function run() {
   mkdirSync('reports/mobile-security', { recursive: true });
-  const app = await NestFactory.create(SecurityTestModule, { logger: false });
+  const bootstrap = new DataSource({ type: 'postgres', host: process.env.DATABASE_HOST,
+    port: Number(process.env.DATABASE_PORT ?? 5432), username: process.env.DATABASE_USER,
+    password: process.env.DATABASE_PASS, database: process.env.DATABASE_NAME });
+  await bootstrap.initialize();
+  try { await bootstrap.query('CREATE SCHEMA IF NOT EXISTS operativo'); } finally { await bootstrap.destroy(); }
+  const app = await NestFactory.create(SecurityTestModule, { logger: ['error'], abortOnError: false });
   const security = app.get(SecurityService);
   const helmet = require('helmet') as typeof import('helmet');
   app.use(helmet.default(security.buildHelmetConfig()));
@@ -141,7 +146,7 @@ async function run() {
     });
     await test('Refresh concurrente no reutiliza una credencial de un solo uso', async () => {
       const concurrent = await Promise.all([0, 1].map(() => request('/auth/refresh', 'POST', undefined, { refreshToken: session.refreshToken })));
-      assert.deepEqual(concurrent.map(r => r.status).sort(), [201, 401]);
+      assert.deepEqual(concurrent.map(r => r.status).sort((a, b) => a - b), [201, 401]);
       const issued = concurrent.find(r => r.status === 201)!;
       assert.equal((await request('/profile', 'GET', issued.data.token)).status, 401);
       session = await login(staff);
@@ -172,6 +177,7 @@ async function run() {
       const activeAdmin = await login(admin);
       assert.equal((await request('/account', 'DELETE', activeAdmin.token, { currentPassword: password, confirmation: 'NO' })).status, 400);
       assert.equal((await request('/account', 'DELETE', activeAdmin.token, { currentPassword: password, confirmation: 'ELIMINAR MI CUENTA' })).status, 409);
+      assert.equal((await request(`/admin/users/${admin.id}/role`, 'PATCH', activeAdmin.token, { rol: 'recepcionista' })).status, 409);
     });
     await test('Cancelación propia elimina cuenta, sesiones, preferencias y logs asociados', async () => {
       const result = await request('/account', 'DELETE', session.token, { currentPassword: password, confirmation: 'ELIMINAR MI CUENTA' });
