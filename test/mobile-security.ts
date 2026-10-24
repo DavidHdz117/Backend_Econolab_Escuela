@@ -29,7 +29,7 @@ if (!['localhost', '127.0.0.1', '::1'].includes(process.env.DATABASE_HOST ?? '')
 }
 process.env.JWT_SECRET ||= randomBytes(32).toString('hex');
 process.env.GOOGLE_CLIENT_ID ||= 'local-qa';
-process.env.GOOGLE_CLIENT_SECRET ||= 'local-qa';
+process.env.GOOGLE_CLIENT_SECRET ||= randomBytes(16).toString('hex');
 process.env.GOOGLE_CALLBACK_URL ||= 'http://127.0.0.1:3109/api/auth/google/callback';
 
 @Module({ imports: [
