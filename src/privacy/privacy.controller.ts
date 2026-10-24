@@ -32,6 +32,8 @@ export class PrivacyController {
   @Get()
   @Header('Content-Type', 'text/html; charset=utf-8')
   @Header('Content-Security-Policy', NOTICE_CSP)
+  @Header('Cross-Origin-Embedder-Policy', 'require-corp')
+  @Header('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()')
   @Header('Cache-Control', 'no-store')
   page() {
     return this.publicPage(false);
@@ -40,6 +42,8 @@ export class PrivacyController {
   @Get('account-deletion')
   @Header('Content-Type', 'text/html; charset=utf-8')
   @Header('Content-Security-Policy', NOTICE_CSP)
+  @Header('Cross-Origin-Embedder-Policy', 'require-corp')
+  @Header('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()')
   @Header('Cache-Control', 'no-store')
   deletionPage() {
     return this.publicPage(true);

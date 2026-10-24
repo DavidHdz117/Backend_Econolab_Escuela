@@ -158,6 +158,9 @@ async function run() {
       assert.match(html.headers.get('content-security-policy') ?? '', /default-src 'none'/);
       assert.match(html.headers.get('content-security-policy') ?? '', /style-src 'sha256-/);
       assert.ok(!html.headers.get('content-security-policy')?.includes('unsafe-inline'));
+      assert.equal(html.headers.get('cross-origin-embedder-policy'), 'require-corp');
+      assert.match(html.headers.get('permissions-policy') ?? '', /camera=\(\)/);
+      assert.match(html.headers.get('permissions-policy') ?? '', /microphone=\(\)/);
       assert.equal((await request('/privacy/account-deletion')).status, 200);
     });
     await test('Consentimiento ausente y opciones desactivadas por defecto', async () => {
