@@ -31,4 +31,3 @@ Ejecutar después de npm run build y con PostgreSQL de pruebas disponible:
 SCHOOL_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:55440/econolab_school_test node scripts/school-smoke.cjs
 
 La revisión de Google Play de la aplicación móvil es independiente de estas pruebas y no se garantiza su aprobación.
-

@@ -23,7 +23,7 @@ export class SchoolService implements OnModuleInit {
       'CREATE TABLE IF NOT EXISTS school_workspace (user_id INTEGER PRIMARY KEY REFERENCES "user"(id) ON DELETE CASCADE, state JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())',
     );
   }
-  private async access<T>(
+  private access<T>(
     userId: string,
     operation: (state: Workspace) => T,
     write = false,

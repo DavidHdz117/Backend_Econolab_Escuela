@@ -1,6 +1,7 @@
 /* Local fixture only. Refuses remote databases and non-test names. */
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const { randomBytes } = require('node:crypto');
 const { DataSource } = require('typeorm');
 const { Client } = require('pg');
 const { Test } = require('@nestjs/testing');
@@ -15,7 +16,7 @@ const { SchoolService } = require('../dist/school/school.service');
 const { JwtStrategy } = require('../dist/auth/strategies/jwt.strategy');
 const { UserSession } = require('../dist/auth/entities/user-session.entity');
 const { SCHOOL_NOTICE_VERSION } = require('../dist/school/domain');
-const secret = 'local-school-fixture-secret-only-2026';
+const secret = randomBytes(32).toString('hex');
 const databaseUrl = process.env.SCHOOL_TEST_DATABASE_URL || 'postgresql://postgres@127.0.0.1:55440/econolab_school_test';
 async function main() {
   const url = new URL(databaseUrl);
@@ -40,7 +41,8 @@ async function main() {
         { provide: ConfigService, useValue: { getOrThrow: name => { assert.equal(name, 'JWT_SECRET'); return secret; } } },
         { provide: getRepositoryToken(UserSession), useValue: {
           findOne: async ({ where }) => {
-            const id = where.id === 'fixture-admin' ? '9011' : where.id === 'fixture-member' ? '9022' : null;
+            const owners = { 'fixture-admin': '9011', 'fixture-member': '9022' };
+            const id = owners[where.id] ?? null;
             return id ? { id: where.id, revoked: false, expiresAt: new Date(Date.now() + 60000),
               user: { id, confirmed: true, email: 'fixture@example.test', rol: id === '9011' ? 'admin' : 'recepcionista' } } : null;
           },
@@ -57,7 +59,9 @@ async function main() {
     const service = app.get(SchoolService);
     await service.reset('9011'); await service.reset('9022');
     let checks = 0;
-    async function request(route, token, method = 'GET', body, expected = 200) {
+    async function request(route, token, method, body, expected) {
+      method ??= 'GET';
+      expected ??= 200;
       const response = await fetch(base + '/api' + route, { method, headers: { ...(token ? { Authorization: 'Bearer ' + token } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
       const text = await response.text();
       assert.equal(response.status, expected, route + ' returned ' + response.status + ': ' + text.slice(0, 200));
@@ -109,4 +113,3 @@ async function main() {
   }
 }
 main().catch(error => { process.stderr.write(error.stack + '\n'); process.exitCode = 1; });
-

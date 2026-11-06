@@ -13,27 +13,30 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: econolab_school_test
-        ports: ['5432:5432']
-        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
+      - name: Start isolated PostgreSQL with an ephemeral credential
+        shell: bash
+        run: |
+          school_db_password="$(openssl rand -hex 32)"
+          echo "::add-mask::$school_db_password"
+          echo "SCHOOL_TEST_DATABASE_URL=postgresql://postgres:$school_db_password@127.0.0.1:5432/econolab_school_test" >> "$GITHUB_ENV"
+          docker run --detach --name school-postgres --publish 127.0.0.1:5432:5432 --env POSTGRES_USER=postgres --env POSTGRES_PASSWORD="$school_db_password" --env POSTGRES_DB=econolab_school_test postgres:17
+          for attempt in $(seq 1 30); do
+            if docker exec school-postgres pg_isready -U postgres; then exit 0; fi
+            sleep 1
+          done
+          exit 1
       - run: npm ci --ignore-scripts
       - run: node node_modules/eslint/bin/eslint.js src/school --max-warnings 0
       - run: npm test -- --ci --runInBand school.spec.ts
       - run: npm run build
       - name: Real HTTP, JWT and PostgreSQL tests
-        env:
-          SCHOOL_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/econolab_school_test
         run: node scripts/school-smoke.cjs
-
+      - name: Stop fixture database
+        if: always()
+        run: docker rm --force school-postgres
