@@ -2,10 +2,10 @@ name: School administration CI
 on:
   push:
     branches: [main, feature/school-administration]
-    paths: ['src/school/**', 'src/app.module.ts', 'scripts/school-smoke.cjs', 'scripts/start-school-db.sh', '.github/workflows/school.yml']
+    paths: ['src/school/**', 'src/app.module.ts', 'scripts/school-smoke.cjs', 'scripts/start-school-db.cjs', '.github/workflows/school.yml']
   pull_request:
     branches: [main]
-    paths: ['src/school/**', 'src/app.module.ts', 'scripts/school-smoke.cjs', 'scripts/start-school-db.sh', '.github/workflows/school.yml']
+    paths: ['src/school/**', 'src/app.module.ts', 'scripts/school-smoke.cjs', 'scripts/start-school-db.cjs', '.github/workflows/school.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -20,7 +20,7 @@ jobs:
           node-version: '24'
           cache: npm
       - name: Start isolated PostgreSQL with an ephemeral credential
-        run: bash scripts/start-school-db.sh
+        run: node scripts/start-school-db.cjs
       - run: npm ci --ignore-scripts
       - run: node node_modules/eslint/bin/eslint.js src/school --max-warnings 0
       - run: npm test -- --ci --runInBand school.spec.ts
