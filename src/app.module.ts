@@ -19,6 +19,7 @@ import { SecurityModule } from './security/security.module';
 import { StudyClusteringModule } from './study-clustering/study-clustering.module';
 import { CashCutsModule } from './cash-cuts/cash-cuts.module';
 import { PrivacyModule } from './privacy/privacy.module';
+import { SchoolModule } from './school/school.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { PrivacyModule } from './privacy/privacy.module';
     StudyClusteringModule,
     CashCutsModule,
     PrivacyModule,
+    SchoolModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,0 +1,32 @@
+name: School administration CI
+on:
+  push:
+    branches: [main, feature/school-administration]
+    paths: ['src/school/**', 'src/app.module.ts', 'scripts/school-smoke.cjs', 'scripts/start-school-db.cjs', '.github/workflows/school.yml']
+  pull_request:
+    branches: [main]
+    paths: ['src/school/**', 'src/app.module.ts', 'scripts/school-smoke.cjs', 'scripts/start-school-db.cjs', '.github/workflows/school.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Start isolated PostgreSQL with an ephemeral credential
+        run: node scripts/start-school-db.cjs
+      - run: npm ci --ignore-scripts
+      - run: node node_modules/eslint/bin/eslint.js src/school --max-warnings 0
+      - run: npm test -- --ci --runInBand school.spec.ts
+      - run: npm run build
+      - name: Real HTTP, JWT and PostgreSQL tests
+        run: node scripts/school-smoke.cjs
+      - name: Stop fixture database
+        if: always()
+        run: docker rm --force school-postgres
