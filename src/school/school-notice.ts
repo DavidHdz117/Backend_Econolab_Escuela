@@ -5,7 +5,7 @@ export function schoolNotice() {
     ready: true,
     controller: 'Jesús David Saldaña Hernández',
     supportEmail: '20230009@uthh.edu.mx',
-    title: 'Privacidad de Econolab Aula',
+    title: 'Privacidad de Econolab',
     purposes: [
       'Permitir el acceso a una cuenta y administrar su perfil.',
       'Guardar un catálogo genérico y registros de práctica en un espacio separado por cuenta.',
@@ -20,7 +20,7 @@ export function schoolNotice() {
     optionalPurposes:
       'No se integran anuncios, campañas ni SDK de analítica opcional. Las preferencias opcionales comienzan desactivadas.',
     cancellation:
-      'En Mi perfil → Privacidad y mis datos puedes eliminar tu cuenta, sus sesiones, preferencias y espacio de práctica. Confirma con tu contraseña y ELIMINAR MI CUENTA. Si no puedes acceder, escribe al correo de soporte con el asunto Eliminación de cuenta Econolab Aula y tu correo registrado; no envíes contraseñas. Verificaremos tu identidad antes de atender la solicitud. La última cuenta administradora necesita que otra persona asuma esa responsabilidad. La cuenta de acceso se comparte con otros clientes del mismo servidor; eliminarla también cancela ese acceso.',
+      'En Mi perfil → Privacidad y mis datos puedes eliminar tu cuenta, sus sesiones, preferencias y espacio de práctica. Confirma con tu contraseña y ELIMINAR MI CUENTA. Si no puedes acceder, escribe al correo de soporte con el asunto Eliminación de cuenta Econolab y tu correo registrado; no envíes contraseñas. Verificaremos tu identidad antes de atender la solicitud. La última cuenta administradora necesita que otra persona asuma esa responsabilidad. La cuenta de acceso se comparte con otros clientes del mismo servidor; eliminarla también cancela ese acceso.',
     retention:
       'Los datos de acceso y práctica se conservan mientras exista la cuenta o hasta que se reinicien los registros de práctica. La eliminación de cuenta borra el espacio de práctica asociado. No se venden datos. El proveedor de alojamiento Render y la base PostgreSQL procesan la información para prestar el servicio; el dispositivo guarda la sesión en almacenamiento seguro. Las solicitudes de eliminación se aplican al sistema activo. Los respaldos automáticos, si están habilitados, se eliminan según el ciclo de retención configurado con el proveedor.',
   };
@@ -43,7 +43,7 @@ export function schoolPage(deletion = false) {
   return (
     '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' +
     title +
-    '</title><style>body{font:17px/1.65 system-ui;color:#172033;background:#f5f6fa;margin:0}main{max-width:760px;margin:32px auto;background:white;padding:28px;border-radius:20px}h1{color:#b91c1c}a{color:#b91c1c}</style></head><body><main><p>ECONOLAB AULA · PRÁCTICA ADMINISTRATIVA</p><h1>' +
+    '</title><style>body{font:17px/1.65 system-ui;color:#172033;background:#f5f6fa;margin:0}main{max-width:760px;margin:32px auto;background:white;padding:28px;border-radius:20px}h1{color:#b91c1c}a{color:#b91c1c}</style></head><body><main><p>ECONOLAB · PRÁCTICA ADMINISTRATIVA</p><h1>' +
     title +
     '</h1><p>Versión ' +
     n.version +
